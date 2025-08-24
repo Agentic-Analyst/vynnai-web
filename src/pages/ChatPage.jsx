@@ -190,10 +190,10 @@ const ChatPage = () => {
   };
 
   return (
-    <div className="flex h-screen bg-chatbg">
+    <div className="flex h-[calc(100vh-4rem)] bg-chatbg">
       <div className="relative">
-        <Collapsible open={isSidebarOpen} onOpenChange={setIsSidebarOpen} className="bg-white border-r">
-          <CollapsibleContent className="w-64 p-4">
+        <Collapsible open={isSidebarOpen} onOpenChange={setIsSidebarOpen} className="bg-white border-r h-full">
+          <CollapsibleContent className="w-64 p-4 h-full flex flex-col">
             <Button onClick={startNewConversation} className="w-full mb-4">
               <PlusCircle className="mr-2 h-4 w-4" /> New Chat
             </Button>
@@ -207,7 +207,7 @@ const ChatPage = () => {
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             </div>
-            <ScrollArea className="h-[calc(100vh-180px)]">
+            <ScrollArea className="flex-1">
               {filteredConversations.map((conversation, index) => (
                 <Button
                   key={conversation.id}
@@ -231,8 +231,8 @@ const ChatPage = () => {
           </CollapsibleTrigger>
         </Collapsible>
       </div>
-      <div className="flex flex-col flex-grow overflow-hidden">
-        <div className="flex justify-end p-4">
+      <div className="flex flex-col flex-grow h-full">
+        <div className="flex justify-end p-4 bg-white border-b">
           <SettingsModal
             apiKey={apiKey}
             setApiKey={setApiKey}
@@ -240,43 +240,45 @@ const ChatPage = () => {
             setSystemMessage={setSystemMessage}
           />
         </div>
-        <ScrollArea className="flex-grow p-4" ref={scrollAreaRef}>
-          {conversations[currentConversationIndex].messages.map((message, index) => (
-            <div key={index} className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
-              <div className={`inline-block p-3 rounded-lg shadow-md ${
-                message.role === 'user' ? 'bg-usermsg text-white' : 'bg-assistantmsg text-gray-800'
-              }`}>
-                <ReactMarkdown
-                  className="prose max-w-none dark:prose-invert"
-                  components={{
-                    code({node, inline, className, children, ...props}) {
-                      const match = /language-(\w+)/.exec(className || '')
-                      return !inline && match ? (
-                        <SyntaxHighlighter
-                          {...props}
-                          style={vscDarkPlus}
-                          language={match[1]}
-                          PreTag="div"
-                        >
-                          {String(children).replace(/\n$/, '')}
-                        </SyntaxHighlighter>
-                      ) : (
-                        <code {...props} className={className}>
-                          {children}
-                        </code>
-                      )
-                    }
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
-                {isStreaming && index === conversations[currentConversationIndex].messages.length - 1 && message.content === '' && (
-                  <Loader2 className="h-4 w-4 animate-spin inline-block ml-2" />
-                )}
+        <div className="flex-1 overflow-hidden">
+          <ScrollArea className="h-full p-4" ref={scrollAreaRef}>
+            {conversations[currentConversationIndex].messages.map((message, index) => (
+              <div key={index} className={`mb-4 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+                <div className={`inline-block p-3 rounded-lg shadow-md ${
+                  message.role === 'user' ? 'bg-usermsg text-white' : 'bg-assistantmsg text-gray-800'
+                }`}>
+                  <ReactMarkdown
+                    className="prose max-w-none dark:prose-invert"
+                    components={{
+                      code({node, inline, className, children, ...props}) {
+                        const match = /language-(\w+)/.exec(className || '')
+                        return !inline && match ? (
+                          <SyntaxHighlighter
+                            {...props}
+                            style={vscDarkPlus}
+                            language={match[1]}
+                            PreTag="div"
+                          >
+                            {String(children).replace(/\n$/, '')}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code {...props} className={className}>
+                            {children}
+                          </code>
+                        )
+                      }
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                  {isStreaming && index === conversations[currentConversationIndex].messages.length - 1 && message.content === '' && (
+                    <Loader2 className="h-4 w-4 animate-spin inline-block ml-2" />
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </ScrollArea>
+            ))}
+          </ScrollArea>
+        </div>
         <div className="p-4 bg-white border-t shadow-md">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Input

@@ -4,7 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ChatPage from "./pages/ChatPage";
+import DashboardPage from "./pages/DashboardPage";
 import LandingPage from "./pages/LandingPage";
+import Navigation from "./components/Navigation";
 
 const queryClient = new QueryClient();
 
@@ -22,9 +24,11 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <BrowserRouter>
+            {hasApiKey && <Navigation />}
             <Routes>
               <Route path="/" element={hasApiKey ? <Navigate to="/chat" replace /> : <LandingPage />} />
               <Route path="/chat" element={<ChatPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
