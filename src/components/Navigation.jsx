@@ -12,7 +12,7 @@ const Navigation = () => {
       label: "Chat",
       icon: MessageSquare,
       path: "/chat",
-      description: "Start a conversation"
+      description: "AI Chat with Stock Analysis"
     },
     {
       label: "Dashboard",

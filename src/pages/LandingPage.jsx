@@ -11,6 +11,8 @@ const LandingPage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     localStorage.setItem('openai_api_key', apiKey);
+    // Dispatch custom event to notify App component
+    window.dispatchEvent(new CustomEvent('apiKeyUpdated'));
     navigate('/chat');
   };
 

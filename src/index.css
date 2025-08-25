@@ -86,4 +86,29 @@
   .assistantmsg {
     @apply bg-white;
   }
+
+  /* Prevent horizontal overflow in chat messages */
+  .prose {
+    max-width: none !important;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    hyphens: auto;
+  }
+
+  .prose pre {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .prose code {
+    overflow-wrap: break-word;
+    word-break: break-all;
+  }
+
+  /* Ensure long URLs and text break properly */
+  .break-long-words {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+  }
 }

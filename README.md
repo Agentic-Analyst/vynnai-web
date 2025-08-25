@@ -1,67 +1,75 @@
-# Welcome to your GPT Engineer project
+# AI Chat Platform with Stock Analysis
 
-## Project info
+A ChatGPT-style interface enhanced with intelligent stock analysis capabilities. 
 
-**Project**: chatgpt-mimic-verse
+## Features
 
-**URL**: https://run.gptengineer.app/projects/4e4f8fa9-169c-4762-b885-56ac83b4ade3/improve
+- **Classic ChatGPT Interface**: Familiar chat UI with conversation history, search, and settings
+- **Intelligent Query Routing**: Automatically detects stock-related queries and routes to appropriate API
+- **Stock Analysis Integration**: Real-time streaming analysis with progress updates and downloads
+- **Dual API Support**: 
+  - OpenAI GPT API for general chat
+  - Stock Analysis API for financial analysis with SSE streaming
 
-## How can I edit this code?
+## Quick Start
 
-There are several ways of editing your application.
-
-**Use GPT Engineer**
-
-Simply visit the GPT Engineer project at [GPT Engineer](https://gptengineer.app/projects/4e4f8fa9-169c-4762-b885-56ac83b4ade3/improve) and start prompting.
-
-Changes made via gptengineer.app will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in the GPT Engineer UI.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-git clone https://github.com/GPT-Engineer-App/chatgpt-mimic-verse.git
-cd chatgpt-mimic-verse
-npm i
-
-# This will run a dev server with auto reloading and an instant preview.
+### Development Mode
+```bash
+npm install
 npm run dev
 ```
+Access at: http://localhost:8081
 
-**Edit a file directly in GitHub**
+### Full Stack with Docker
+```bash
+docker compose up
+```
+Access at: http://localhost:8080
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Usage
 
-**Use GitHub Codespaces**
+1. **Set OpenAI API Key**: Click the settings icon (⚙️) to configure your API key
+2. **Regular Chat**: Ask any question for normal AI chat
+3. **Stock Analysis**: Try queries like:
+   - "analyze AAPL stock"
+   - "TSLA financial analysis" 
+   - "stock report for Microsoft"
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Architecture
 
-## What technologies are used for this project?
+- **Frontend**: React + Vite with shadcn/ui components
+- **Chat API**: OpenAI GPT-4o-mini for conversations
+- **Stock API**: FastAPI backend with SSE streaming
+- **Integration**: Intelligent query detection and routing
 
-This project is built with .
+## Docker Services
 
-- Vite
-- React
-- shadcn-ui
-- Tailwind CSS
+- `frontend`: React development server
+- `backend`: Stock analysis API runner (fuzanwenn/api-runner:latest)
+- `stock-analyst`: Analysis engine (fuzanwenn/stock-analyst:latest)
 
-## How can I deploy this project?
+See [DOCKER_SETUP.md](./DOCKER_SETUP.md) for detailed Docker configuration.
 
-All GPT Engineer projects can be deployed directly via the GPT Engineer app.
+## Project Structure
 
-Simply visit your project at [GPT Engineer](https://gptengineer.app/projects/4e4f8fa9-169c-4762-b885-56ac83b4ade3/improve) and click on Share -> Publish.
+```
+src/
+├── pages/
+│   ├── ChatPage.jsx     # Main chat interface with stock integration
+│   ├── LandingPage.jsx  # API key setup
+│   └── DashboardPage.jsx
+├── components/
+│   ├── Navigation.jsx   # Top navigation
+│   ├── SettingsModal.jsx
+│   └── ui/             # shadcn/ui components
+└── lib/
+    ├── api.js          # Stock analysis API client
+    └── utils.js        # Utilities
+```
 
-## I want to use a custom domain - is that possible?
+## Technologies
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify or GitHub pages. Visit our docs for more details: [Custom domains](https://docs.gptengineer.app/tips-tricks/custom-domain/)
+- **Frontend**: React 18, Vite, shadcn/ui, Tailwind CSS
+- **Backend**: FastAPI, Server-Sent Events (SSE)
+- **APIs**: OpenAI GPT-4o-mini, Stock Analysis REST API
+- **Deployment**: Docker Compose
