@@ -1,416 +1,202 @@
-// Modern Stock Analysis API Client
-const DEFAULT_API_BASE_URL =
-  typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_RUNNER_URL
-    ? import.meta.env.VITE_RUNNER_URL
-    : 'http://localhost:8080';
+// Central API utilities for the Stock Analysis frontend
 
-export const getApiBaseUrl = () => {
-  // Priority: localStorage override -> Vite env -> default
-  const fromStorage = localStorage.getItem('stock_api_base_url');
-  if (fromStorage) return fromStorage;
-  return DEFAULT_API_BASE_URL;
+const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8080';
+
+// ---- Low-level helpers ----
+const safeJson = async (resp) => {
+  try { return await resp.json(); } catch { return null; }
+};
+const contentDispositionName = (cdHeader) => {
+  if (!cdHeader) return null;
+  const m = cdHeader.match(/filename\*?=(?:UTF-8'')?"?([^";]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
 };
 
-export const setApiBaseUrl = (url) => {
-  localStorage.setItem('stock_api_base_url', url);
-};
+// ---- High-level API surface ----
+export const api = {
+  base: API_BASE_URL,
 
-// API Types
-export const JobStatus = {
-  PENDING: 'pending',
-  RUNNING: 'running',
-  COMPLETED: 'completed',
-  COMPLETED_WITH_WARNINGS: 'completed_with_warnings',
-  FAILED: 'failed',
-  LLM_TIMEOUT: 'llm_timeout'
-};
-
-export const SSEMessageTypes = {
-  CONNECTION: 'connection',
-  STATUS: 'status',
-  LOG: 'log',
-  LATEST: 'latest',
-  FINAL: 'final',
-  ERROR: 'error'
-};
-
-// API Client Class
-export class StockAnalysisAPI {
-  constructor(baseUrl = null) {
-    this.baseUrl = baseUrl || getApiBaseUrl();
-  }
-
-  /**
-   * Start a new stock analysis job
-   */
-  async startAnalysis(request) {
-    try {
-      const response = await fetch(`${this.baseUrl}/run`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ticker: request.ticker.toUpperCase(),
-          company: request.company,
-          query: request.query,
-          pipeline: request.pipeline,
-          model: request.model,
-          years: request.years,
-          max_articles: request.max_articles,
-          min_score: request.min_score,
-          max_filtered: request.max_filtered,
-          min_confidence: request.min_confidence,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || `HTTP ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to start analysis:', error);
-      throw this.formatError(error);
+  async startAnalysis(payload) {
+    const resp = await fetch(`${API_BASE_URL}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => '');
+      throw new Error(`API Error ${resp.status}: ${t}`);
     }
-  }
+    return resp.json();
+  },
 
-  /**
-   * Get basic job status
-   */
   async getJobStatus(jobId) {
-    try {
-      const response = await fetch(`${this.baseUrl}/jobs/${jobId}`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || `Job not found: ${jobId}`);
-      }
+    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}`);
+    if (resp.status === 404) return null;
+    if (!resp.ok) throw new Error('Status check failed');
+    return resp.json();
+  },
 
-      return await response.json();
-    } catch (error) {
-      console.error(`Failed to get job status for ${jobId}:`, error);
-      throw this.formatError(error);
-    }
-  }
+  async getDetailedStatus(jobId) {
+    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/status/detailed`);
+    if (!resp.ok) return null;
+    return resp.json();
+  },
 
   /**
-   * Get detailed job status with file availability and progress metrics
+   * Open the SSE stream for a job.
+   * handlers: {
+   *   onOpen,
+   *   onStatus(payload),
+   *   onLog(payload),
+   *   onLogBatch(payload),
+   *   onCompleted(payload),
+   *   onServerError(payload),
+   *   onErrorEvent()
+   * }
    */
-  async getDetailedJobStatus(jobId) {
-    try {
-      const response = await fetch(`${this.baseUrl}/jobs/${jobId}/status/detailed`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || `Job not found: ${jobId}`);
-      }
+  openLogStream(jobId, handlers = {}) {
+    const es = new EventSource(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/logs/stream`);
 
-      const data = await response.json();
-      console.log('🔍 Raw API response for detailed status:', data);
-      
-      // Handle potential field name variations from backend
-      if (data.files_available) {
-        const files = data.files_available;
-        
-        // Map potential field name variations
-        if (files.searched_articles_count !== undefined && files.searched_articles === undefined) {
-          files.searched_articles = files.searched_articles_count;
-        }
-        
-        if (files.filtered_articles_count !== undefined && files.filtered_articles === undefined) {
-          files.filtered_articles = files.filtered_articles_count;
-        }
-      }
-      
-      return data;
-    } catch (error) {
-      console.error(`Failed to get detailed status for ${jobId}:`, error);
-      throw this.formatError(error);
-    }
-  }
+    es.onopen = () => handlers.onOpen && handlers.onOpen();
 
-  /**
-   * Monitor job progress with Server-Sent Events (SSE)
-   */
-  monitorJob(jobId, callbacks = {}) {
-    const streamUrl = `${this.baseUrl}/jobs/${jobId}/logs/stream`;
-    console.log('🔌 Creating SSE connection to:', streamUrl);
-    
-    const eventSource = new EventSource(streamUrl);
-    
-    eventSource.onopen = (_event) => {
-      console.log('✅ SSE connection opened successfully:', {
-        url: streamUrl,
-        readyState: eventSource.readyState,
-        timestamp: new Date().toISOString()
-      });
+    const safeParse = (ev) => {
+      try { return JSON.parse(ev.data); } catch { return null; }
     };
-    
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('✅ Parsed SSE message:', data);
-        
-        switch (data.type) {
-          case SSEMessageTypes.CONNECTION:
-            callbacks.onConnection?.(data);
-            break;
-          case SSEMessageTypes.STATUS:
-            callbacks.onStatus?.(data);
-            break;
-          case SSEMessageTypes.LOG:
-            callbacks.onLog?.(data);
-            break;
-          case SSEMessageTypes.LATEST:
-            callbacks.onLatest?.(data);
-            break;
-          case SSEMessageTypes.FINAL:
-            callbacks.onFinal?.(data);
-            eventSource.close();
-            break;
-          case SSEMessageTypes.ERROR:
-            callbacks.onError?.(new Event('error'));
-            eventSource.close();
-            break;
-        }
-      } catch (error) {
-        console.error('❌ Error parsing SSE message:', {
-          error: error,
-          rawData: event.data,
-          url: streamUrl
-        });
-      }
+
+    const wrap = (fn) => (ev) => {
+      if (!fn) return;
+      const data = safeParse(ev) || {};
+      fn(data);
     };
-    
-    eventSource.onerror = (error) => {
-      console.error('❌ SSE connection error:', {
-        error: error,
-        readyState: eventSource.readyState,
-        readyStateText: ['CONNECTING', 'OPEN', 'CLOSED'][eventSource.readyState],
-        url: streamUrl,
-        timestamp: new Date().toISOString()
-      });
-      callbacks.onError?.(error);
+
+    es.addEventListener('status', wrap(handlers.onStatus));
+    es.addEventListener('log', wrap(handlers.onLog));
+    es.addEventListener('log_batch', wrap(handlers.onLogBatch));
+    es.addEventListener('completed', wrap(handlers.onCompleted));
+    es.addEventListener('error', wrap(handlers.onServerError));
+
+    // Fallback generic message handler (typed "type" messages)
+    es.onmessage = (event) => {
+      const data = safeParse(event) || {};
+      if (data?.type === 'status')      return handlers.onStatus && handlers.onStatus(data);
+      if (data?.type === 'log')         return handlers.onLog && handlers.onLog(data);
+      if (data?.type === 'log_batch')   return handlers.onLogBatch && handlers.onLogBatch(data);
+      if (data?.type === 'completed')   return handlers.onCompleted && handlers.onCompleted(data);
+      // otherwise ignore
     };
-    
-    return eventSource;
-  }
 
-  /**
-   * Download a specific file type
-   */
-  async downloadFile(jobId, fileType, customFileName = null) {
-    try {
-      const downloadUrl = `${this.baseUrl}/jobs/${jobId}/download/${fileType}`;
-      console.log('🔽 Starting download request:', {
-        jobId,
-        fileType,
-        url: downloadUrl
-      });
-      
-      const response = await fetch(downloadUrl);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || `Failed to download ${fileType}`);
-      }
+    es.onerror = () => handlers.onErrorEvent && handlers.onErrorEvent();
 
-      // Extract filename from response headers
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = customFileName || `${jobId}_${fileType}`;
-      if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^"]+)"?/);
-        if (match) filename = match[1];
-      }
-
-      // Create blob and trigger download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Cleanup
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      console.log('✅ Download triggered successfully');
-      
-    } catch (error) {
-      console.error(`❌ Download failed for ${fileType} (${jobId}):`, error);
-      throw this.formatError(error);
-    }
-  }
-
-  /**
-   * Check API health status
-   */
-  async checkHealth() {
-    try {
-      const response = await fetch(`${this.baseUrl}/health`);
-      
-      if (!response.ok) {
-        throw new Error('Health check failed');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.warn('Health check failed:', error);
-      throw this.formatError(error);
-    }
-  }
-
-  /**
-   * List all jobs
-   */
-  async listJobs() {
-    try {
-      const response = await fetch(`${this.baseUrl}/jobs`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to list jobs');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Failed to list jobs:', error);
-      throw this.formatError(error);
-    }
-  }
-
-  /**
-   * Get complete info.log content
-   */
-  async getInfoLog(jobId) {
-    try {
-      const response = await fetch(`${this.baseUrl}/jobs/${jobId}/info-log`);
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || `Failed to get info.log for ${jobId}`);
-      }
-
-      const data = await response.json();
-      return data.log_content;
-    } catch (error) {
-      console.error(`Failed to get info.log for ${jobId}:`, error);
-      throw this.formatError(error);
-    }
-  }
-
-  /**
-   * Format error messages consistently
-   */
-  formatError(error) {
-    if (error instanceof Error) {
-      return {
-        message: error.message,
-        status: error.status || 0
-      };
-    }
-    
-    if (typeof error === 'string') {
-      return { message: error, status: 0 };
-    }
-    
-    return {
-      message: error.message || 'An unknown error occurred',
-      status: error.status || 0
-    };
-  }
-}
-
-// Default API instance
-export const api = new StockAnalysisAPI();
-
-// Utility functions
-export const parseCommand = (input) => {
-  const trimmed = input.trim().toUpperCase();
-  
-  // Simple ticker only
-  if (/^[A-Z]{1,5}$/.test(trimmed)) {
-    return { ticker: trimmed };
-  }
-  
-  // Ticker with company and/or query
-  const parts = input.trim().split(' ');
-  if (parts.length >= 2) {
-    const ticker = parts[0].toUpperCase();
-    const remaining = parts.slice(1).join(' ');
-    
-    // Try to separate company name from query
-    const companyIndicators = ['Inc', 'Corp', 'Corporation', 'Company', 'Ltd', 'Limited', 'Group', 'Holdings', 'Technologies', 'Systems'];
-    const hasCompanyIndicator = companyIndicators.some(indicator => 
-      remaining.toLowerCase().includes(indicator.toLowerCase())
-    );
-    
-    if (hasCompanyIndicator) {
-      // Find where company name might end
-      let companyEnd = -1;
-      for (const indicator of companyIndicators) {
-        const index = remaining.toLowerCase().indexOf(indicator.toLowerCase());
-        if (index !== -1) {
-          companyEnd = Math.max(companyEnd, index + indicator.length);
-        }
-      }
-      
-      if (companyEnd !== -1) {
-        const company = remaining.slice(0, companyEnd).trim();
-        const query = remaining.slice(companyEnd).trim();
-        
-        return {
-          ticker,
-          company: company || undefined,
-          query: query || undefined
-        };
-      }
-      
-      return { ticker, company: remaining };
-    }
-    
-    // Assume it's a query without explicit company name
-    return { ticker, query: remaining };
-  }
-  
-  return null;
+    return es;
+  },
 };
 
-export const getProgressPercentage = (status, progress) => {
-  if (status === JobStatus.COMPLETED) return 100;
-  if (status === JobStatus.FAILED) return 0;
-  if (status === JobStatus.PENDING) return 5;
-  if (status === JobStatus.LLM_TIMEOUT) return 75;
-  
-  // Map progress messages to percentages
-  const progressMap = [
-    { keywords: ['pipeline', 'initialized'], percentage: 10 },
-    { keywords: ['stage: article scraping', 'scraping'], percentage: 25 },
-    { keywords: ['stage: article filtering', 'filtering'], percentage: 50 },
-    { keywords: ['stage: llm analysis', 'llm analysis', 'analyzing'], percentage: 75 },
-    { keywords: ['generating', 'report', 'screening'], percentage: 90 },
-    { keywords: ['pipeline session completed', 'completed', 'session', 'finished'], percentage: 100 },
-  ];
-  
-  const lowerProgress = progress?.toLowerCase() || '';
-  for (const { keywords, percentage } of progressMap) {
-    if (keywords.some(keyword => lowerProgress.includes(keyword))) {
-      return percentage;
-    }
+// ---- Download mapping utilities ----
+
+/**
+ * Build a definitive list of download entries from "files" booleans/counts.
+ * Returns an object keyed by 'key' with { key, label, url, suggestedName }.
+ */
+export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
+  const base = `${apiBase}/jobs/${encodeURIComponent(jobId)}`;
+  const T = (ticker || '').toUpperCase();
+
+  const entries = [];
+
+  if (files?.info_log) {
+    entries.push({
+      key: 'info_log',
+      label: 'info.log',
+      url: `${base}/files/info.log`,
+      suggestedName: 'info.log'
+    });
   }
-  
-  return status === JobStatus.RUNNING ? 20 : 10;
+  if (files?.screening_report) {
+    entries.push({
+      key: 'screening_report',
+      label: `${T}_screening_report.pdf`,
+      url: `${base}/download/screening-report`,
+      suggestedName: `${T}_screening_report.pdf`
+    });
+  }
+  if (files?.screening_data) {
+    entries.push({
+      key: 'screening_data',
+      label: 'screening_data.json',
+      url: `${base}/files/screening_data.json`,
+      suggestedName: 'screening_data.json'
+    });
+  }
+  if ((files?.searched_articles_count ?? 0) > 0) {
+    entries.push({
+      key: 'searched_articles',
+      label: `${T}_searched_articles.zip`,
+      url: `${base}/download/searched-articles`,
+      suggestedName: `${T}_searched_articles.zip`
+    });
+  }
+  if ((files?.filtered_articles_count ?? 0) > 0) {
+    entries.push({
+      key: 'filtered_articles',
+      label: `${T}_filtered_articles.zip`,
+      url: `${base}/download/filtered-articles`,
+      suggestedName: `${T}_filtered_articles.zip`
+    });
+  }
+  if (files?.financials_annual) {
+    entries.push({
+      key: 'financials_annual',
+      label: `${T}_financials_annual_modeling_latest.json`,
+      url: `${base}/download/financials-annual`,
+      suggestedName: `${T}_financials_annual_modeling_latest.json`
+    });
+  }
+  if (files?.financial_model) {
+    entries.push({
+      key: 'financial_model',
+      label: `${T}_financial_model_comprehensive_latest.xlsx`,
+      url: `${base}/download/financial-model`,
+      suggestedName: `${T}_financial_model_comprehensive_latest.xlsx`
+    });
+  }
+  if (files?.filtered_report) {
+    entries.push({
+      key: 'filtered_report',
+      label: `${T}_filtered_report.md`,
+      url: `${base}/download/filtered-report`,
+      suggestedName: `${T}_filtered_report.md`
+    });
+  }
+  if (files?.price_adjustment_explanation) {
+    entries.push({
+      key: 'price_adjustment_explanation',
+      label: `${T}_price_adjustment_explanation_latest.md`,
+      url: `${base}/download/price-adjustment-explanation`,
+      suggestedName: `${T}_price_adjustment_explanation_latest.md`
+    });
+  }
+
+  // bundle
+  if (entries.length > 0) {
+    entries.push({
+      key: 'all_results',
+      label: `${T}_complete_analysis.zip`,
+      url: `${base}/download/all-results`,
+      suggestedName: `${T}_complete_analysis.zip`
+    });
+  }
+
+  return Object.fromEntries(entries.map(e => [e.key, e]));
 };
 
-export const getErrorMessage = (error) => {
-  if (error?.message) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  return 'An unexpected error occurred';
+/**
+ * Perform a download for a prepared entry and return { blob, filename }.
+ */
+export const downloadByEntry = async (entry) => {
+  const resp = await fetch(entry.url);
+  if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+  const blob = await resp.blob();
+  const cd = resp.headers.get('Content-Disposition');
+  const filename = contentDispositionName(cd) || entry.suggestedName || entry.label || 'download';
+  return { blob, filename };
 };

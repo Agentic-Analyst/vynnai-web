@@ -1,16 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import ReactMarkdown from 'react-markdown'
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import ReactMarkdown from 'react-markdown';
 import SettingsModal from '@/components/SettingsModal';
-import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, Download } from "lucide-react"
+import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useNavigate } from 'react-router-dom';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VariableSizeList as List } from 'react-window';
+import { api, buildDownloadEntries, downloadByEntry } from '@/lib/api';
 
 const ChatPage = () => {
+  // ---------- Local state ----------
   const [analysisParams, setAnalysisParams] = useState(() => {
     const savedParams = localStorage.getItem('analysis_params');
     return savedParams ? JSON.parse(savedParams) : {};
@@ -24,19 +25,15 @@ const ChatPage = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const eventSourceRef = useRef(null);
-  const navigate = useNavigate();
-  const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
 
-
-  // Virtualization
+  // virtualization
   const listRef = useRef(null);
   const listContainerRef = useRef(null);
   const [listHeight, setListHeight] = useState(400);
-  const rowHeightsRef = useRef({});           // index -> measured px
-  const DEFAULT_ROW_HEIGHT = 56;              // initial guess for short rows
+  const rowHeightsRef = useRef({});
+  const DEFAULT_ROW_HEIGHT = 56;
 
-  // Stock analysis state
+  // job state
   const [activeJobId, setActiveJobId] = useState(() => {
     const cached = localStorage.getItem('activeJob');
     if (cached) {
@@ -47,24 +44,22 @@ const ChatPage = () => {
     }
     return null;
   });
-  const [eventSource, setEventSource] = useState(null);
+  const eventSourceRef = useRef(null);
   const [availableFiles, setAvailableFiles] = useState({});
   const [lastJobId, setLastJobId] = useState(null);
-
-  // FastAPI base URL
-  const API_BASE_URL = 'http://localhost:8080';
+  const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
 
   const filteredConversations = conversations.filter(c =>
     c.title && c.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Persist settings & conversations
+  // ---------- Persistence ----------
   useEffect(() => {
     localStorage.setItem('conversations', JSON.stringify(conversations));
     localStorage.setItem('analysis_params', JSON.stringify(analysisParams));
   }, [conversations, analysisParams]);
 
-  // Reconnect SSE if needed
+  // ---------- Reconnect SSE if needed ----------
   useEffect(() => {
     let reconnectInterval = null;
 
@@ -77,15 +72,13 @@ const ChatPage = () => {
       if (eventSourceRef.current) return;
 
       try {
-        const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(parsed.id)}`);
-        if (resp.status === 404) {
+        const status = await api.getJobStatus(parsed.id);
+        if (!status) {
           localStorage.removeItem('activeJob');
           setActiveJobId(null);
           setIsStreaming(false);
           return;
         }
-        if (!resp.ok) throw new Error('Status check failed');
-        const status = await resp.json();
         if (status.status === 'running' || status.status === 'pending') {
           setActiveJobId(parsed.id);
           setIsStreaming(true);
@@ -95,30 +88,28 @@ const ChatPage = () => {
           setActiveJobId(null);
           setIsStreaming(false);
         }
-      } catch (err) {
-        console.warn('Job status check failed:', err);
+      } catch {
+        /* ignore */
       }
     };
 
     checkAndReconnect();
     reconnectInterval = setInterval(checkAndReconnect, 15000);
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') checkAndReconnect();
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const onVis = () => document.visibilityState === 'visible' && checkAndReconnect();
+    document.addEventListener('visibilitychange', onVis);
 
     return () => {
       clearInterval(reconnectInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', onVis);
       if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+        try { eventSourceRef.current.close(); } catch {}
         eventSourceRef.current = null;
       }
     };
   }, []);
 
-  // Auto-size list to container and keep pinned to bottom
+  // ---------- Virtual list sizing ----------
   useEffect(() => {
     if (!listContainerRef.current) return;
     const el = listContainerRef.current;
@@ -135,7 +126,6 @@ const ChatPage = () => {
     return () => ro.disconnect();
   }, [currentConversationIndex, conversations]);
 
-  // Scroll to bottom when new messages arrive
   useEffect(() => {
     const msgs = conversations[currentConversationIndex]?.messages ?? [];
     if (listRef.current && msgs.length > 0) {
@@ -143,14 +133,14 @@ const ChatPage = () => {
     }
   }, [conversations, currentConversationIndex]);
 
-  // ---- Helpers (parsing, API, SSE) ----
-  const parseAnalysisRequest = (input) => {
-    const text = input.trim();
+  // ---------- Helpers ----------
+  const parseAnalysisRequest = (textIn) => {
+    const text = textIn.trim();
     const tickerCommaPattern = text.match(/\b([A-Z]{1,5})\s*,\s*(.+)/i);
     if (tickerCommaPattern) {
       const ticker = tickerCommaPattern[1].toUpperCase();
       const company = tickerCommaPattern[2].trim();
-      const req = { ticker, query: input, company };
+      const req = { ticker, query: textIn, company };
       Object.keys(analysisParams).forEach(k => {
         const v = analysisParams[k];
         if (v !== undefined && v !== null && v !== '') req[k] = v;
@@ -161,7 +151,7 @@ const ChatPage = () => {
     const tickerMatch = upperText.match(/\b([A-Z]{1,5})\b/);
     if (tickerMatch) {
       const ticker = tickerMatch[1];
-      const req = { ticker, query: input };
+      const req = { ticker, query: textIn };
       Object.keys(analysisParams).forEach(k => {
         const v = analysisParams[k];
         if (v !== undefined && v !== null && v !== '') req[k] = v;
@@ -171,136 +161,96 @@ const ChatPage = () => {
     return null;
   };
 
-  const startStockAnalysis = async (analysisRequest) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(analysisRequest)
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error ${response.status}: ${errorText}`);
-      }
-      const result = await response.json();
-      setActiveJobId(result.job_id);
-      localStorage.setItem('activeJob', JSON.stringify({ id: result.job_id, started: Date.now(), status: 'running' }));
-      startJobMonitoring(result.job_id);
-      return result;
-    } catch (error) {
-      console.error('❌ Failed to start analysis:', error);
-      throw error;
-    }
-  };
-
-  // batched log bubble
-  const addAssistantLogBatch = (lines) => {
-    if (!Array.isArray(lines) || lines.length === 0) return;
-    const nowIso = new Date().toISOString();
-    setConversations(prev => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      const msgs = convo.messages;
-      const last = msgs[msgs.length - 1];
-
-      if (last && last.role === 'assistant' && last.kind === 'logbatch') {
-        last.lines = (last.lines || []).concat(lines);
-        last.content = last.lines.join('\n');
-        last.timestamp = nowIso;
-        return updated;
-      }
-
-      msgs.push({
-        role: 'assistant',
-        kind: 'logbatch',
-        lines: [...lines],
-        content: lines.join('\n'),
-        timestamp: nowIso
-      });
-      return updated;
-    });
-  };
-
-  // Call this after you add/merge a message to remeasure and keep pinned to bottom
+  // virtual list nudge
   const bumpListToBottom = () => {
     requestAnimationFrame(() => {
       const count = conversations[currentConversationIndex]?.messages?.length || 0;
       if (count > 0) {
-        // re-measure last row and scroll to it
         listRef.current?.resetAfterIndex(count - 1, true);
         listRef.current?.scrollToItem(count - 1, 'end');
       }
     });
   };
 
+  // log batch bubble
+  const addAssistantLogBatch = (lines) => {
+    if (!Array.isArray(lines) || lines.length === 0) return;
+    const nowIso = new Date().toISOString();
+    setConversations(prev => {
+      const updated = [...prev];
+      const convo = updated[currentConversationIndex];
+      const msgs = [...(convo.messages || [])];
+      const last = msgs[msgs.length - 1];
+
+      if (last && last.role === 'assistant' && last.kind === 'logbatch') {
+        msgs[msgs.length - 1] = {
+          ...last,
+          lines: (last.lines || []).concat(lines),
+          content: ((last.lines || []).concat(lines)).join('\n'),
+          timestamp: nowIso
+        };
+      } else {
+        msgs.push({
+          role: 'assistant',
+          kind: 'logbatch',
+          lines: [...lines],
+          content: lines.join('\n'),
+          timestamp: nowIso
+        });
+      }
+      updated[currentConversationIndex] = { ...convo, messages: msgs };
+      return updated;
+    });
+    bumpListToBottom();
+  };
+
   const addAssistantMessage = (content) => {
     const COALESCE_MS = 3000;
-
-    setConversations((prev) => {
+    setConversations(prev => {
       const updated = [...prev];
       const convo = updated[currentConversationIndex] ?? { id: Date.now(), title: 'New Analysis', messages: [] };
-
-      // IMPORTANT: copy messages array so we don't mutate in place
       const msgs = [...(convo.messages || [])];
 
       const nowIso = new Date().toISOString();
       const last = msgs[msgs.length - 1];
-
       const canCoalesce =
-        last &&
-        last.role === 'assistant' &&
-        !last.kind &&                          // don't merge into special bubbles (logbatch/downloads/etc.)
-        last.timestamp &&
+        last && last.role === 'assistant' && !last.kind && last.timestamp &&
         (Date.now() - new Date(last.timestamp).getTime() <= COALESCE_MS);
 
       if (canCoalesce) {
-        // replace the last message immutably
-        msgs[msgs.length - 1] = {
-          ...last,
-          content: `${last.content}\n${content}`,
-          timestamp: nowIso,
-        };
-        // Debug:
-        // console.log('[addAssistantMessage] merged into last assistant bubble');
+        msgs[msgs.length - 1] = { ...last, content: `${last.content}\n${content}`, timestamp: nowIso };
       } else {
         msgs.push({ role: 'assistant', content, timestamp: nowIso });
-        // console.log('[addAssistantMessage] pushed new assistant bubble');
       }
-
-      // write back a NEW convo object so React sees a change
       updated[currentConversationIndex] = { ...convo, messages: msgs };
       return updated;
     });
-
-    // Nudge virtualization after state is applied
     bumpListToBottom();
   };
 
-
   const addDownloadsMessage = (jobId, entriesObject) => {
-    if (downloadsPostedRef.current.has(jobId)) return;  // guard against dupes
+    if (downloadsPostedRef.current.has(jobId)) return;
     downloadsPostedRef.current.add(jobId);
 
     const nowIso = new Date().toISOString();
     const entries = Object.values(entriesObject);
-
     setConversations(prev => {
       const updated = [...prev];
-      updated[currentConversationIndex].messages.push({
+      const convo = updated[currentConversationIndex];
+      const msgs = [...(convo.messages || [])];
+      msgs.push({
         role: 'assistant',
         kind: 'downloads',
         jobId,
-        entries,                   // array of { key, label, url, suggestedName }
+        entries,
         content: `Downloads available (${entries.length})`,
         timestamp: nowIso
       });
+      updated[currentConversationIndex] = { ...convo, messages: msgs };
       return updated;
     });
-
-    const count = conversations[currentConversationIndex]?.messages?.length || 0;
-    if (count > 0) listRef.current?.resetAfterIndex(count - 1, true);
+    bumpListToBottom();
   };
-
 
   const generateTitle = (userMessage) => {
     const text = userMessage.toLowerCase();
@@ -327,6 +277,7 @@ const ChatPage = () => {
 
   const toggleSidebar = () => setIsSidebarOpen(v => !v);
 
+  // ---------- Submits ----------
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || isStreaming) return;
@@ -345,7 +296,8 @@ const ChatPage = () => {
     try {
       const analysisRequest = parseAnalysisRequest(currentInput);
       if (!analysisRequest) {
-        addAssistantMessage(`I'm your **Stock Analysis Assistant**! 📊 
+        addAssistantMessage(
+`I'm your **Stock Analysis Assistant**! 📊 
 
 **How to get started:**
 • Enter a stock ticker symbol (e.g., **AAPL**, **NVDA**, **TSLA**)
@@ -356,21 +308,27 @@ const ChatPage = () => {
 
 ⚙️ **Configure Analysis Parameters:** use **Settings** ⚙️ above.
 
-🎯 **Current Settings:** ${Object.keys(analysisParams).length > 0 ? `${Object.keys(analysisParams).length} parameters configured` : 'Using API defaults'}`);
+🎯 **Current Settings:** ${Object.keys(analysisParams).length > 0 ? `${Object.keys(analysisParams).length} parameters configured` : 'Using API defaults'}`
+        );
         setIsStreaming(false);
         return;
       }
 
-      addAssistantMessage(`🚀 **Starting Analysis** for **${analysisRequest.ticker}**${analysisRequest.company ? ` (${analysisRequest.company})` : ''}
+      addAssistantMessage(
+`🚀 **Starting Analysis** for **${analysisRequest.ticker}**${analysisRequest.company ? ` (${analysisRequest.company})` : ''}
 
 📋 **Request Parameters:**
 \`\`\`json
 ${JSON.stringify(analysisRequest, null, 2)}
 \`\`\`
 
-⚡ **Connecting to analysis service...**`);
+⚡ **Connecting to analysis service...**`
+      );
 
-      const result = await startStockAnalysis(analysisRequest);
+      const result = await api.startAnalysis(analysisRequest);
+      setActiveJobId(result.job_id);
+      localStorage.setItem('activeJob', JSON.stringify({ id: result.job_id, started: Date.now(), status: 'running' }));
+      startJobMonitoring(result.job_id);
 
       if (conversations[currentConversationIndex].title === 'New Analysis') {
         const newTitle = generateTitle(currentInput);
@@ -381,13 +339,12 @@ ${JSON.stringify(analysisRequest, null, 2)}
         });
       }
     } catch (error) {
-      console.error('❌ Analysis failed:', error);
-      addAssistantMessage(`❌ **Analysis Failed:** ${error.message}\n\nPlease try again or check if the ticker symbol is valid.`);
+      addAssistantMessage(`❌ **Analysis Failed:** ${error.message}`);
       setIsStreaming(false);
     }
   };
 
-  // ---- SSE monitor (unchanged except minor logs) ----
+  // ---------- SSE monitoring ----------
   const startJobMonitoring = (jobId, opts = {}) => {
     if (eventSourceRef.current) {
       try { eventSourceRef.current.close(); } catch {}
@@ -416,7 +373,6 @@ ${JSON.stringify(analysisRequest, null, 2)}
       const lines = batch; batch = []; batchBytes = 0;
       if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
       addAssistantLogBatch(lines);
-      // ensure virtualization re-measures appended content
       const count = conversations[currentConversationIndex]?.messages?.length || 0;
       if (count > 0) listRef.current?.resetAfterIndex(count - 1);
     };
@@ -428,7 +384,21 @@ ${JSON.stringify(analysisRequest, null, 2)}
       setActiveJobId(null);
       setLastJobId(jobId);
       localStorage.removeItem('activeJob');
-      checkAvailableFiles(jobId);
+      (async () => {
+        try {
+          const detail = await api.getDetailedStatus(jobId);
+          if (detail) {
+            const files = detail.files_available || detail.files || {};
+            const ticker = (detail.ticker || '').toUpperCase();
+            const mapped = buildDownloadEntries(api.base, jobId, ticker, files);
+            if (Object.keys(mapped).length > 0) {
+              setAvailableFiles(mapped);
+              setLastJobId(jobId);
+              addDownloadsMessage(jobId, mapped);
+            }
+          }
+        } catch {/* ignore */}
+      })();
       if (eventSourceRef.current) { try { eventSourceRef.current.close(); } catch {} eventSourceRef.current = null; }
     };
 
@@ -441,257 +411,86 @@ ${JSON.stringify(analysisRequest, null, 2)}
       if (eventSourceRef.current) { try { eventSourceRef.current.close(); } catch {} eventSourceRef.current = null; }
     };
 
-    const es = new EventSource(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/logs/stream`);
-    eventSourceRef.current = es;
-    setEventSource(es);
-
-    es.onopen = () => {
-      addAssistantMessage(opts.fromReconnect
-        ? `🔄 **Reconnected to analysis job ${jobId}**`
-        : `🔗 **Connected to analysis job ${jobId}**`);
-    };
-
-    const onStatus = (ev) => {
-      try {
-        const { message, progress } = JSON.parse(ev.data);
+    // open EventSource via API helper
+    const es = api.openLogStream(jobId, {
+      onOpen: () => {
+        addAssistantMessage(opts.fromReconnect
+          ? `🔄 **Reconnected to analysis job ${jobId}**`
+          : `🔗 **Connected to analysis job ${jobId}**`);
+      },
+      onStatus: (payload) => {
+        const { message, progress } = payload || {};
         queue(progress ? `**Status Update:** ${progress}` : `**Status:** ${message}`, 'status');
-      } catch {}
-    };
-
-    const onLog = (ev) => {
-      try {
-        const { message } = JSON.parse(ev.data);
+      },
+      onLog: (payload) => {
+        const { message } = payload || {};
         if (Array.isArray(message)) message.forEach(m => queue(m, 'log'));
         else if (message) {
-          // safety: detect completion text even if event type is wrong
           if (/ENTIRE PROGRAM.*COMPLETED/i.test(message)) {
             finalizeDone('completed', 'Analysis completed'); return;
           }
           queue(message, 'log');
         }
-      } catch {}
-    };
-
-    const onLogBatch = (ev) => {
-      try {
-        const { message } = JSON.parse(ev.data);
+      },
+      onLogBatch: (payload) => {
+        const { message } = payload || {};
         if (Array.isArray(message)) message.forEach(m => queue(m, 'log'));
-      } catch {}
-    };
-
-    const onCompletion = (ev) => {
-      try {
-        console.debug('✅ typed completion:', ev.type, ev.data);
-        const { message, status } = JSON.parse(ev.data);
-        finalizeDone(status || 'completed', message);
-      } catch { finalizeDone('completed'); }
-    };
-
-    const onServerError = (ev) => {
-      try {
-        const { message, detail, status } = JSON.parse(ev.data);
-        finalizeFail(status || 'failed', detail || message);
-      } catch { finalizeFail('failed', 'Server signaled error'); }
-    };
-
-    es.addEventListener('status', onStatus);
-    es.addEventListener('log', onLog);
-    es.addEventListener('log_batch', onLogBatch);
-    es.addEventListener('completed', onCompletion);
-    es.addEventListener('error', onServerError);
-
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data?.type === 'completed' || /ENTIRE PROGRAM.*COMPLETED/i.test(data?.message || '')) {
-          return onCompletion({ data: event.data });
+      },
+      onCompleted: (payload) => {
+        try {
+          const { message, status } = payload || {};
+          finalizeDone(status || 'completed', message);
+        } catch {
+          finalizeDone('completed');
         }
-        if (data?.type === 'status')     return onStatus({ data: event.data });
-        if (data?.type === 'log_batch')  return onLogBatch({ data: event.data });
-        if (data?.type === 'log')        return onLog({ data: event.data });
-        if (data?.message) queue(data.message, data.type || 'log');
-      } catch {
-        queue(event.data || String(event));
+      },
+      onServerError: (payload) => {
+        const { message, detail, status } = payload || {};
+        finalizeFail(status || 'failed', detail || message || 'Server signaled error');
+      },
+      onErrorEvent: () => {
+        if (es.readyState === 2) { // CLOSED
+          flush();
+          addAssistantMessage('ℹ️ **Stream closed by server. Finalizing…**');
+          setIsStreaming(false);
+          setActiveJobId(null);
+          setLastJobId(jobId);
+          localStorage.removeItem('activeJob');
+          try { es.close(); } catch {}
+          eventSourceRef.current = null;
+        } else {
+          flush();
+          addAssistantMessage('⚠️ **Connection issue:** Monitoring may resume automatically.');
+        }
       }
-    };
+    });
 
-    es.onerror = (err) => {
-      if (es.readyState === 2) { // CLOSED
-        flush();
-        addAssistantMessage('ℹ️ **Stream closed by server. Finalizing…**');
-        setIsStreaming(false);
-        setActiveJobId(null);
-        setLastJobId(jobId);
-        localStorage.removeItem('activeJob');
-        try { es.close(); } catch {}
-        eventSourceRef.current = null;
-      } else {
-        flush();
-        addAssistantMessage('⚠️ **Connection issue:** Monitoring may resume automatically.');
-      }
-    };
+    eventSourceRef.current = es;
   };
 
-  // Build a definitive list of downloadables from API "files" booleans/counts
-  const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
-    const base = `${apiBase}/jobs/${encodeURIComponent(jobId)}`;
-    const T = (ticker || '').toUpperCase();
-
-    const entries = [];
-
-    if (files?.info_log) {
-      entries.push({
-        key: 'info_log',
-        label: 'info.log',
-        url: `${base}/files/info.log`,
-        suggestedName: 'info.log'
-      });
-    }
-    if (files?.screening_report) {
-      entries.push({
-        key: 'screening_report',
-        label: `${T}_screening_report.pdf`,
-        url: `${base}/download/screening-report`,
-        suggestedName: `${T}_screening_report.pdf`
-      });
-    }
-    if (files?.screening_data) {
-      entries.push({
-        key: 'screening_data',
-        label: 'screening_data.json',
-        url: `${base}/files/screening_data.json`,
-        suggestedName: 'screening_data.json'
-      });
-    }
-    if ((files?.searched_articles_count ?? 0) > 0) {
-      entries.push({
-        key: 'searched_articles',
-        label: `${T}_searched_articles.zip`,
-        url: `${base}/download/searched-articles`,
-        suggestedName: `${T}_searched_articles.zip`
-      });
-    }
-    if ((files?.filtered_articles_count ?? 0) > 0) {
-      entries.push({
-        key: 'filtered_articles',
-        label: `${T}_filtered_articles.zip`,
-        url: `${base}/download/filtered-articles`,
-        suggestedName: `${T}_filtered_articles.zip`
-      });
-    }
-    if (files?.financials_annual) {
-      entries.push({
-        key: 'financials_annual',
-        label: `${T}_financials_annual_modeling_latest.json`,
-        url: `${base}/download/financials-annual`,
-        suggestedName: `${T}_financials_annual_modeling_latest.json`
-      });
-    }
-    if (files?.financial_model) {
-      entries.push({
-        key: 'financial_model',
-        label: `${T}_financial_model_comprehensive_latest.xlsx`,
-        url: `${base}/download/financial-model`,
-        suggestedName: `${T}_financial_model_comprehensive_latest.xlsx`
-      });
-    }
-    if (files?.filtered_report) {
-      entries.push({
-        key: 'filtered_report',
-        label: `${T}_filtered_report.md`,
-        url: `${base}/download/filtered-report`,
-        suggestedName: `${T}_filtered_report.md`
-      });
-    }
-    if (files?.price_adjustment_explanation) {
-      entries.push({
-        key: 'price_adjustment_explanation',
-        label: `${T}_price_adjustment_explanation_latest.md`,
-        url: `${base}/download/price-adjustment-explanation`,
-        suggestedName: `${T}_price_adjustment_explanation_latest.md`
-      });
-    }
-
-    // Convenience bundle if anything exists
-    if (entries.length > 0) {
-      entries.push({
-        key: 'all_results',
-        label: `${T}_complete_analysis.zip`,
-        url: `${base}/download/all-results`,
-        suggestedName: `${T}_complete_analysis.zip`
-      });
-    }
-
-    // Return as an object keyed by "key" for easy rendering
-    return Object.fromEntries(entries.map(e => [e.key, e]));
-  };
-
-
-  // fetch & post a downloads message
-  const checkAvailableFiles = async (jobId) => {
-    try {
-      console.log('🔎 Checking available files for job:', jobId);
-      const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/status/detailed`);
-      console.log('📡 status/detailed resp:', resp.status);
-      if (!resp.ok) return;
-
-      const status = await resp.json();
-      console.log('📦 detailed payload:', status);
-      const files = status.files_available || status.files || {};
-      const ticker = (status.ticker || '').toUpperCase();
-
-      const mapped = buildDownloadEntries(API_BASE_URL, jobId, ticker, files);
-      console.log('📂 mapped downloads:', mapped);
-
-      if (Object.keys(mapped).length > 0) {
-        setAvailableFiles(mapped);  // keep for convenience if you want
-        setLastJobId(jobId);
-        addDownloadsMessage(jobId, mapped);   // << post a chat bubble (once)
-      }
-    } catch (error) {
-      console.error('❌ Error checking file availability:', error);
-    }
-  };
-
-
-  // Accept either an entry object or a string key into availableFiles
+  // ---------- Downloads ----------
   const handleDownload = async (entryOrKey) => {
     try {
-      const entry = typeof entryOrKey === 'string'
-        ? availableFiles[entryOrKey]
-        : entryOrKey;
+      const entry = typeof entryOrKey === 'string' ? availableFiles[entryOrKey] : entryOrKey;
       if (!entry?.url) throw new Error('Unknown download type');
 
-      const response = await fetch(entry.url);
-      if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-
-      const blob = await response.blob();
-      const cd = response.headers.get('Content-Disposition');
-      let filename = entry.suggestedName || entry.label;
-      if (cd) {
-        const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)/);
-        if (m) filename = decodeURIComponent(m[1]);
-      }
-
-      const url = window.URL.createObjectURL(blob);
+      const { blob, filename } = await downloadByEntry(entry);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      a.download = filename || entry.suggestedName || entry.label;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      addAssistantMessage(`✅ **Downloaded:** ${filename}`);
+      addAssistantMessage(`✅ **Downloaded:** ${a.download}`);
     } catch (error) {
-      console.error('❌ Download failed:', error);
       addAssistantMessage(`❌ **Download Failed:** ${error.message}`);
     }
   };
 
-
-  // ----------- Virtualized Row (auto-measured) -----------
-  // Row renderer
+  // ---------- Row renderer ----------
   const Row = ({ index, style, data }) => {
     const message = data[index];
     const isUser = message.role === 'user';
@@ -789,10 +588,9 @@ ${JSON.stringify(analysisRequest, null, 2)}
     );
   };
 
-
   const getItemSize = (index) => rowHeightsRef.current[index] || DEFAULT_ROW_HEIGHT;
 
-  // ---------------- UI ----------------
+  // ---------- UI ----------
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-chatbg overflow-x-hidden">
       <div className="relative">
