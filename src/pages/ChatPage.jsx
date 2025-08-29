@@ -285,7 +285,10 @@ const ChatPage = () => {
     const userMessage = { role: 'user', content: input };
     setConversations(prev => {
       const updated = [...prev];
-      updated[currentConversationIndex].messages.push(userMessage);
+      const convo = updated[currentConversationIndex] ?? { id: Date.now(), title: 'New Analysis', messages: [] };
+      const msgs = [...(convo.messages || [])];   // clone messages
+      msgs.push(userMessage);                     // pure append
+      updated[currentConversationIndex] = { ...convo, messages: msgs }; // replace convo
       return updated;
     });
 
