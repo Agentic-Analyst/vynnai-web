@@ -469,24 +469,36 @@ ${JSON.stringify(analysisRequest, null, 2)}
   };
 
   // ---------- Downloads ----------
+  const saveBlob = async (blob, suggestedName) => {
+    const supportsFS = 'showSaveFilePicker' in window;
+    if (supportsFS) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: 'Excel Workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = suggestedName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+    }
+  };
+
   const handleDownload = async (entryOrKey) => {
     try {
       const entry = typeof entryOrKey === 'string' ? availableFiles[entryOrKey] : entryOrKey;
       if (!entry?.url) throw new Error('Unknown download type');
-
       const { blob, filename } = await downloadByEntry(entry);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename || entry.suggestedName || entry.label;
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      addAssistantMessage(`✅ **Downloaded:** ${a.download}`);
-    } catch (error) {
-      addAssistantMessage(`❌ **Download Failed:** ${error.message}`);
+      await saveBlob(blob, filename || entry.suggestedName || entry.label || 'download.xlsx');
+      addAssistantMessage(`✅ **Downloaded:** ${filename}`);
+    } catch (e) {
+      addAssistantMessage(`❌ **Download Failed:** ${e.message}`);
     }
   };
 

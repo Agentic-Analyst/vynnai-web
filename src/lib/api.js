@@ -180,9 +180,9 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
   if (entries.length > 0) {
     entries.push({
       key: 'all_results',
-      label: `${T}_complete_analysis.zip`,
+      label: `${T}_complete_analysis.tar`,
       url: `${base}/download/all-results`,
-      suggestedName: `${T}_complete_analysis.zip`
+      suggestedName: `${T}_complete_analysis.tar`
     });
   }
 
