@@ -11,6 +11,17 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { VariableSizeList as List } from 'react-window';
 import { api, buildDownloadEntries, downloadByEntry } from '@/lib/api';
 
+// NEW
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+
+
 const ChatPage = () => {
   // ---------- Local state ----------
   const [analysisParams, setAnalysisParams] = useState(() => {
@@ -50,9 +61,79 @@ const ChatPage = () => {
   const [lastJobId, setLastJobId] = useState(null);
   const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
 
-  const filteredConversations = conversations.filter(c =>
-    c.title && c.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    // NEW — rename state
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  // REPLACE your filteredConversations with index mapping (so search works without breaking selection)
+  const filteredConversations = conversations
+    .map((c, idx) => ({ ...c, _index: idx }))
+    .filter((c) => (c.title || "").toLowerCase().includes(searchQuery.toLowerCase()));
+
+  // NEW — select by id (safe when filtering)
+  const switchConversationById = (id) => {
+    const idx = conversations.findIndex((c) => c.id === id);
+    if (idx !== -1) switchConversation(idx);
+  };
+
+  // NEW — rename helpers
+  const startRename = (id, currentTitle) => {
+    setRenamingId(id);
+    setRenameValue(currentTitle || "");
+  };
+
+  const commitRename = () => {
+    const val = (renameValue || "").trim();
+    setConversations((prev) =>
+      prev.map((c) => (c.id === renamingId ? { ...c, title: val || "Untitled chat" } : c))
+    );
+    setRenamingId(null);
+    setRenameValue("");
+  };
+
+  const cancelRename = () => {
+    setRenamingId(null);
+    setRenameValue("");
+  };
+
+  // NEW — delete chat
+  const deleteConversation = (id) => {
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === id);
+      if (idx === -1) return prev;
+
+      // if deleting the active convo, stop streaming + close SSE
+      if (idx === currentConversationIndex) {
+        setIsStreaming(false);
+        setActiveJobId(null);
+        localStorage.removeItem("activeJob");
+        if (eventSourceRef.current) {
+          try { eventSourceRef.current.close(); } catch {}
+          eventSourceRef.current = null;
+        }
+      }
+
+      const next = prev.filter((c) => c.id !== id);
+      // choose a sane next index
+      let nextIndex = currentConversationIndex;
+      if (idx < currentConversationIndex) nextIndex = Math.max(0, currentConversationIndex - 1);
+      if (idx === currentConversationIndex) nextIndex = Math.max(0, idx - 1);
+
+      // fallback: always keep at least one chat
+      const finalList = next.length ? next : [{ id: Date.now(), title: "New Analysis", messages: [] }];
+      setCurrentConversationIndex(Math.min(nextIndex, finalList.length - 1));
+      return finalList;
+    });
+    // if we were renaming this one, reset rename state
+    if (renamingId === id) cancelRename();
+  };
+
+  const confirmDelete = (id) => {
+    if (window.confirm("Delete this chat? This cannot be undone.")) {
+      deleteConversation(id);
+    }
+  };
+
 
   // ---------- Persistence ----------
   useEffect(() => {
@@ -659,18 +740,68 @@ ${JSON.stringify(analysisRequest, null, 2)}
               />
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             </div>
-            <div className="flex-1 overflow-auto">
-              {filteredConversations.map((conversation, index) => (
-                <Button
-                  key={conversation.id}
-                  onClick={() => switchConversation(index)}
-                  variant={currentConversationIndex === index ? "secondary" : "ghost"}
-                  className="w-full justify-start mb-2 truncate"
-                >
-                  {conversation.title}
-                </Button>
-              ))}
+            <div className="flex-1 overflow-auto space-y-1">
+              {filteredConversations.map((c) => {
+                const idx = c._index;
+                const isActive = currentConversationIndex === idx;
+                const isEditing = renamingId === c.id;
+
+                return (
+                  <div key={c.id} className="group relative">
+                    {isEditing ? (
+                      <form
+                        onSubmit={(e) => { e.preventDefault(); commitRename(); }}
+                        className="flex items-center gap-2 mb-1"
+                      >
+                        <Input
+                          autoFocus
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onBlur={commitRename}
+                          onKeyDown={(e) => { if (e.key === "Escape") cancelRename(); }}
+                          className="h-9"
+                        />
+                        <Button type="submit" size="sm">Save</Button>
+                      </form>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={() => switchConversationById(c.id)}
+                          variant={isActive ? "secondary" : "ghost"}
+                          className="w-full justify-start pr-9 truncate"
+                        >
+                          <span className="truncate">{c.title}</span>
+                        </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100"
+                              aria-label="Chat actions"
+                            >
+                              <MoreVertical className="h-4 w-4 text-slate-500" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" side="right" className="w-44">
+                            <DropdownMenuItem onClick={() => startRename(c.id, c.title)} className="flex items-center gap-2">
+                              <Pencil className="h-4 w-4" /> Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => confirmDelete(c.id)}
+                              className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+
           </CollapsibleContent>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" size="icon" className={`absolute top-4 ${isSidebarOpen ? 'left-64' : 'left-0'} transition-all duration-300`}>
