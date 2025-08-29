@@ -1,3 +1,4 @@
+// ChatPage.jsx (refined UI)
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -505,7 +506,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
     }
   };
 
-  // ---------- Row renderer ----------
+  // ---------- Row renderer (UI refresh) ----------
   const Row = ({ index, style, data }) => {
     const message = data[index];
     const isUser = message.role === 'user';
@@ -522,81 +523,115 @@ ${JSON.stringify(analysisRequest, null, 2)}
       }
     }, [index, message]);
 
-    return (
-      <div style={style} className={`px-4 py-1 ${isUser ? 'text-right' : 'text-left'}`}>
-        <div
-          ref={measureRef}
-          className={`inline-block p-3 rounded-lg shadow-md max-w-[92%] break-words ${
-            isUser ? 'bg-usermsg text-white' : 'bg-assistantmsg text-gray-800'
-          }`}
-        >
-          {isDownloads ? (
-            <div className="m-1 p-3 rounded-lg bg-blue-50 border border-blue-200">
-              <h3 className="text-base font-semibold text-blue-800 mb-2">📥 Available Downloads</h3>
-              <div className="flex flex-wrap gap-2">
-                {Array.isArray(message.entries) && message.entries.map((entry) => (
-                  <button
-                    key={entry.key}
-                    onClick={() => handleDownload(entry)}
-                    className="text-xs inline-flex items-center px-3 py-2 rounded-md border border-blue-200 bg-white hover:bg-blue-50"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-3 w-3 mr-1" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" />
-                    </svg>
-                    {entry.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : isLogBatch ? (
-            <pre className="whitespace-pre-wrap break-words font-mono text-[12.5px] leading-5">
-              {message.lines ? message.lines.join('\n') : message.content}
-            </pre>
-          ) : (
-            <ReactMarkdown
-              className="prose max-w-none dark:prose-invert break-words overflow-x-auto"
-              components={{
-                code({ node, inline, className, children, ...props }) {
-                  const match = /language-(\w+)/.exec(className || '');
-                  return !inline && match ? (
-                    <div className="overflow-x-auto">
-                      <SyntaxHighlighter
-                        {...props}
-                        style={vscDarkPlus}
-                        language={match[1]}
-                        PreTag="div"
-                        customStyle={{ margin: 0, maxWidth: '100%' }}
-                      >
-                        {String(children).replace(/\n$/, '')}
-                      </SyntaxHighlighter>
-                    </div>
-                  ) : (
-                    <code {...props} className={`${className} break-all`}>
-                      {children}
-                    </code>
-                  );
-                },
-                pre({ node, children, ...props }) {
-                  return (
-                    <pre {...props} className="whitespace-pre-wrap break-words overflow-x-auto">
-                      {children}
-                    </pre>
-                  );
-                },
-                p({ node, children, ...props }) {
-                  return <p {...props} className="break-words">{children}</p>;
-                },
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
-          )}
+    const Bubble = ({ children }) => (
+      <div
+        ref={measureRef}
+        className={[
+          "inline-block max-w-[920px] break-words",
+          "rounded-2xl shadow-sm ring-1",
+          isUser
+            ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-blue-700/30"
+            : "bg-white text-slate-800 ring-slate-200"
+        ].join(" ")}
+      >
+        <div className={isUser ? "p-3 sm:p-4" : "p-4 sm:p-5"}>{children}</div>
+      </div>
+    );
 
-          {isStreaming && index === data.length - 1 && !isUser && (
-            <div className="mt-2 flex items-center">
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span className="text-sm opacity-75">Analyzing...</span>
+    return (
+      <div style={style} className="px-4 py-2">
+        <div className={isUser ? "flex justify-end" : "flex justify-start"}>
+          {isDownloads ? (
+            <Bubble>
+              <div className="m-0">
+                <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                  Available Downloads
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Array.isArray(message.entries) && message.entries.map((entry) => (
+                    <button
+                      key={entry.key}
+                      onClick={() => handleDownload(entry)}
+                      className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+                    >
+                      <span className="flex items-center gap-2">
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" />
+                        </svg>
+                        {entry.label}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-slate-400" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Bubble>
+          ) : isLogBatch ? (
+            <div
+              ref={measureRef}
+              className="inline-block max-w-[1000px] rounded-2xl overflow-hidden bg-white ring-1 ring-slate-200 shadow-sm"
+            >
+              <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-200 bg-slate-50">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[11px] tracking-wide font-semibold text-slate-700 uppercase">Live Analysis Log</span>
+              </div>
+              <pre className="whitespace-pre-wrap break-words font-mono text-[12.75px] leading-5 text-slate-700 p-4 bg-slate-50/50">
+                {message.lines ? message.lines.join('\n') : message.content}
+              </pre>
+              {isStreaming && index === data.length - 1 && (
+                <div className="border-t border-slate-200 px-4 py-2 bg-slate-50/60 flex items-center gap-2 text-slate-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-xs">Analyzing…</span>
+                </div>
+              )}
             </div>
+          ) : (
+            <Bubble>
+              <ReactMarkdown
+                className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
+                      ${isUser ? 'prose-invert' : 'prose-slate'}`}
+                components={{
+                  code({ node, inline, className, children, ...props }) {
+                    const match = /language-(\w+)/.exec(className || '');
+                    return !inline && match ? (
+                      <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
+                        <SyntaxHighlighter
+                          {...props}
+                          style={vscDarkPlus}
+                          language={match[1]}
+                          PreTag="div"
+                          customStyle={{ margin: 0, maxWidth: '100%' }}
+                        >
+                          {String(children).replace(/\n$/, '')}
+                        </SyntaxHighlighter>
+                      </div>
+                    ) : (
+                      <code
+                        {...props}
+                        className={`${className} break-all px-1.5 py-0.5 rounded ${
+                          isUser ? 'bg-white/20 text-white' : 'bg-slate-100'
+                        }`}
+                      >
+                        {children}
+                      </code>
+                    );
+                  },
+                  pre({ node, children, ...props }) {
+                    return (
+                      <pre {...props} className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3">
+                        {children}
+                      </pre>
+                    );
+                  },
+                  p({ node, children, ...props }) {
+                    return <p {...props} className="break-words">{children}</p>;
+                  },
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </Bubble>
           )}
         </div>
       </div>
@@ -607,7 +642,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
   // ---------- UI ----------
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-chatbg overflow-x-hidden">
+    <div className="flex h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-50 to-slate-100 overflow-x-hidden">
       <div className="relative">
         <Collapsible open={isSidebarOpen} onOpenChange={setIsSidebarOpen} className="bg-white border-r h-full">
           <CollapsibleContent className="w-64 p-4 h-full flex flex-col">
@@ -646,10 +681,15 @@ ${JSON.stringify(analysisRequest, null, 2)}
       </div>
 
       <div className="flex flex-col flex-grow h-full">
-        <div className="flex justify-between items-center p-4 bg-white border-b">
-          <div className="text-lg font-semibold text-gray-700">
+        <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
+          <div className="text-lg font-semibold text-gray-700 flex items-center gap-3">
             Stock Analysis Assistant
-            {activeJobId && <span className="ml-2 text-sm text-blue-600">• Job {activeJobId.slice(0, 8)} running...</span>}
+            {activeJobId && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Job {activeJobId.slice(0, 8)} running
+              </span>
+            )}
           </div>
           <SettingsModal analysisParams={analysisParams} setAnalysisParams={setAnalysisParams} />
         </div>
@@ -670,17 +710,17 @@ ${JSON.stringify(analysisRequest, null, 2)}
           </div>
         </div>
 
-        <div className="p-4 bg-white border-t shadow-md">
+        <div className="p-4 bg-white border-t shadow-sm">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Enter ticker or 'TICKER, company' for analysis (e.g., AAPL, Apple Inc. or NVDA, NVIDIA Corporation)"
-              className="flex-grow"
+              className="flex-grow rounded-xl"
               disabled={isStreaming}
             />
-            <Button type="submit" disabled={isStreaming} className="bg-usermsg hover:bg-blue-600">
+            <Button type="submit" disabled={isStreaming} className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
               {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Analyze'}
             </Button>
           </form>
