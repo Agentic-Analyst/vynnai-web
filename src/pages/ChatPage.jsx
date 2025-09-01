@@ -217,12 +217,13 @@ const ChatPage = () => {
 
   // ---------- Helpers ----------
   const parseAnalysisRequest = (textIn) => {
+    const email = localStorage.getItem('auth_email');
     const text = textIn.trim();
     const tickerCommaPattern = text.match(/\b([A-Z]{1,5})\s*,\s*(.+)/i);
     if (tickerCommaPattern) {
       const ticker = tickerCommaPattern[1].toUpperCase();
       const company = tickerCommaPattern[2].trim();
-      const req = { ticker, query: textIn, company };
+      const req = { ticker, query: textIn, company, email };
       Object.keys(analysisParams).forEach(k => {
         const v = analysisParams[k];
         if (v !== undefined && v !== null && v !== '') req[k] = v;
@@ -233,7 +234,7 @@ const ChatPage = () => {
     const tickerMatch = upperText.match(/\b([A-Z]{1,5})\b/);
     if (tickerMatch) {
       const ticker = tickerMatch[1];
-      const req = { ticker, query: textIn };
+      const req = { ticker, query: textIn, email };
       Object.keys(analysisParams).forEach(k => {
         const v = analysisParams[k];
         if (v !== undefined && v !== null && v !== '') req[k] = v;

@@ -75,11 +75,13 @@ export const authApi = {
     localStorage.setItem('auth_token', token);       // <-- match Shell
     localStorage.setItem('auth_email', email || '');
     // IMPORTANT: 'storage' doesn't fire in the same tab; emit your custom event
+    sessionStorage.setItem('client_session', '1');
     window.dispatchEvent(new Event('authUpdated'));
   },
   clearSession() {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_email');
+    sessionStorage.removeItem('client_session');
     window.dispatchEvent(new Event('authUpdated'));
   },
   getSession() {
@@ -99,6 +101,7 @@ export const authApi = {
     }
     localStorage.removeItem("auth_token"); // legacy
     localStorage.removeItem("user_email");
+    sessionStorage.removeItem('client_session');
     window.dispatchEvent(new CustomEvent("authUpdated"));
   },
 };

@@ -9,32 +9,63 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import OAuthCallback from "./pages/OAuthCallback.jsx";
 import Navigation from "./components/Navigation.jsx";
+import { API_BASE_URL } from "@/lib/authApi";
 
 const queryClient = new QueryClient();
+const AUTH_CHECK_URL = `${API_BASE_URL}/auth/session/me`; // 200 if cookie valid, 401 otherwise
+const FRONT_SESSION_KEY = 'client_session'; // ephemeral per-tab flag
 
 const Shell = ({ children }) => {
-  // Hide top nav on the callback screen
   const loc = useLocation();
   const hideNav = loc.pathname.startsWith('/auth/callback');
 
   const [isAuthed, setIsAuthed] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  const checkAuth = React.useCallback(async () => {
+    try {
+      const res = await fetch(AUTH_CHECK_URL, { method: 'GET', credentials: 'include' });
+      const hasFront = sessionStorage.getItem(FRONT_SESSION_KEY) === '1';
+      // require BOTH: server cookie valid AND this tab's front flag
+      setIsAuthed(res.ok && hasFront);
+      if (!res.ok) {
+        // optional: clean any stale token your app might have used earlier
+        localStorage.removeItem('auth_token');
+      }
+    } catch {
+      setIsAuthed(false);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const checkAuth = () => {
-      const tok = localStorage.getItem('auth_token');
-      setIsAuthed(!!tok);
-    };
     checkAuth();
+
     const onStorage = (e) => { if (e.key === 'auth_token') checkAuth(); };
+    const onFocus = () => checkAuth();
+    const onVisibility = () => { if (document.visibilityState === 'visible') checkAuth(); };
+
+    // NEW: re-check immediately when login flow finishes in the same tab
     const onAuthUpdated = () => checkAuth();
 
+    const poll = setInterval(checkAuth, 5 * 60 * 1000);
+
     window.addEventListener('storage', onStorage);
-    window.addEventListener('authUpdated', onAuthUpdated);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('authUpdated', onAuthUpdated);   // <-- add
+
     return () => {
+      clearInterval(poll);
       window.removeEventListener('storage', onStorage);
-      window.removeEventListener('authUpdated', onAuthUpdated);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('authUpdated', onAuthUpdated); // <-- add
     };
-  }, []);
+  }, [checkAuth]);
+
+  if (checking && !isAuthed && !hideNav) return null;
 
   return (
     <>

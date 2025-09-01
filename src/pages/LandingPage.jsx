@@ -25,6 +25,7 @@ const LandingPage = () => {
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const navigate = useNavigate();
+  const FRONT_SESSION_KEY = 'client_session';
 
   const startCooldown = (sec = 30) => {
     setCooldown(sec);
@@ -61,6 +62,8 @@ const LandingPage = () => {
       const res = await authApi.verifyCode(email.trim(), code.trim());
       console.log(res);
       authApi.persistSession({ token: res.token, email: res.email });
+      sessionStorage.setItem(FRONT_SESSION_KEY, '1');       // <-- add this
+      window.dispatchEvent(new Event('authUpdated'));       // <-- notify other tabs (optional)
       navigate('/chat', { replace: true });
     } catch (err) {
       setError(err.message || 'Verification failed.');
