@@ -170,9 +170,9 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
   if (files?.price_adjustment_explanation) {
     entries.push({
       key: 'price_adjustment_explanation',
-      label: `${T}_price_adjustment_explanation_latest.md`,
+      label: `${T}_price_adjustment_explanation_latest.pdf`,
       url: `${base}/download/price-adjustment-explanation`,
-      suggestedName: `${T}_price_adjustment_explanation_latest.md`
+      suggestedName: `${T}_price_adjustment_explanation_latest.pdf`
     });
   }
 

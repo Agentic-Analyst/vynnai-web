@@ -475,6 +475,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
           const detail = await api.getDetailedStatus(jobId);
           if (detail) {
             const files = detail.files_available || detail.files || {};
+            console.log(files)
             const ticker = (detail.ticker || '').toUpperCase();
             const mapped = buildDownloadEntries(api.base, jobId, ticker, files);
             if (Object.keys(mapped).length > 0) {
