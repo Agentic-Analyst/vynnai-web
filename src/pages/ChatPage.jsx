@@ -218,30 +218,12 @@ const ChatPage = () => {
   // ---------- Helpers ----------
   const parseAnalysisRequest = (textIn) => {
     const email = localStorage.getItem('auth_email');
-    const text = textIn.trim();
-    const tickerCommaPattern = text.match(/\b([A-Z]{1,5})\s*,\s*(.+)/i);
-    if (tickerCommaPattern) {
-      const ticker = tickerCommaPattern[1].toUpperCase();
-      const company = tickerCommaPattern[2].trim();
-      const req = { ticker, query: textIn, company, email };
-      Object.keys(analysisParams).forEach(k => {
-        const v = analysisParams[k];
-        if (v !== undefined && v !== null && v !== '') req[k] = v;
-      });
-      return req;
-    }
-    const upperText = text.toUpperCase();
-    const tickerMatch = upperText.match(/\b([A-Z]{1,5})\b/);
-    if (tickerMatch) {
-      const ticker = tickerMatch[1];
-      const req = { ticker, query: textIn, email };
-      Object.keys(analysisParams).forEach(k => {
-        const v = analysisParams[k];
-        if (v !== undefined && v !== null && v !== '') req[k] = v;
-      });
-      return req;
-    }
-    return null;
+    const req = { request: textIn, email };
+    Object.keys(analysisParams).forEach(k => {
+      const v = analysisParams[k];
+      if (v !== undefined && v !== null && v !== '') req[k] = v;
+    });
+    return req;
   };
 
   // virtual list nudge
@@ -401,7 +383,7 @@ const ChatPage = () => {
       }
 
       addAssistantMessage(
-`🚀 **Starting Analysis** for **${analysisRequest.ticker}**${analysisRequest.company ? ` (${analysisRequest.company})` : ''}
+`🚀 **I will help you** with **${analysisRequest.request}**}
 
 📋 **Request Parameters:**
 \`\`\`json

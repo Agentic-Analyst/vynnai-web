@@ -17,7 +17,7 @@ export const api = {
   base: API_BASE_URL,
 
   async startAnalysis(payload) {
-    const resp = await fetch(`${API_BASE_URL}/run`, {
+    const resp = await fetch(`${API_BASE_URL}/nl/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
