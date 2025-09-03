@@ -383,7 +383,7 @@ const ChatPage = () => {
       }
 
       addAssistantMessage(
-`🚀 **I will help you** with **${analysisRequest.request}**}
+`🚀 **I will help you** with **${analysisRequest.request}**
 
 📋 **Request Parameters:**
 \`\`\`json
