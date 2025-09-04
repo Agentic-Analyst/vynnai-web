@@ -51,7 +51,7 @@ const SettingsModal = ({
         <DialogHeader>
           <DialogTitle>Analysis Settings</DialogTitle>
           <DialogDescription>
-            Configure optional parameters for stock analysis. Leave empty to use API defaults.
+            Configure optional parameters for Vynn AI stock analysis. Leave empty to use API defaults.
           </DialogDescription>
         </DialogHeader>
         

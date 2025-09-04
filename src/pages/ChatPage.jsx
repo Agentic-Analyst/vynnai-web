@@ -23,6 +23,19 @@ import {
 
 
 const ChatPage = () => {
+  // ---------- Helper functions ----------
+  const createWelcomeMessage = () => ({
+    role: 'assistant',
+    content: `**Welcome to Vynn AI. Your AI Financial Analyst!** 📊
+
+**Getting Started:**
+- Tell me which company or stock you’d like to analyze (e.g., "I want to analyze Google").
+- Configure your analysis parameters using ⚙️ above.
+
+Need financial statements, models, news, or insights? I’ve got you covered — just ask!`,
+    timestamp: new Date().toISOString()
+  });
+
   // ---------- Local state ----------
   const [analysisParams, setAnalysisParams] = useState(() => {
     const savedParams = localStorage.getItem('analysis_params');
@@ -30,7 +43,12 @@ const ChatPage = () => {
   });
   const [conversations, setConversations] = useState(() => {
     const savedConversations = localStorage.getItem('conversations');
-    return savedConversations ? JSON.parse(savedConversations) : [{ id: Date.now(), title: 'New Analysis', messages: [] }];
+    if (savedConversations) {
+      return JSON.parse(savedConversations);
+    } else {
+      // First time user - create conversation with welcome message
+      return [{ id: Date.now(), title: 'New Analysis', messages: [createWelcomeMessage()] }];
+    }
   });
   const [currentConversationIndex, setCurrentConversationIndex] = useState(0);
   const [input, setInput] = useState('');
@@ -120,7 +138,7 @@ const ChatPage = () => {
       if (idx === currentConversationIndex) nextIndex = Math.max(0, idx - 1);
 
       // fallback: always keep at least one chat
-      const finalList = next.length ? next : [{ id: Date.now(), title: "New Analysis", messages: [] }];
+      const finalList = next.length ? next : [{ id: Date.now(), title: "New Analysis", messages: [createWelcomeMessage()] }];
       setCurrentConversationIndex(Math.min(nextIndex, finalList.length - 1));
       return finalList;
     });
@@ -328,7 +346,12 @@ const ChatPage = () => {
   };
 
   const startNewConversation = () => {
-    setConversations([...conversations, { id: Date.now(), title: 'New Analysis', messages: [] }]);
+    const newConversation = { 
+      id: Date.now(), 
+      title: 'New Analysis', 
+      messages: [createWelcomeMessage()] 
+    };
+    setConversations([...conversations, newConversation]);
     setCurrentConversationIndex(conversations.length);
     rowHeightsRef.current = {};
     listRef.current?.resetAfterIndex(0, true);
@@ -361,26 +384,8 @@ const ChatPage = () => {
     setInput('');
     setIsStreaming(true);
 
-    try {
+    try {      
       const analysisRequest = parseAnalysisRequest(currentInput);
-      if (!analysisRequest) {
-        addAssistantMessage(
-`I'm your **Stock Analysis Assistant**! 📊 
-
-**How to get started:**
-• Enter a stock ticker symbol (e.g., **AAPL**, **NVDA**, **TSLA**)
-• For best results, use format: **TICKER, Company Name**
-  - Example: **AAPL, Apple Inc.**
-  - Example: **NVDA, NVIDIA Corporation**
-  - Example: **TSLA, Tesla Inc.**
-
-⚙️ **Configure Analysis Parameters:** use **Settings** ⚙️ above.
-
-🎯 **Current Settings:** ${Object.keys(analysisParams).length > 0 ? `${Object.keys(analysisParams).length} parameters configured` : 'Using API defaults'}`
-        );
-        setIsStreaming(false);
-        return;
-      }
 
       addAssistantMessage(
 `🚀 **I will help you** with **${analysisRequest.request}**
@@ -798,7 +803,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
       <div className="flex flex-col flex-grow h-full">
         <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
           <div className="text-lg font-semibold text-gray-700 flex items-center gap-3">
-            Stock Analysis Assistant
+            AI Stock Analyst
             {activeJobId && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -831,7 +836,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Enter ticker or 'TICKER, company' for analysis (e.g., AAPL, Apple Inc. or NVDA, NVIDIA Corporation)"
+              placeholder="Ask me to analyze any stock or company."
               className="flex-grow rounded-xl"
               disabled={isStreaming}
             />
