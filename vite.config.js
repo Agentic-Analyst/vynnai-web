@@ -7,7 +7,14 @@ import { resolve } from "path";
 export default defineConfig({
   server: {
     port: 5173,
-    host: true // Allow external connections
+    host: true, // Allow external connections
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      }
+    }
   },
   plugins: [react()],
   resolve: {

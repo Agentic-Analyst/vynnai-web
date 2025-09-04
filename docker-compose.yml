@@ -12,6 +12,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - BACKEND_IMAGE=fuzanwenn/stock-analyst:latest  # ✅ Use Docker Hub backend
       - DATA_VOLUME=stockdata
+      - CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:3000,https://localhost:5173,https://localhost:3000
+      - CORS_ALLOW_CREDENTIALS=true
     volumes:
       - stockdata:/data
       - /var/run/docker.sock:/var/run/docker.sock

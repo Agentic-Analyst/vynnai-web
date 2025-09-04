@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from 'react-markdown';
 import SettingsModal from '@/components/SettingsModal';
-import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -82,6 +82,9 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     // NEW — rename state
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
+
+  // Log panel collapse state - track collapsed state by message index
+  const [collapsedLogs, setCollapsedLogs] = useState(new Set());
 
   // REPLACE your filteredConversations with index mapping (so search works without breaking selection)
   const filteredConversations = conversations
@@ -365,6 +368,43 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
   const toggleSidebar = () => setIsSidebarOpen(v => !v);
 
+  // Toggle log panel collapse state
+  const toggleLogCollapse = (messageIndex) => {
+    setCollapsedLogs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(messageIndex)) {
+        newSet.delete(messageIndex);
+      } else {
+        newSet.add(messageIndex);
+      }
+      return newSet;
+    });
+    
+    // Force immediate re-measurement and virtual list reset
+    setTimeout(() => {
+      // Clear the height cache for this specific row
+      delete rowHeightsRef.current[messageIndex];
+      
+      // Reset the virtual list starting from this index
+      if (listRef.current) {
+        listRef.current.resetAfterIndex(messageIndex, true);
+        
+        // Force a re-render by scrolling slightly and back
+        const currentScroll = listRef.current._outerRef?.scrollTop || 0;
+        requestAnimationFrame(() => {
+          if (listRef.current?._outerRef) {
+            listRef.current._outerRef.scrollTop = currentScroll + 1;
+            requestAnimationFrame(() => {
+              if (listRef.current?._outerRef) {
+                listRef.current._outerRef.scrollTop = currentScroll;
+              }
+            });
+          }
+        });
+      }
+    }, 0);
+  };
+
   // ---------- Submits ----------
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -586,12 +626,28 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
     useEffect(() => {
       if (!measureRef.current) return;
-      const h = Math.ceil(measureRef.current.getBoundingClientRect().height) + 16;
-      if (rowHeightsRef.current[index] !== h) {
-        rowHeightsRef.current[index] = h;
-        listRef.current?.resetAfterIndex(index);
-      }
-    }, [index, message]);
+      
+      const measureHeight = () => {
+        const rect = measureRef.current.getBoundingClientRect();
+        const h = Math.ceil(rect.height) + 16;
+        
+        if (rowHeightsRef.current[index] !== h && h > 0) {
+          rowHeightsRef.current[index] = h;
+          // Use requestAnimationFrame for smooth updates
+          requestAnimationFrame(() => {
+            listRef.current?.resetAfterIndex(index);
+          });
+        }
+      };
+      
+      // Measure immediately
+      measureHeight();
+      
+      // Also measure after a small delay to catch any async rendering
+      const timer = setTimeout(measureHeight, 50);
+      
+      return () => clearTimeout(timer);
+    }, [index, message, collapsedLogs.has(index)]);
 
     const Bubble = ({ children }) => (
       <div
@@ -642,17 +698,44 @@ ${JSON.stringify(analysisRequest, null, 2)}
               ref={measureRef}
               className="inline-block max-w-[1000px] rounded-2xl overflow-hidden bg-white ring-1 ring-slate-200 shadow-sm"
             >
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-200 bg-slate-50">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[11px] tracking-wide font-semibold text-slate-700 uppercase">Live Analysis Log</span>
+              <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] tracking-wide font-semibold text-slate-700 uppercase">Live Analysis Log</span>
+                </div>
+                <button
+                  onClick={() => toggleLogCollapse(index)}
+                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+                  aria-label={collapsedLogs.has(index) ? "Expand log" : "Collapse log"}
+                >
+                  <span className="text-[10px] font-medium text-slate-600">
+                    {collapsedLogs.has(index) ? 'Show' : 'Hide'}
+                  </span>
+                  {collapsedLogs.has(index) ? (
+                    <ChevronDown className="h-3 w-3 text-slate-500" />
+                  ) : (
+                    <ChevronUp className="h-3 w-3 text-slate-500" />
+                  )}
+                </button>
               </div>
-              <pre className="whitespace-pre-wrap break-words font-mono text-[12.75px] leading-5 text-slate-700 p-4 bg-slate-50/50">
-                {message.lines ? message.lines.join('\n') : message.content}
-              </pre>
-              {isStreaming && index === data.length - 1 && (
-                <div className="border-t border-slate-200 px-4 py-2 bg-slate-50/60 flex items-center gap-2 text-slate-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-xs">Analyzing…</span>
+              {!collapsedLogs.has(index) && (
+                <>
+                  <pre className="whitespace-pre-wrap break-words font-mono text-[12.75px] leading-5 text-slate-700 p-4 bg-slate-50/50">
+                    {message.lines ? message.lines.join('\n') : message.content}
+                  </pre>
+                  {isStreaming && index === data.length - 1 && (
+                    <div className="border-t border-slate-200 px-4 py-2 bg-slate-50/60 flex items-center gap-2 text-slate-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-xs">Analyzing…</span>
+                    </div>
+                  )}
+                </>
+              )}
+              {collapsedLogs.has(index) && (
+                <div className="px-4 py-3 bg-slate-50/50">
+                  <span className="text-xs text-slate-500 italic">
+                    Log collapsed ({message.lines ? message.lines.length : '1'} lines)
+                  </span>
                 </div>
               )}
             </div>

@@ -1,6 +1,6 @@
 // Central API utilities for the Stock Analysis frontend
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = '/api';
 
 // ---- Low-level helpers ----
 const safeJson = async (resp) => {
