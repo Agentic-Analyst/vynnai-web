@@ -9,7 +9,7 @@ import DashboardPage from "./pages/DashboardPage.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import OAuthCallback from "./pages/OAuthCallback.jsx";
 import Navigation from "./components/Navigation.jsx";
-import { API_BASE_URL } from "@/lib/authApi";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 const queryClient = new QueryClient();
 const AUTH_CHECK_URL = `${API_BASE_URL}/auth/session/me`; // 200 if cookie valid, 401 otherwise

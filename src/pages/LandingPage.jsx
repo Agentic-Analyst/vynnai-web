@@ -79,7 +79,7 @@ const LandingPage = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-6 sm:p-8 text-white shadow-2xl">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Welcome to Financial AI Agent</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold">Welcome to Vynn AI Agent</h1>
           <p className="text-sm opacity-80 mt-1">Log in to continue</p>
         </div>
 

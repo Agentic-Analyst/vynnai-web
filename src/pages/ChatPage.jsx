@@ -10,6 +10,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VariableSizeList as List } from 'react-window';
 import { api, buildDownloadEntries, downloadByEntry } from '@/lib/api';
+import { userStorage } from '@/lib/userStorage.js';
 
 // NEW
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
@@ -38,13 +39,12 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
   // ---------- Local state ----------
   const [analysisParams, setAnalysisParams] = useState(() => {
-    const savedParams = localStorage.getItem('analysis_params');
-    return savedParams ? JSON.parse(savedParams) : {};
+    return userStorage.getJSON('analysis_params', {});
   });
   const [conversations, setConversations] = useState(() => {
-    const savedConversations = localStorage.getItem('conversations');
+    const savedConversations = userStorage.getJSON('conversations');
     if (savedConversations) {
-      return JSON.parse(savedConversations);
+      return savedConversations;
     } else {
       // First time user - create conversation with welcome message
       return [{ id: Date.now(), title: 'New Analysis', messages: [createWelcomeMessage()] }];
@@ -65,10 +65,10 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
   // job state
   const [activeJobId, setActiveJobId] = useState(() => {
-    const cached = localStorage.getItem('activeJob');
+    const cached = userStorage.getJSON('activeJob');
     if (cached) {
       try {
-        const { id, status } = JSON.parse(cached);
+        const { id, status } = cached;
         return status === 'running' ? id : null;
       } catch { return null; }
     }
@@ -127,7 +127,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       if (idx === currentConversationIndex) {
         setIsStreaming(false);
         setActiveJobId(null);
-        localStorage.removeItem("activeJob");
+        userStorage.removeItem("activeJob");
         if (eventSourceRef.current) {
           try { eventSourceRef.current.close(); } catch {}
           eventSourceRef.current = null;
@@ -158,36 +158,98 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
   // ---------- Persistence ----------
   useEffect(() => {
-    localStorage.setItem('conversations', JSON.stringify(conversations));
-    localStorage.setItem('analysis_params', JSON.stringify(analysisParams));
+    if (userStorage.hasUser()) {
+      userStorage.setJSON('conversations', conversations);
+      userStorage.setJSON('analysis_params', analysisParams);
+    }
   }, [conversations, analysisParams]);
+
+  // ---------- Handle user changes ----------
+  useEffect(() => {
+    const currentUser = userStorage.getCurrentUser();
+    const storedUser = localStorage.getItem('lastActiveUser');
+    
+    if (currentUser && currentUser !== storedUser) {
+      // User has changed - reset state to new user's data
+      localStorage.setItem('lastActiveUser', currentUser);
+      
+      // Load new user's data
+      const newConversations = userStorage.getJSON('conversations');
+      const newAnalysisParams = userStorage.getJSON('analysis_params', {});
+      const newActiveJob = userStorage.getJSON('activeJob');
+      
+      if (newConversations) {
+        setConversations(newConversations);
+      } else {
+        // First time user - create conversation with welcome message
+        setConversations([{ id: Date.now(), title: 'New Analysis', messages: [createWelcomeMessage()] }]);
+      }
+      
+      setAnalysisParams(newAnalysisParams);
+      setCurrentConversationIndex(0);
+      
+      // Handle active job
+      if (newActiveJob && newActiveJob.status === 'running') {
+        setActiveJobId(newActiveJob.id);
+      } else {
+        setActiveJobId(null);
+      }
+      
+      // Reset other state
+      setCollapsedLogs(new Set());
+      rowHeightsRef.current = {};
+      if (listRef.current) {
+        listRef.current.resetAfterIndex(0, true);
+      }
+    } else if (!currentUser && storedUser) {
+      // User logged out - clear the stored user
+      localStorage.removeItem('lastActiveUser');
+    }
+  }, []);
+
+  // ---------- Listen for auth changes ----------
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const currentUser = userStorage.getCurrentUser();
+      const storedUser = localStorage.getItem('lastActiveUser');
+      
+      if (!currentUser) {
+        // User logged out
+        localStorage.removeItem('lastActiveUser');
+      } else if (currentUser !== storedUser) {
+        // User changed - force page reload to reset all state properly
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('authUpdated', handleAuthChange);
+    return () => window.removeEventListener('authUpdated', handleAuthChange);
+  }, []);
 
   // ---------- Reconnect SSE if needed ----------
   useEffect(() => {
     let reconnectInterval = null;
 
     const checkAndReconnect = async () => {
-      const cached = localStorage.getItem('activeJob');
+      const cached = userStorage.getJSON('activeJob');
       if (!cached) return;
-      let parsed;
-      try { parsed = JSON.parse(cached); } catch { return; }
-      if (!parsed.id || parsed.status !== 'running') return;
+      if (!cached.id || cached.status !== 'running') return;
       if (eventSourceRef.current) return;
 
       try {
-        const status = await api.getJobStatus(parsed.id);
+        const status = await api.getJobStatus(cached.id);
         if (!status) {
-          localStorage.removeItem('activeJob');
+          userStorage.removeItem('activeJob');
           setActiveJobId(null);
           setIsStreaming(false);
           return;
         }
         if (status.status === 'running' || status.status === 'pending') {
-          setActiveJobId(parsed.id);
+          setActiveJobId(cached.id);
           setIsStreaming(true);
-          startJobMonitoring(parsed.id, { fromReconnect: true });
+          startJobMonitoring(cached.id, { fromReconnect: true });
         } else {
-          localStorage.removeItem('activeJob');
+          userStorage.removeItem('activeJob');
           setActiveJobId(null);
           setIsStreaming(false);
         }
@@ -440,7 +502,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
       const result = await api.startAnalysis(analysisRequest);
       setActiveJobId(result.job_id);
-      localStorage.setItem('activeJob', JSON.stringify({ id: result.job_id, started: Date.now(), status: 'running' }));
+      userStorage.setJSON('activeJob', { id: result.job_id, started: Date.now(), status: 'running' });
       startJobMonitoring(result.job_id);
 
       if (conversations[currentConversationIndex].title === 'New Analysis') {
@@ -496,7 +558,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
       setIsStreaming(false);
       setActiveJobId(null);
       setLastJobId(jobId);
-      localStorage.removeItem('activeJob');
+      userStorage.removeItem('activeJob');
       (async () => {
         try {
           const detail = await api.getDetailedStatus(jobId);
@@ -521,7 +583,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
       addAssistantMessage(`❌ **Analysis Failed** (status: ${status})${detail ? `\n\n${detail}` : ''}`);
       setIsStreaming(false);
       setActiveJobId(null);
-      localStorage.removeItem('activeJob');
+      userStorage.removeItem('activeJob');
       if (eventSourceRef.current) { try { eventSourceRef.current.close(); } catch {} eventSourceRef.current = null; }
     };
 
@@ -569,7 +631,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
           setIsStreaming(false);
           setActiveJobId(null);
           setLastJobId(jobId);
-          localStorage.removeItem('activeJob');
+          userStorage.removeItem('activeJob');
           try { es.close(); } catch {}
           eventSourceRef.current = null;
         } else {

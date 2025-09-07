@@ -26,6 +26,32 @@ docker compose up
 ```
 Access at: http://localhost:8080
 
+### Upload to Hetzner
+docker buildx create --name vynnx --use 2>/dev/null || docker buildx use vynnx
+docker buildx inspect --bootstrap
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t fuzanwenn/gpt-web:latest \
+  --build-arg VITE_RUNNER_URL=https://api.vynnai.com \
+  --push .
+
+ssh root@5.223.46.44
+cd /root/vynn
+
+### Pull new images and restart only what changed
+docker compose pull web && docker compose up -d web      # frontend update
+docker compose pull api && docker compose up -d api      # backend update
+
+### Sanity checks
+docker compose ps
+docker compose logs -f caddy
+curl -I https://app.vynnai.com
+curl -I https://api.vynnai.com/health
+
+docker compose logs -f api
+docker compose logs -f web
+docker compose logs -f caddy
+
+
 ## Usage
 
 1. **Set OpenAI API Key**: Click the settings icon (⚙️) to configure your API key

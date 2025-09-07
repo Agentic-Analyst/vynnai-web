@@ -1,6 +1,5 @@
 // Central API utilities for the Stock Analysis frontend
-
-const API_BASE_URL = '/api';
+import { API_BASE_URL } from "@/lib/apiBase";
 
 // ---- Low-level helpers ----
 const safeJson = async (resp) => {
@@ -20,7 +19,8 @@ export const api = {
     const resp = await fetch(`${API_BASE_URL}/nl/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      credentials: 'include',
     });
     if (!resp.ok) {
       const t = await resp.text().catch(() => '');
@@ -30,14 +30,18 @@ export const api = {
   },
 
   async getJobStatus(jobId) {
-    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}`);
+    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}`, {
+      credentials: 'include',
+    });
     if (resp.status === 404) return null;
     if (!resp.ok) throw new Error('Status check failed');
     return resp.json();
   },
 
   async getDetailedStatus(jobId) {
-    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/status/detailed`);
+    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/status/detailed`, {
+      credentials: 'include',
+    });
     if (!resp.ok) return null;
     return resp.json();
   },
@@ -55,9 +59,11 @@ export const api = {
    * }
    */
   openLogStream(jobId, handlers = {}) {
-    const es = new EventSource(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/logs/stream`);
-
-    es.onopen = () => handlers.onOpen && handlers.onOpen();
+    const es = new EventSource(
+     `${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/logs/stream`,
+     { withCredentials: true } // REQUIRED for cookie-auth over subdomain
+   );
+   es.onopen = () => handlers.onOpen && handlers.onOpen();
 
     const safeParse = (ev) => {
       try { return JSON.parse(ev.data); } catch { return null; }
@@ -193,7 +199,7 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
  * Perform a download for a prepared entry and return { blob, filename }.
  */
 export const downloadByEntry = async (entry) => {
-  const resp = await fetch(entry.url);
+  const resp = await fetch(entry.url, { credentials: 'include' });
   if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
   const blob = await resp.blob();
   const cd = resp.headers.get('Content-Disposition');

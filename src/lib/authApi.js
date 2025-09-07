@@ -1,5 +1,5 @@
 // lib/authApi.js
-const API_BASE_URL = "/api";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 const getCallbackUrl = (nextPath) => {
   const base = `${window.location.origin}/auth/callback`;
@@ -91,6 +91,9 @@ export const authApi = {
   },
 
   async logout() {
+    // Import userStorage here to avoid circular dependency
+    const { userStorage } = await import('./userStorage.js');
+    
     try {
       await fetch(`${API_BASE_URL}/auth/logout`, {
         method: "POST",
@@ -99,11 +102,16 @@ export const authApi = {
     } catch {
       // ignore network errors; still clear local cache below
     }
+    
+    // Clear user-specific data before removing auth info
+    userStorage.clearUserData();
+    
+    // Clear auth-related data
     localStorage.removeItem("auth_token"); // legacy
+    localStorage.removeItem("auth_email");
     localStorage.removeItem("user_email");
     sessionStorage.removeItem('client_session');
     window.dispatchEvent(new CustomEvent("authUpdated"));
   },
 };
 
-export { API_BASE_URL };

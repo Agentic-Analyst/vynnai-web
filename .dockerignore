@@ -21,6 +21,10 @@ ENV/
 *.swo
 *~
 
+.env
+.env.*.local
+.env.dev
+
 # Exclude OS files
 .DS_Store
 Thumbs.db
