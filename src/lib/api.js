@@ -157,6 +157,14 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
       suggestedName: `${T}_financials_annual_modeling_latest.json`
     });
   }
+  if (files?.peer_financials) {
+    entries.push({
+      key: 'peer_financials',
+      label: `${T}_peer_financials_annual.zip`,
+      url: `${base}/download/peer-financials`,
+      suggestedName: `${T}_peer_financials_annual.zip`
+    });
+  }
   if (files?.financial_model) {
     entries.push({
       key: 'financial_model',
