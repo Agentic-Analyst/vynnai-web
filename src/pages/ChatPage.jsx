@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from 'react-markdown';
 import SettingsModal from '@/components/SettingsModal';
-import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp, ArrowDown } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -21,6 +21,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 
 const ChatPage = () => {
@@ -85,6 +90,10 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
   // Log panel collapse state - track collapsed state by message index
   const [collapsedLogs, setCollapsedLogs] = useState(new Set());
+
+  // Scroll to bottom button state
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   // REPLACE your filteredConversations with index mapping (so search works without breaking selection)
   const filteredConversations = conversations
@@ -281,22 +290,73 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
     const ro = new ResizeObserver(() => {
       setListHeight(el.clientHeight);
-      const msgs = conversations[currentConversationIndex]?.messages ?? [];
-      if (listRef.current && msgs.length) {
-        listRef.current.scrollToItem(msgs.length - 1, 'end');
-      }
     });
 
     ro.observe(el);
     return () => ro.disconnect();
   }, [currentConversationIndex, conversations]);
 
+  // ---------- Scroll detection ----------
+  useEffect(() => {
+    if (!listRef.current?._outerRef) return;
+    
+    const scrollContainer = listRef.current._outerRef;
+    
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      const isNearBottom = distanceFromBottom < 50; // Reduced threshold
+      
+      // Debug logging
+      console.log('Scroll Debug:', {
+        scrollTop,
+        scrollHeight,
+        clientHeight,
+        distanceFromBottom,
+        isNearBottom,
+        shouldShowButton: !isNearBottom
+      });
+      
+      setShowScrollToBottom(!isNearBottom);
+      
+      if (isNearBottom) {
+        setUnreadMessages(0);
+      }
+    };
+
+    // Initial check
+    handleScroll();
+    
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, [conversations, currentConversationIndex]);
+
+  // ---------- Track unread messages when new messages arrive ----------
+  const lastMessageCountRef = useRef(0);
+  
+  // Initialize message count tracking
   useEffect(() => {
     const msgs = conversations[currentConversationIndex]?.messages ?? [];
-    if (listRef.current && msgs.length > 0) {
-      listRef.current.scrollToItem(msgs.length - 1, 'end');
+    lastMessageCountRef.current = msgs.length;
+  }, []); // Only run on mount
+  
+  useEffect(() => {
+    const msgs = conversations[currentConversationIndex]?.messages ?? [];
+    const currentMessageCount = msgs.length;
+    
+    // Only increment unread count if:
+    // 1. Message count actually increased (new message arrived)
+    // 2. User is not at bottom (showScrollToBottom is true)
+    // 3. This is not the initial load or conversation switch
+    if (currentMessageCount > lastMessageCountRef.current && showScrollToBottom) {
+      const newMessagesCount = currentMessageCount - lastMessageCountRef.current;
+      setUnreadMessages(prev => prev + newMessagesCount);
+      console.log(`New messages detected: ${newMessagesCount}, Total unread: ${unreadMessages + newMessagesCount}`);
     }
-  }, [conversations, currentConversationIndex]);
+    
+    // Update the ref to current count
+    lastMessageCountRef.current = currentMessageCount;
+  }, [conversations[currentConversationIndex]?.messages?.length, showScrollToBottom]);
 
   // ---------- Helpers ----------
   const parseAnalysisRequest = (textIn) => {
@@ -309,13 +369,15 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     return req;
   };
 
-  // virtual list nudge
-  const bumpListToBottom = () => {
+  // Manual scroll to bottom function for user interaction
+  const scrollToBottom = () => {
     requestAnimationFrame(() => {
       const count = conversations[currentConversationIndex]?.messages?.length || 0;
-      if (count > 0) {
-        listRef.current?.resetAfterIndex(count - 1, true);
-        listRef.current?.scrollToItem(count - 1, 'end');
+      if (count > 0 && listRef.current) {
+        listRef.current.resetAfterIndex(count - 1, true);
+        listRef.current.scrollToItem(count - 1, 'end');
+        setShowScrollToBottom(false);
+        setUnreadMessages(0);
       }
     });
   };
@@ -349,7 +411,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       updated[currentConversationIndex] = { ...convo, messages: msgs };
       return updated;
     });
-    bumpListToBottom();
   };
 
   const addAssistantMessage = (content) => {
@@ -373,7 +434,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       updated[currentConversationIndex] = { ...convo, messages: msgs };
       return updated;
     });
-    bumpListToBottom();
   };
 
   const addDownloadsMessage = (jobId, entriesObject) => {
@@ -397,7 +457,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       updated[currentConversationIndex] = { ...convo, messages: msgs };
       return updated;
     });
-    bumpListToBottom();
   };
 
   const generateTitle = (userMessage) => {
@@ -419,13 +478,41 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     setConversations([...conversations, newConversation]);
     setCurrentConversationIndex(conversations.length);
     rowHeightsRef.current = {};
-    listRef.current?.resetAfterIndex(0, true);
+    setShowScrollToBottom(false);
+    setUnreadMessages(0);
+    
+    // Reset message count tracking for new conversation
+    lastMessageCountRef.current = 1; // One welcome message
+    
+    // Scroll to bottom for new conversation
+    requestAnimationFrame(() => {
+      if (listRef.current) {
+        listRef.current.resetAfterIndex(0, true);
+        listRef.current.scrollToItem(0, 'end');
+      }
+    });
   };
 
   const switchConversation = (index) => {
     setCurrentConversationIndex(index);
     rowHeightsRef.current = {};
-    listRef.current?.resetAfterIndex(0, true);
+    setShowScrollToBottom(false);
+    setUnreadMessages(0);
+    
+    // Reset message count tracking for new conversation
+    const msgs = conversations[index]?.messages ?? [];
+    lastMessageCountRef.current = msgs.length;
+    
+    // Scroll to bottom after switching conversation
+    requestAnimationFrame(() => {
+      if (listRef.current) {
+        listRef.current.resetAfterIndex(0, true);
+        const msgs = conversations[index]?.messages ?? [];
+        if (msgs.length > 0) {
+          listRef.current.scrollToItem(msgs.length - 1, 'end');
+        }
+      }
+    });
   };
 
   // Toggle log panel collapse state
@@ -479,6 +566,9 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       updated[currentConversationIndex] = { ...convo, messages: msgs }; // replace convo
       return updated;
     });
+
+    // Auto-scroll to bottom when user sends a message
+    setTimeout(() => scrollToBottom(), 100);
 
     const currentInput = input;
     setInput('');
@@ -958,7 +1048,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-auto" ref={listContainerRef}>
+          <div className="flex-1 overflow-auto relative" ref={listContainerRef}>
             <List
               ref={listRef}
               height={listHeight}
@@ -970,6 +1060,39 @@ ${JSON.stringify(analysisRequest, null, 2)}
             >
               {Row}
             </List>
+            
+            {/* Scroll to Bottom Button */}
+            {showScrollToBottom && (
+              <div className="absolute bottom-4 right-4 z-50 opacity-100 transform transition-all duration-300 ease-in-out">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={scrollToBottom}
+                      variant="default"
+                      size="default"
+                      className="h-12 w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white border-2 border-white transition-all duration-200 hover:scale-105 relative group"
+                    >
+                      <ArrowDown className="h-5 w-5 transition-transform group-hover:translate-y-0.5" />
+                      {unreadMessages > 0 && (
+                        <span className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {unreadMessages > 9 ? '9+' : unreadMessages}
+                        </span>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p>{unreadMessages > 0 ? `${unreadMessages} new message${unreadMessages > 1 ? 's' : ''}` : 'Scroll to bottom'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
+            
+            {/* Debug info - only show when there are unread messages */}
+            {unreadMessages > 0 && (
+              <div className="absolute top-4 right-4 z-50 bg-black text-white p-2 rounded text-xs">
+                Unread: {unreadMessages}
+              </div>
+            )}
           </div>
         </div>
 
