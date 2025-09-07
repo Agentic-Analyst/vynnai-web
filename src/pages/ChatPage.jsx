@@ -94,6 +94,17 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   // Scroll to bottom button state
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  
+  // Deterministic explanation report state
+  const [capturedReport, setCapturedReport] = useState(null);
+  const reportCaptureRef = useRef({ 
+    isCapturing: false, 
+    content: '', 
+    reportType: '',
+    reports: { deterministic: '', llm: '' } // Store both reports
+  });
 
   // REPLACE your filteredConversations with index mapping (so search works without breaking selection)
   const filteredConversations = conversations
@@ -301,11 +312,29 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     if (!listRef.current?._outerRef) return;
     
     const scrollContainer = listRef.current._outerRef;
+    let isUserScrolling = false;
+    let scrollTimeout = null;
     
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = scrollContainer;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
       const isNearBottom = distanceFromBottom < 50; // Reduced threshold
+      
+      // Detect if user manually scrolled up (and disable auto-scroll)
+      if (!isUserScrolling && autoScrollEnabled && !isNearBottom && isUserAtBottom) {
+        // User was at bottom and scrolled up manually
+        setAutoScrollEnabled(false);
+        console.log('Auto-scroll disabled - user scrolled up manually');
+      }
+      
+      // Track if user is at bottom
+      setIsUserAtBottom(isNearBottom);
+      
+      // Enable auto-scroll when user reaches bottom
+      if (isNearBottom && !autoScrollEnabled) {
+        setAutoScrollEnabled(true);
+        console.log('Auto-scroll re-enabled - user reached bottom');
+      }
       
       // Debug logging
       console.log('Scroll Debug:', {
@@ -314,7 +343,10 @@ Need financial statements, models, news, or insights? I’ve got you covered —
         clientHeight,
         distanceFromBottom,
         isNearBottom,
-        shouldShowButton: !isNearBottom
+        shouldShowButton: !isNearBottom,
+        autoScrollEnabled,
+        isUserAtBottom: isNearBottom,
+        isUserScrolling
       });
       
       setShowScrollToBottom(!isNearBottom);
@@ -322,14 +354,24 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       if (isNearBottom) {
         setUnreadMessages(0);
       }
+      
+      // Mark that user is actively scrolling
+      isUserScrolling = true;
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isUserScrolling = false;
+      }, 150); // Give a small delay to detect end of scroll
     };
 
     // Initial check
     handleScroll();
     
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-    return () => scrollContainer.removeEventListener('scroll', handleScroll);
-  }, [conversations, currentConversationIndex]);
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+    };
+  }, [conversations, currentConversationIndex, autoScrollEnabled, isUserAtBottom]);
 
   // ---------- Track unread messages when new messages arrive ----------
   const lastMessageCountRef = useRef(0);
@@ -344,19 +386,30 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     const msgs = conversations[currentConversationIndex]?.messages ?? [];
     const currentMessageCount = msgs.length;
     
-    // Only increment unread count if:
-    // 1. Message count actually increased (new message arrived)
-    // 2. User is not at bottom (showScrollToBottom is true)
-    // 3. This is not the initial load or conversation switch
-    if (currentMessageCount > lastMessageCountRef.current && showScrollToBottom) {
+    // Only process if message count actually increased (new message arrived)
+    if (currentMessageCount > lastMessageCountRef.current) {
       const newMessagesCount = currentMessageCount - lastMessageCountRef.current;
-      setUnreadMessages(prev => prev + newMessagesCount);
-      console.log(`New messages detected: ${newMessagesCount}, Total unread: ${unreadMessages + newMessagesCount}`);
+      
+      // If user is at bottom and auto-scroll is enabled, automatically scroll
+      if (isUserAtBottom && autoScrollEnabled) {
+        console.log(`Auto-scrolling due to ${newMessagesCount} new messages`);
+        requestAnimationFrame(() => {
+          if (listRef.current) {
+            listRef.current.resetAfterIndex(currentMessageCount - 1, true);
+            listRef.current.scrollToItem(currentMessageCount - 1, 'end');
+          }
+        });
+      } 
+      // If user is not at bottom, increment unread count
+      else if (!isUserAtBottom) {
+        setUnreadMessages(prev => prev + newMessagesCount);
+        console.log(`New messages detected: ${newMessagesCount}, Total unread: ${unreadMessages + newMessagesCount}`);
+      }
     }
     
     // Update the ref to current count
     lastMessageCountRef.current = currentMessageCount;
-  }, [conversations[currentConversationIndex]?.messages?.length, showScrollToBottom]);
+  }, [conversations[currentConversationIndex]?.messages?.length, isUserAtBottom, autoScrollEnabled]);
 
   // ---------- Helpers ----------
   const parseAnalysisRequest = (textIn) => {
@@ -378,6 +431,8 @@ Need financial statements, models, news, or insights? I’ve got you covered —
         listRef.current.scrollToItem(count - 1, 'end');
         setShowScrollToBottom(false);
         setUnreadMessages(0);
+        setAutoScrollEnabled(true); // Re-enable auto-scroll when user manually goes to bottom
+        console.log('Manual scroll to bottom - auto-scroll re-enabled');
       }
     });
   };
@@ -459,6 +514,24 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     });
   };
 
+  const addReportMessage = (reportContent, reportType = 'deterministic') => {
+    const nowIso = new Date().toISOString();
+    setConversations(prev => {
+      const updated = [...prev];
+      const convo = updated[currentConversationIndex];
+      const msgs = [...(convo.messages || [])];
+      msgs.push({
+        role: 'assistant',
+        kind: 'report',
+        reportType: reportType,
+        content: reportContent,
+        timestamp: nowIso
+      });
+      updated[currentConversationIndex] = { ...convo, messages: msgs };
+      return updated;
+    });
+  };
+
   const generateTitle = (userMessage) => {
     const text = userMessage.toLowerCase();
     if (text.includes('analyze') || text.includes('analysis')) {
@@ -480,6 +553,17 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     rowHeightsRef.current = {};
     setShowScrollToBottom(false);
     setUnreadMessages(0);
+    setIsUserAtBottom(true);
+    setAutoScrollEnabled(true);
+    
+    // Reset report capture state
+    reportCaptureRef.current = { 
+      isCapturing: false, 
+      content: '', 
+      reportType: '',
+      reports: { deterministic: '', llm: '' }
+    };
+    setCapturedReport(null);
     
     // Reset message count tracking for new conversation
     lastMessageCountRef.current = 1; // One welcome message
@@ -498,6 +582,17 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     rowHeightsRef.current = {};
     setShowScrollToBottom(false);
     setUnreadMessages(0);
+    setIsUserAtBottom(true);
+    setAutoScrollEnabled(true);
+    
+    // Reset report capture state
+    reportCaptureRef.current = { 
+      isCapturing: false, 
+      content: '', 
+      reportType: '',
+      reports: { deterministic: '', llm: '' }
+    };
+    setCapturedReport(null);
     
     // Reset message count tracking for new conversation
     const msgs = conversations[index]?.messages ?? [];
@@ -567,9 +662,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       return updated;
     });
 
-    // Auto-scroll to bottom when user sends a message
-    setTimeout(() => scrollToBottom(), 100);
-
     const currentInput = input;
     setInput('');
     setIsStreaming(true);
@@ -625,6 +717,64 @@ ${JSON.stringify(analysisRequest, null, 2)}
     const queue = (text, kind = 'log') => {
       if (kind !== 'log') { addAssistantMessage(text); return; }
       const s = typeof text === 'string' ? text : String(text);
+      
+      // Check for deterministic explanation report start
+      if (s.includes('📄 Deterministic explanation report content:')) {
+        console.log('🔍 Detected deterministic report marker, starting capture...');
+        reportCaptureRef.current.isCapturing = true;
+        reportCaptureRef.current.content = '';
+        reportCaptureRef.current.reportType = 'deterministic';
+        
+        // Extract content after the marker if it's on the same line
+        const markerIndex = s.indexOf('📄 Deterministic explanation report content:');
+        const afterMarker = s.substring(markerIndex + '📄 Deterministic explanation report content:'.length).trim();
+        if (afterMarker) {
+          reportCaptureRef.current.content = afterMarker;
+          console.log('📝 Initial deterministic content captured:', afterMarker.substring(0, 100) + '...');
+        }
+      } 
+      // Check for LLM explanation report start
+      else if (s.includes('📄 LLM explanation report content:')) {
+        console.log('🔍 Detected LLM report marker, starting capture...');
+        reportCaptureRef.current.isCapturing = true;
+        reportCaptureRef.current.content = '';
+        reportCaptureRef.current.reportType = 'llm';
+        
+        // Extract content after the marker if it's on the same line
+        const markerIndex = s.indexOf('📄 LLM explanation report content:');
+        const afterMarker = s.substring(markerIndex + '📄 LLM explanation report content:'.length).trim();
+        if (afterMarker) {
+          reportCaptureRef.current.content = afterMarker;
+          console.log('📝 Initial LLM content captured:', afterMarker.substring(0, 100) + '...');
+        }
+      }
+      // If we're capturing, add to the report content
+      else if (reportCaptureRef.current.isCapturing) {
+        // Stop capturing when we hit certain patterns that indicate end of report
+        if (s.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \| (INFO|DEBUG|WARNING|ERROR)/)) {
+          // This looks like a new log entry, finalize current report and stop capturing
+          console.log('🛑 Stopping report capture (detected new log entry)');
+          
+          // Store the completed report
+          if (reportCaptureRef.current.reportType && reportCaptureRef.current.content.trim()) {
+            reportCaptureRef.current.reports[reportCaptureRef.current.reportType] = reportCaptureRef.current.content.trim();
+            console.log('💾 Stored', reportCaptureRef.current.reportType, 'report, length:', reportCaptureRef.current.content.trim().length);
+          }
+          
+          reportCaptureRef.current.isCapturing = false;
+          reportCaptureRef.current.content = '';
+          reportCaptureRef.current.reportType = '';
+        } else {
+          // Continue capturing
+          if (reportCaptureRef.current.content) {
+            reportCaptureRef.current.content += '\n' + s;
+          } else {
+            reportCaptureRef.current.content = s;
+          }
+          console.log('📝 Added to', reportCaptureRef.current.reportType, 'report content:', s.substring(0, 50) + '...');
+        }
+      }
+      
       batch.push(s);
       batchBytes += s.length + 1;
       if (batch.length >= BATCH_COUNT_CAP || batchBytes >= BATCH_BYTE_CAP) { flush(); return; }
@@ -642,6 +792,34 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
     const finalizeDone = (status = 'completed', note) => {
       flush();
+      
+      // Finalize any currently capturing report
+      if (reportCaptureRef.current.isCapturing && reportCaptureRef.current.reportType && reportCaptureRef.current.content.trim()) {
+        reportCaptureRef.current.reports[reportCaptureRef.current.reportType] = reportCaptureRef.current.content.trim();
+        console.log('� Finalized', reportCaptureRef.current.reportType, 'report during completion');
+        reportCaptureRef.current.isCapturing = false;
+        reportCaptureRef.current.content = '';
+        reportCaptureRef.current.reportType = '';
+      }
+      
+      // Display both captured reports if available
+      if (reportCaptureRef.current.reports.deterministic) {
+        console.log('📊 Displaying deterministic report with length:', reportCaptureRef.current.reports.deterministic.length);
+        addReportMessage(reportCaptureRef.current.reports.deterministic, 'deterministic');
+      }
+      
+      if (reportCaptureRef.current.reports.llm) {
+        console.log('🤖 Displaying LLM report with length:', reportCaptureRef.current.reports.llm.length);
+        addReportMessage(reportCaptureRef.current.reports.llm, 'llm');
+      }
+      
+      if (!reportCaptureRef.current.reports.deterministic && !reportCaptureRef.current.reports.llm) {
+        console.log('⚠️ No reports captured');
+      }
+      
+      // Reset report capture state
+      reportCaptureRef.current.reports = { deterministic: '', llm: '' };
+      
       addAssistantMessage(`🏁 **Analysis Complete**${note ? `: ${note}` : ''}.`);
       setIsStreaming(false);
       setActiveJobId(null);
@@ -772,6 +950,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
     const isUser = message.role === 'user';
     const isLogBatch = message.kind === 'logbatch';
     const isDownloads = message.kind === 'downloads';
+    const isReport = message.kind === 'report';
     const measureRef = useRef(null);
 
     useEffect(() => {
@@ -888,6 +1067,107 @@ ${JSON.stringify(analysisRequest, null, 2)}
                   </span>
                 </div>
               )}
+            </div>
+          ) : isReport ? (
+            <div
+              ref={measureRef}
+              className={`inline-block max-w-[1000px] rounded-2xl overflow-hidden shadow-lg ring-1 ${
+                message.reportType === 'llm' 
+                  ? 'bg-gradient-to-br from-purple-50 to-pink-50 ring-purple-200'
+                  : 'bg-gradient-to-br from-indigo-50 to-blue-50 ring-indigo-200'
+              }`}
+            >
+              <div className={`flex items-center gap-3 px-5 py-3 border-b ${
+                message.reportType === 'llm'
+                  ? 'border-purple-200 bg-gradient-to-r from-purple-100 to-pink-100'
+                  : 'border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className={`h-3 w-3 rounded-full shadow-sm ${
+                    message.reportType === 'llm' ? 'bg-purple-500' : 'bg-indigo-500'
+                  }`} />
+                  <span className={`text-sm font-bold tracking-wide ${
+                    message.reportType === 'llm' ? 'text-purple-900' : 'text-indigo-900'
+                  }`}>
+                    {message.reportType === 'llm' ? '📑 LLM ANALYSIS REPORT' : '📊 DETERMINISTIC ANALYSIS REPORT'}
+                  </span>
+                </div>
+                <span className={`ml-auto text-xs font-medium bg-white/60 px-2 py-1 rounded-full ${
+                  message.reportType === 'llm' ? 'text-purple-600' : 'text-indigo-600'
+                }`}>
+                  {message.reportType === 'llm' ? 'AI-Generated Output' : 'Deterministic Model Output'}
+                </span>
+              </div>
+              <div className="p-5 bg-white/80">
+                <ReactMarkdown
+                  className={`prose prose-sm max-w-none break-words prose-headings:font-bold prose-p:leading-relaxed prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 ${
+                    message.reportType === 'llm'
+                      ? 'prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-purple-700 prose-code:bg-purple-50 prose-code:text-purple-800'
+                      : 'prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-indigo-700 prose-code:bg-indigo-50 prose-code:text-indigo-800'
+                  }`}
+                  components={{
+                    h1: ({ children }) => (
+                      <h1 className={`text-xl font-bold mb-3 pb-2 border-b ${
+                        message.reportType === 'llm' 
+                          ? 'text-purple-900 border-purple-200' 
+                          : 'text-indigo-900 border-indigo-200'
+                      }`}>{children}</h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className={`text-lg font-semibold mb-2 mt-4 ${
+                        message.reportType === 'llm' ? 'text-purple-800' : 'text-indigo-800'
+                      }`}>{children}</h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-base font-medium text-slate-700 mb-2 mt-3">{children}</h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-slate-600 leading-relaxed mb-3">{children}</p>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="list-disc list-inside space-y-1 text-slate-600 mb-3">{children}</ul>
+                    ),
+                    li: ({ children }) => (
+                      <li className="text-slate-600">{children}</li>
+                    ),
+                    code: ({ node, inline, children, ...props }) => 
+                      inline ? (
+                        <code className={`px-1.5 py-0.5 rounded text-sm font-mono ${
+                          message.reportType === 'llm' 
+                            ? 'bg-purple-50 text-purple-800' 
+                            : 'bg-indigo-50 text-indigo-800'
+                        }`} {...props}>
+                          {children}
+                        </code>
+                      ) : (
+                        <pre className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm font-mono text-slate-700 overflow-x-auto" {...props}>
+                          <code>{children}</code>
+                        </pre>
+                      )
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
+              <div className={`px-5 py-3 border-t ${
+                message.reportType === 'llm'
+                  ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200'
+                  : 'bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200'
+              }`}>
+                <div className={`flex items-center justify-between text-xs ${
+                  message.reportType === 'llm' ? 'text-purple-600' : 'text-indigo-600'
+                }`}>
+                  <span className="flex items-center gap-1">
+                    <span className={`h-1.5 w-1.5 rounded-full ${
+                      message.reportType === 'llm' ? 'bg-purple-400' : 'bg-indigo-400'
+                    }`} />
+                    Generated by Vynn AI Agent
+                  </span>
+                  <span>
+                    {new Date(message.timestamp || Date.now()).toLocaleString()}
+                  </span>
+                </div>
+              </div>
             </div>
           ) : (
             <Bubble>
