@@ -173,6 +173,14 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
       suggestedName: `${T}_financial_model_comprehensive_latest.xlsx`
     });
   }
+  if (files?.financial_model_comparable) {
+    entries.push({
+      key: 'financial_model_comparable',
+      label: `${T}_financial_model_comparable_latest.xlsx`,
+      url: `${base}/download/financial-model-comparable`,
+      suggestedName: `${T}_financial_model_comparable_latest.xlsx`
+    });
+  }
   if (files?.filtered_report) {
     entries.push({
       key: 'filtered_report',
