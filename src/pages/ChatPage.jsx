@@ -428,8 +428,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     listRef.current?.resetAfterIndex(0, true);
   };
 
-  const toggleSidebar = () => setIsSidebarOpen(v => !v);
-
   // Toggle log panel collapse state
   const toggleLogCollapse = (messageIndex) => {
     setCollapsedLogs(prev => {
@@ -506,7 +504,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
       startJobMonitoring(result.job_id);
 
       if (conversations[currentConversationIndex].title === 'New Analysis') {
-        const newTitle = generateTitle(currentInput);
+        const newTitle = `${result.ticker} Stock Analysis`;
         setConversations(prev => {
           const updated = [...prev];
           updated[currentConversationIndex].title = newTitle;
@@ -554,7 +552,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
     const finalizeDone = (status = 'completed', note) => {
       flush();
-      addAssistantMessage(`🏁 **Analysis Complete**${note ? `: ${note}` : ''} (status: ${status})`);
+      addAssistantMessage(`🏁 **Analysis Complete**${note ? `: ${note}` : ''}.`);
       setIsStreaming(false);
       setActiveJobId(null);
       setLastJobId(jobId);
