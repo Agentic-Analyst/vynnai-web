@@ -95,11 +95,8 @@ const SettingsModal = ({
                         <SelectContent>
                           <SelectItem value="default">Use API Default</SelectItem>
                           <SelectItem value="comprehensive">Comprehensive - Full analysis</SelectItem>
-                          <SelectItem value="financial-only">Financial Only - Data and modeling</SelectItem>
-                          <SelectItem value="model-only">Model Only - Pure modeling</SelectItem>
-                          <SelectItem value="news-only">News Only - Sentiment analysis</SelectItem>
-                          <SelectItem value="model-to-price">Model to Price - Price targets</SelectItem>
-                          <SelectItem value="news-to-price">News to Price - Price impact</SelectItem>
+                          <SelectItem value="financial-only">Build Financial Model - Financial statements and modeling</SelectItem>
+                          <SelectItem value="news-only">Screen Financial News - Catalyst, risk and mitigation analysis</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
