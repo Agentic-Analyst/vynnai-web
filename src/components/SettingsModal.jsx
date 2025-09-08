@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,12 +13,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Settings, Trash2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Settings, Trash2, LogOut, User } from "lucide-react"
+import { userStorage } from '@/lib/userStorage'
+import { authApi } from '@/lib/authApi'
 
 const SettingsModal = ({ 
   analysisParams,
   setAnalysisParams 
 }) => {
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const currentUser = userStorage.getCurrentUser();
   
   const updateAnalysisParam = (key, value) => {
     setAnalysisParams(prev => ({
@@ -39,6 +54,17 @@ const SettingsModal = ({
     setAnalysisParams({});
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await authApi.logout();
+      // The page will automatically refresh due to auth state change
+    } catch (error) {
+      console.error('Logout error:', error);
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -56,6 +82,7 @@ const SettingsModal = ({
         </DialogHeader>
         
         <div className="space-y-6">
+          {/* Analysis Parameters Section */}
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-lg font-semibold">Optional Analysis Parameters</h3>
@@ -311,6 +338,78 @@ const SettingsModal = ({
                 </CardContent>
               </Card>
             </div>
+          
+          {/* Account & Security Section - Updated */}
+          <div className="pt-6 border-t border-slate-200">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Account & Security
+            </h3>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-slate-50">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <User className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-900">Signed in as</p>
+                        <p className="text-sm text-slate-600">{currentUser || 'No user signed in'}</p>
+                      </div>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          disabled={isLoggingOut}
+                        >
+                          <LogOut className="h-4 w-4" />
+                          {isLoggingOut ? 'Signing out...' : 'Sign Out'}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Sign Out Confirmation</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to sign out? This will clear all your local data and you'll need to sign in again to access your analysis history.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={handleLogout}
+                            className="bg-red-600 hover:bg-red-700"
+                            disabled={isLoggingOut}
+                          >
+                            {isLoggingOut ? 'Signing out...' : 'Sign Out'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                  
+                  <div className="p-4 border rounded-lg bg-blue-50 border-blue-200">
+                    <div className="flex items-start gap-3">
+                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mt-0.5">
+                        <Settings className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-blue-900 mb-1">Data Privacy</h4>
+                        <p className="text-sm text-blue-800 leading-relaxed">
+                          Your analysis parameters and conversation history are stored locally in your browser. 
+                          Signing out will clear all this data. Your login credentials are managed securely by our authentication system.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
