@@ -122,8 +122,11 @@ const SettingsModal = ({
                         <SelectContent>
                           <SelectItem value="default">Use API Default</SelectItem>
                           <SelectItem value="comprehensive">Comprehensive - Full analysis</SelectItem>
-                          <SelectItem value="financial-only">Build Financial Model - Financial statements and modeling</SelectItem>
-                          <SelectItem value="news-only">Screen Financial News - Catalyst, risk and mitigation analysis</SelectItem>
+                          <SelectItem value="financial-statements">Get Financial Statements - Income statement, balance sheet, cash flow</SelectItem>
+                          <SelectItem value="financial-model">Build Financial Model - Financial statements and modeling</SelectItem>
+                          <SelectItem value="search-news">Search Financial News - Relevant news articles for the company</SelectItem>
+                          <SelectItem value="screen-news">Screen Financial News - Catalyst, risk and mitigation analysis</SelectItem>
+                          <SelectItem value="news-to-price">News to Price - Analyze impact of news on stock price</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -262,7 +265,7 @@ const SettingsModal = ({
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="max_articles">Maximum Articles</Label>
+                      <Label htmlFor="max_articles">Maximum Searched Articles</Label>
                       <Input
                         id="max_articles"
                         type="number"

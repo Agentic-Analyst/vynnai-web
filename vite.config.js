@@ -3,30 +3,27 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";
 
-// https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   server: {
     port: 5173,
-    host: true, // Allow external connections
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      }
-    }
+    host: true,
+    ...(mode === "development"
+      ? {
+          proxy: {
+            "/api": {
+              target: "http://localhost:8080",
+              changeOrigin: true,
+              rewrite: (p) => p.replace(/^\/api/, ""),
+            },
+          },
+        }
+      : {}),
   },
   plugins: [react()],
   resolve: {
     alias: [
-      {
-        find: "@",
-        replacement: fileURLToPath(new URL("./src", import.meta.url)),
-      },
-      {
-        find: "lib",
-        replacement: resolve(__dirname, "lib"),
-      },
+      { find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) },
+      { find: "lib", replacement: resolve(__dirname, "lib") },
     ],
   },
-});
+}));
