@@ -265,14 +265,14 @@ const SettingsModal = ({
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="max_articles">Maximum Searched Articles</Label>
+                      <Label htmlFor="max_searched">Maximum Searched Articles</Label>
                       <Input
-                        id="max_articles"
+                        id="max_searched"
                         type="number"
                         min="10"
                         max="100"
-                        value={analysisParams.max_articles || ''}
-                        onChange={(e) => updateAnalysisParam('max_articles', e.target.value ? parseInt(e.target.value) : undefined)}
+                        value={analysisParams.max_searched || ''}
+                        onChange={(e) => updateAnalysisParam('max_searched', e.target.value ? parseInt(e.target.value) : undefined)}
                         placeholder="e.g., 30"
                       />
                     </div>
