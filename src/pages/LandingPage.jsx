@@ -78,9 +78,34 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-6 sm:p-8 text-white shadow-2xl">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Welcome to Vynn AI Agent</h1>
-          <p className="text-sm opacity-80 mt-1">Log in to continue</p>
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent mb-4">
+            Welcome to Vynn AI Agent
+          </h1>
+          
+          <div className="space-y-3 text-slate-300 leading-relaxed">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-200 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
+              BETA ACCESS
+            </div>
+            
+            <p className="text-sm">
+              As we are still in development, Vynn AI agent is only publicly available for a limited number of users.
+            </p>
+            
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 space-y-2">
+              <p className="text-sm font-medium text-slate-200">To request access:</p>
+              <p className="text-sm">
+                Send a request to 
+                <span className="mx-1 px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded text-blue-300 font-mono text-xs">
+                  zanwen.fu@duke.edu
+                </span>
+              </p>
+              <p className="text-xs text-slate-400">
+                Then login using your email and the verification code I send you.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* OAuth buttons */}
