@@ -42,6 +42,32 @@ const SettingsModal = ({
     }));
   };
 
+  // Special handler for percentage fields - converts UI percentage to API decimal
+  const updatePercentageParam = (key, value) => {
+    if (value === '' || value === undefined || parseFloat(value) <= 0) {
+      setAnalysisParams(prev => ({
+        ...prev,
+        [key]: undefined
+      }));
+    } else {
+      // Convert percentage to decimal (e.g., 2.5% -> 0.025)
+      const decimalValue = parseFloat(value) / 100;
+      setAnalysisParams(prev => ({
+        ...prev,
+        [key]: decimalValue
+      }));
+    }
+  };
+
+  // Helper to display percentage values (converts API decimal back to UI percentage)
+  const getPercentageDisplayValue = (key) => {
+    const value = analysisParams[key];
+    if (value === undefined || value === null) return '';
+    // Convert decimal back to percentage for display (e.g., 0.025 -> 2.5)
+    // Round to 2 decimal places to avoid overflow
+    return (Math.round(value * 100 * 100) / 100).toString();
+  };
+
   const clearAnalysisParam = (key) => {
     setAnalysisParams(prev => {
       const newParams = { ...prev };
@@ -216,11 +242,11 @@ const SettingsModal = ({
                       <Input
                         id="term_growth"
                         type="number"
-                        min="1.0"
-                        max="4.0"
+                        min="0.1"
+                        max="500.0"
                         step="0.1"
-                        value={analysisParams.term_growth || ''}
-                        onChange={(e) => updateAnalysisParam('term_growth', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        value={getPercentageDisplayValue('term_growth')}
+                        onChange={(e) => updatePercentageParam('term_growth', e.target.value)}
                         placeholder="e.g., 2.5"
                       />
                     </div>
@@ -230,11 +256,11 @@ const SettingsModal = ({
                       <Input
                         id="wacc"
                         type="number"
-                        min="5.0"
-                        max="15.0"
+                        min="0.1"
+                        max="100.0"
                         step="0.1"
-                        value={analysisParams.wacc || ''}
-                        onChange={(e) => updateAnalysisParam('wacc', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        value={getPercentageDisplayValue('wacc')}
+                        onChange={(e) => updatePercentageParam('wacc', e.target.value)}
                         placeholder="e.g., 8.0"
                       />
                     </div>
@@ -244,11 +270,11 @@ const SettingsModal = ({
                       <Input
                         id="adjustment_cap"
                         type="number"
-                        min="5.0"
-                        max="50.0"
-                        step="1.0"
-                        value={analysisParams.adjustment_cap || ''}
-                        onChange={(e) => updateAnalysisParam('adjustment_cap', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        min="0.1"
+                        max="100.0"
+                        step="0.1"
+                        value={getPercentageDisplayValue('adjustment_cap')}
+                        onChange={(e) => updatePercentageParam('adjustment_cap', e.target.value)}
                         placeholder="e.g., 20.0"
                       />
                     </div>
