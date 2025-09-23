@@ -324,7 +324,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       if (!isUserScrolling && autoScrollEnabled && !isNearBottom && isUserAtBottom) {
         // User was at bottom and scrolled up manually
         setAutoScrollEnabled(false);
-        console.log('Auto-scroll disabled - user scrolled up manually');
       }
       
       // Track if user is at bottom
@@ -333,21 +332,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       // Enable auto-scroll when user reaches bottom
       if (isNearBottom && !autoScrollEnabled) {
         setAutoScrollEnabled(true);
-        console.log('Auto-scroll re-enabled - user reached bottom');
       }
-      
-      // Debug logging
-      console.log('Scroll Debug:', {
-        scrollTop,
-        scrollHeight,
-        clientHeight,
-        distanceFromBottom,
-        isNearBottom,
-        shouldShowButton: !isNearBottom,
-        autoScrollEnabled,
-        isUserAtBottom: isNearBottom,
-        isUserScrolling
-      });
       
       setShowScrollToBottom(!isNearBottom);
       
@@ -392,7 +377,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       
       // If user is at bottom and auto-scroll is enabled, automatically scroll
       if (isUserAtBottom && autoScrollEnabled) {
-        console.log(`Auto-scrolling due to ${newMessagesCount} new messages`);
         requestAnimationFrame(() => {
           if (listRef.current) {
             listRef.current.resetAfterIndex(currentMessageCount - 1, true);
@@ -940,6 +924,10 @@ ${JSON.stringify(analysisRequest, null, 2)}
       await saveBlob(blob, filename || entry.suggestedName || entry.label || 'download.xlsx');
       addAssistantMessage(`✅ **Downloaded:** ${filename}`);
     } catch (e) {
+        if (typeof e.message === "string" && e.message.includes("The user aborted a request")) {
+          return;
+        }
+      console.error('Download error:', e);
       addAssistantMessage(`❌ **Download Failed:** ${e.message}`);
     }
   };
