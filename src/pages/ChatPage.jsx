@@ -703,33 +703,33 @@ ${JSON.stringify(analysisRequest, null, 2)}
       const s = typeof text === 'string' ? text : String(text);
       
       // Check for deterministic explanation report start
-      if (s.includes('📄 Deterministic explanation report content:')) {
+      if (s.includes('📄 Financial analysis summary generated successfully:')) {
         console.log('🔍 Detected deterministic report marker, starting capture...');
         reportCaptureRef.current.isCapturing = true;
         reportCaptureRef.current.content = '';
         reportCaptureRef.current.reportType = 'deterministic';
         
         // Extract content after the marker if it's on the same line
-        const markerIndex = s.indexOf('📄 Deterministic explanation report content:');
-        const afterMarker = s.substring(markerIndex + '📄 Deterministic explanation report content:'.length).trim();
+        const markerIndex = s.indexOf('📄 Financial analysis summary generated successfully:');
+        const afterMarker = s.substring(markerIndex + '📄 Financial analysis summary generated successfully:'.length).trim();
         if (afterMarker) {
           reportCaptureRef.current.content = afterMarker;
-          console.log('📝 Initial deterministic content captured:', afterMarker.substring(0, 100) + '...');
+          console.log('📝 Initial financial analysis summary content captured:', afterMarker.substring(0, 100) + '...');
         }
-      } 
+      }
       // Check for LLM explanation report start
-      else if (s.includes('📄 LLM explanation report content:')) {
+      else if (s.includes('📄 Professional analyst report generated successfully:')) {
         console.log('🔍 Detected LLM report marker, starting capture...');
         reportCaptureRef.current.isCapturing = true;
         reportCaptureRef.current.content = '';
         reportCaptureRef.current.reportType = 'llm';
         
         // Extract content after the marker if it's on the same line
-        const markerIndex = s.indexOf('📄 LLM explanation report content:');
-        const afterMarker = s.substring(markerIndex + '📄 LLM explanation report content:'.length).trim();
+        const markerIndex = s.indexOf('📄 Professional analyst report generated successfully:');
+        const afterMarker = s.substring(markerIndex + '📄 Professional analyst report generated successfully:'.length).trim();
         if (afterMarker) {
           reportCaptureRef.current.content = afterMarker;
-          console.log('📝 Initial LLM content captured:', afterMarker.substring(0, 100) + '...');
+          console.log('📝 Professional analyst report content captured:', afterMarker.substring(0, 100) + '...');
         }
       }
       // If we're capturing, add to the report content
