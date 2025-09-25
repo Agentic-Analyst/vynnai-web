@@ -46,6 +46,26 @@ export const api = {
     return resp.json();
   },
 
+  async stopJob(jobId) {
+    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/stop`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => '');
+      throw new Error(`Stop job failed ${resp.status}: ${t}`);
+    }
+    return resp.json();
+  },
+
+  async getStoppableJobs() {
+    const resp = await fetch(`${API_BASE_URL}/jobs/stoppable`, {
+      credentials: 'include',
+    });
+    if (!resp.ok) return null;
+    return resp.json();
+  },
+
   /**
    * Open the SSE stream for a job.
    * handlers: {
@@ -117,46 +137,6 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
       suggestedName: 'info.log'
     });
   }
-  if (files?.screening_report) {
-    entries.push({
-      key: 'screening_report',
-      label: `${T}_screening_report.pdf`,
-      url: `${base}/download/screening-report`,
-      suggestedName: `${T}_screening_report.pdf`
-    });
-  }
-  if (files?.screening_data) {
-    entries.push({
-      key: 'screening_data',
-      label: 'screening_data.json',
-      url: `${base}/files/screening_data.json`,
-      suggestedName: 'screening_data.json'
-    });
-  }
-  if ((files?.searched_articles_count ?? 0) > 0) {
-    entries.push({
-      key: 'searched_articles',
-      label: `${T}_searched_articles.zip`,
-      url: `${base}/download/searched-articles`,
-      suggestedName: `${T}_searched_articles.zip`
-    });
-  }
-  if ((files?.filtered_articles_count ?? 0) > 0) {
-    entries.push({
-      key: 'filtered_articles',
-      label: `${T}_filtered_articles.zip`,
-      url: `${base}/download/filtered-articles`,
-      suggestedName: `${T}_filtered_articles.zip`
-    });
-  }
-  if (files?.financials_annual) {
-    entries.push({
-      key: 'financials_annual',
-      label: `${T}_financials_annual_modeling_latest.json`,
-      url: `${base}/download/financials-annual`,
-      suggestedName: `${T}_financials_annual_modeling_latest.json`
-    });
-  }
   if (files?.peer_financials) {
     entries.push({
       key: 'peer_financials',
@@ -179,14 +159,6 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
       label: `${T}_financial_model_comparable_latest.xlsx`,
       url: `${base}/download/financial-model-comparable`,
       suggestedName: `${T}_financial_model_comparable_latest.xlsx`
-    });
-  }
-  if (files?.filtered_report) {
-    entries.push({
-      key: 'filtered_report',
-      label: `${T}_filtered_report.md`,
-      url: `${base}/download/filtered-report`,
-      suggestedName: `${T}_filtered_report.md`
     });
   }
   if (files?.price_adjustment_explanation) {

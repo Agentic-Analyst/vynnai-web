@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import SettingsModal from '@/components/SettingsModal';
-import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp, ArrowDown } from "lucide-react";
+import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp, ArrowDown, StopCircle } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -85,6 +85,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const [availableFiles, setAvailableFiles] = useState({});
   const [lastJobId, setLastJobId] = useState(null);
   const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
+  const [isStoppingJob, setIsStoppingJob] = useState(false);
 
     // NEW — rename state
   const [renamingId, setRenamingId] = useState(null);
@@ -633,9 +634,45 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     }, 0);
   };
 
+  // ---------- Job Control ----------
+  const handleStopJob = async () => {
+    if (!activeJobId || isStoppingJob) return;
+    
+    setIsStoppingJob(true);
+    try {
+      const result = await api.stopJob(activeJobId);
+      
+      // Add a system message about stopping
+      addAssistantMessage(`🛑 **Job stopped by user**\n\nJob ${activeJobId.slice(0, 8)} has been stopped. The analysis was interrupted and may be incomplete.`);
+      
+      // Clear active job state
+      setActiveJobId(null);
+      userStorage.remove('activeJob');
+      
+      // Close event source if open
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      
+      console.log('Job stopped successfully:', result);
+    } catch (error) {
+      console.error('Failed to stop job:', error);
+    } finally {
+      setIsStoppingJob(false);
+    }
+  };
+
   // ---------- Submits ----------
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // If there's an active job, stop it instead of starting a new one
+    if (activeJobId) {
+      await handleStopJob();
+      return;
+    }
+    
     if (!input.trim() || isStreaming) return;
 
     const userMessage = { role: 'user', content: input };
@@ -1444,10 +1481,32 @@ ${JSON.stringify(analysisRequest, null, 2)}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask me to analyze any stock or company."
               className="flex-grow rounded-xl"
-              disabled={isStreaming}
+              disabled={activeJobId || isStreaming}
             />
-            <Button type="submit" disabled={isStreaming} className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700">
-              {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Analyze'}
+            <Button 
+              type="submit" 
+              disabled={isStoppingJob || (!activeJobId && (!input.trim() || isStreaming))}
+              className={`rounded-xl ${
+                activeJobId 
+                  ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800' 
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'
+              }`}
+            >
+              {activeJobId ? (
+                isStoppingJob ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Stopping...
+                  </>
+                ) : (
+                  <>
+                    <StopCircle className="h-4 w-4 mr-2" />
+                    Stop Analysis
+                  </>
+                )
+              ) : (
+                'Analyze'
+              )}
             </Button>
           </form>
         </div>
