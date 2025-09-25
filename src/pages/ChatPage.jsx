@@ -3,6 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import SettingsModal from '@/components/SettingsModal';
 import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp, ArrowDown } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -1088,6 +1090,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
               </div>
               <div className="p-5 bg-white/80">
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
                   className={`prose prose-sm max-w-none break-words prose-headings:font-bold prose-p:leading-relaxed prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 ${
                     message.reportType === 'llm'
                       ? 'prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-purple-700 prose-code:bg-purple-50 prose-code:text-purple-800'
@@ -1115,9 +1118,38 @@ ${JSON.stringify(analysisRequest, null, 2)}
                     ul: ({ children }) => (
                       <ul className="list-disc list-inside space-y-1 text-slate-600 mb-3">{children}</ul>
                     ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal list-inside space-y-1 text-slate-600 mb-3">{children}</ol>
+                    ),
                     li: ({ children }) => (
                       <li className="text-slate-600">{children}</li>
                     ),
+                    table: ({ children }) => (
+                      <div className="overflow-x-auto my-4">
+                        <table className="min-w-full border-collapse border border-slate-300">
+                          {children}
+                        </table>
+                      </div>
+                    ),
+                    thead: ({ children }) => (
+                      <thead className="bg-slate-100">{children}</thead>
+                    ),
+                    tbody: ({ children }) => (
+                      <tbody>{children}</tbody>
+                    ),
+                    tr: ({ children }) => (
+                      <tr className="border-b border-slate-200">{children}</tr>
+                    ),
+                    th: ({ children }) => (
+                      <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">{children}</th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="border border-slate-300 px-3 py-2 text-slate-600">{children}</td>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-4 border-slate-300 pl-4 italic text-slate-600 my-3">{children}</blockquote>
+                    ),
+                    br: () => <br className="my-1" />,
                     code: ({ node, inline, children, ...props }) => 
                       inline ? (
                         <code className={`px-1.5 py-0.5 rounded text-sm font-mono ${
@@ -1160,6 +1192,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
           ) : (
             <Bubble>
               <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
                 className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
                       ${isUser ? 'prose-invert' : 'prose-slate'}`}
                 components={{
@@ -1197,6 +1230,45 @@ ${JSON.stringify(analysisRequest, null, 2)}
                   },
                   p({ node, children, ...props }) {
                     return <p {...props} className="break-words">{children}</p>;
+                  },
+                  ul({ node, children, ...props }) {
+                    return <ul {...props} className="list-disc list-inside space-y-1 mb-3">{children}</ul>;
+                  },
+                  ol({ node, children, ...props }) {
+                    return <ol {...props} className="list-decimal list-inside space-y-1 mb-3">{children}</ol>;
+                  },
+                  li({ node, children, ...props }) {
+                    return <li {...props} className="break-words">{children}</li>;
+                  },
+                  table({ node, children, ...props }) {
+                    return (
+                      <div className="overflow-x-auto my-4">
+                        <table {...props} className="min-w-full border-collapse border border-slate-300">
+                          {children}
+                        </table>
+                      </div>
+                    );
+                  },
+                  thead({ node, children, ...props }) {
+                    return <thead {...props} className={`${isUser ? 'bg-white/20' : 'bg-slate-100'}`}>{children}</thead>;
+                  },
+                  tbody({ node, children, ...props }) {
+                    return <tbody {...props}>{children}</tbody>;
+                  },
+                  tr({ node, children, ...props }) {
+                    return <tr {...props} className={`border-b ${isUser ? 'border-white/20' : 'border-slate-200'}`}>{children}</tr>;
+                  },
+                  th({ node, children, ...props }) {
+                    return <th {...props} className={`border px-3 py-2 text-left font-semibold ${isUser ? 'border-white/20 text-white' : 'border-slate-300 text-slate-700'}`}>{children}</th>;
+                  },
+                  td({ node, children, ...props }) {
+                    return <td {...props} className={`border px-3 py-2 ${isUser ? 'border-white/20 text-white' : 'border-slate-300 text-slate-600'}`}>{children}</td>;
+                  },
+                  blockquote({ node, children, ...props }) {
+                    return <blockquote {...props} className={`border-l-4 pl-4 italic my-3 ${isUser ? 'border-white/40 text-white/90' : 'border-slate-300 text-slate-600'}`}>{children}</blockquote>;
+                  },
+                  br() {
+                    return <br className="my-1" />;
                   },
                 }}
               >
