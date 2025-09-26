@@ -51,10 +51,23 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const [conversations, setConversations] = useState(() => {
     const savedConversations = userStorage.getJSON('conversations');
     if (savedConversations) {
-      return savedConversations;
+      // Migrate existing conversations to include job state fields if missing
+      return savedConversations.map(conv => ({
+        ...conv,
+        activeJobId: conv.activeJobId || null,
+        isStreaming: conv.isStreaming || false,
+        jobProgress: conv.jobProgress || null
+      }));
     } else {
       // First time user - create conversation with welcome message
-      return [{ id: Date.now(), title: 'New Analysis', messages: [createWelcomeMessage()] }];
+      return [{ 
+        id: Date.now(), 
+        title: 'New Analysis', 
+        messages: [createWelcomeMessage()],
+        activeJobId: null,
+        isStreaming: false,
+        jobProgress: null
+      }];
     }
   });
   const [currentConversationIndex, setCurrentConversationIndex] = useState(0);
@@ -171,7 +184,14 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       if (idx === currentConversationIndex) nextIndex = Math.max(0, idx - 1);
 
       // fallback: always keep at least one chat
-      const finalList = next.length ? next : [{ id: Date.now(), title: "New Analysis", messages: [createWelcomeMessage()] }];
+      const finalList = next.length ? next : [{ 
+        id: Date.now(), 
+        title: "New Analysis", 
+        messages: [createWelcomeMessage()],
+        activeJobId: null,
+        isStreaming: false,
+        jobProgress: null
+      }];
       setCurrentConversationIndex(Math.min(nextIndex, finalList.length - 1));
       return finalList;
     });
@@ -212,7 +232,14 @@ Need financial statements, models, news, or insights? I’ve got you covered —
         setConversations(newConversations);
       } else {
         // First time user - create conversation with welcome message
-        setConversations([{ id: Date.now(), title: 'New Analysis', messages: [createWelcomeMessage()] }]);
+        setConversations([{ 
+          id: Date.now(), 
+          title: 'New Analysis', 
+          messages: [createWelcomeMessage()],
+          activeJobId: null,
+          isStreaming: false,
+          jobProgress: null
+        }]);
       }
       
       setAnalysisParams(newAnalysisParams);
@@ -275,7 +302,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
           return;
         }
         if (status.status === 'running' || status.status === 'pending') {
-          updateCurrentConversationJobState(cached.id, true);
+          updateCurrentConversationJobState(cached.id, true, status.progress || "Reconnecting to analysis...");
           startJobMonitoring(cached.id, { fromReconnect: true });
         } else {
           userStorage.removeItem('activeJob');
@@ -420,23 +447,48 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
   // Get current conversation's job state
   const getCurrentConversationJobId = () => {
-    return conversations[currentConversationIndex]?.activeJobId || null;
+    const jobId = conversations[currentConversationIndex]?.activeJobId || null;
+    if (jobId) {
+      console.log('🆔 Current conversation job ID:', jobId, 'for conversation:', currentConversationIndex);
+    }
+    return jobId;
   };
 
   const getCurrentConversationStreamingState = () => {
-    return conversations[currentConversationIndex]?.isStreaming || false;
+    const isStreaming = conversations[currentConversationIndex]?.isStreaming || false;
+    return isStreaming;
   };
 
   const getCurrentConversationProgress = () => {
-    return conversations[currentConversationIndex]?.jobProgress || null;
+    const progress = conversations[currentConversationIndex]?.jobProgress || null;
+    if (progress) {
+      console.log('📊 Current progress:', progress);
+    }
+    return progress;
   };
 
   // Update current conversation's job state
   const updateCurrentConversationJobState = (jobId, streaming = false, progress = null) => {
+    console.log('🔄 Updating conversation job state:', { jobId, streaming, progress, currentConversationIndex });
+    
+    // If we're trying to clear the job state but there's still an active connection, be more cautious
+    if (!jobId && !streaming && eventSourceRef.current) {
+      console.log('⚠️ Trying to clear job state but EventSource is still active. Delaying...');
+      return; // Don't clear immediately if connection is still active
+    }
+    
     setConversations(prev => {
       const updated = [...prev];
       const convo = updated[currentConversationIndex];
       if (convo) {
+        console.log('📝 Job state change:', {
+          previousJobId: convo.activeJobId,
+          newJobId: jobId,
+          previousProgress: convo.jobProgress,
+          newProgress: progress,
+          previousStreaming: convo.isStreaming,
+          newStreaming: streaming
+        });
         updated[currentConversationIndex] = {
           ...convo,
           activeJobId: jobId,
@@ -697,10 +749,15 @@ Need financial statements, models, news, or insights? I’ve got you covered —
         userStorage.removeItem('activeJob');
       }
       
-      // Close event source if open
+      // Close event source and status check if open
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
+      }
+      
+      if (progressPollRef.current) {
+        clearInterval(progressPollRef.current);
+        progressPollRef.current = null;
       }
       
       console.log('Job stopped successfully:', result);
@@ -730,7 +787,14 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     const userMessage = { role: 'user', content: input };
     setConversations(prev => {
       const updated = [...prev];
-      const convo = updated[currentConversationIndex] ?? { id: Date.now(), title: 'New Analysis', messages: [] };
+      const convo = updated[currentConversationIndex] ?? { 
+        id: Date.now(), 
+        title: 'New Analysis', 
+        messages: [],
+        activeJobId: null,
+        isStreaming: false,
+        jobProgress: null
+      };
       const msgs = [...(convo.messages || [])];   // clone messages
       msgs.push(userMessage);                     // pure append
       updated[currentConversationIndex] = { ...convo, messages: msgs }; // replace convo
@@ -739,7 +803,8 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
     const currentInput = input;
     setInput('');
-    updateCurrentConversationJobState(null, true); // Mark as streaming
+    // Don't clear jobId here, just mark as starting analysis
+    updateCurrentConversationJobState(null, true, "Starting analysis..."); // Mark as streaming with initial progress
 
     try {      
       const analysisRequest = parseAnalysisRequest(currentInput);
@@ -756,9 +821,13 @@ ${JSON.stringify(analysisRequest, null, 2)}
       );
 
       const result = await api.startAnalysis(analysisRequest);
-      updateCurrentConversationJobState(result.job_id, true); // Set job ID and streaming
+      console.log('🎯 Analysis started with job ID:', result.job_id);
+      updateCurrentConversationJobState(result.job_id, true, "Initializing analysis..."); // Set job ID, streaming, and initial progress
       userStorage.setJSON('activeJob', { id: result.job_id, started: Date.now(), status: 'running', conversationId: conversations[currentConversationIndex].id });
+      
+      // Start both SSE monitoring and periodic status checking
       startJobMonitoring(result.job_id);
+      startPeriodicStatusCheck(result.job_id);
 
       if (conversations[currentConversationIndex].title === 'New Analysis') {
         const newTitle = `${result.ticker} Stock Analysis`;
@@ -796,6 +865,54 @@ ${JSON.stringify(analysisRequest, null, 2)}
     const queue = (text, kind = 'log') => {
       if (kind !== 'log') { addAssistantMessage(text); return; }
       const s = typeof text === 'string' ? text : String(text);
+      
+      // Extract progress from log messages
+      const progressPatterns = [
+        // Common progress indicators - more flexible matching
+        /(?:Starting|Initiating|Beginning)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Fetching|Downloading|Getting)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Processing|Analyzing|Parsing)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Generating|Creating|Building)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Running|Executing|Performing)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Scraping|Collecting)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Filtering|Sorting)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Calculating|Computing)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Loading|Importing)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Preparing|Setting up)\s+(.{10,60})(?:\.|$)/i,
+        /(?:Saving|Storing)\s+(.{10,60})(?:\.|$)/i,
+        // Emoji patterns - broader capture
+        /[📊📈📉🔍💰🎯⚡🚀📋📄📑💹🏢📰📊]\s*(.{5,80})(?:\.|$)/,
+        // Pipeline/step indicators
+        /Step\s+\d+[:\-\s]+(.{10,60})(?:\.|$)/i,
+        /Phase\s+\d+[:\-\s]+(.{10,60})(?:\.|$)/i,
+        // Status/progress indicators
+        /(?:Status|Progress)[:\-\s]+(.{10,60})(?:\.|$)/i,
+        // Stock-specific patterns
+        /(?:Ticker|Company|Stock)\s+[A-Z]{1,5}[:\-\s]+(.{10,60})(?:\.|$)/i,
+      ];
+      
+      for (const pattern of progressPatterns) {
+        const match = s.match(pattern);
+        if (match && match[1]) {
+          let progressText = match[1].trim();
+          
+          // Clean up common noise from extracted text
+          progressText = progressText
+            .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .replace(/\.+$/, ''); // Remove trailing dots
+          
+          if (progressText.length >= 5 && progressText.length <= 80) { // Reasonable length
+            console.log('📈 Extracted progress from log:', `"${progressText}"` , 'from line:', s.substring(0, 100));
+            updateCurrentConversationJobState(
+              getCurrentConversationJobId(), 
+              getCurrentConversationStreamingState(), 
+              progressText
+            );
+            break; // Use first match
+          }
+        }
+      }
       
       // Check for deterministic explanation report start
       if (s.includes('📄 Financial analysis summary generated successfully:')) {
@@ -900,9 +1017,15 @@ ${JSON.stringify(analysisRequest, null, 2)}
       reportCaptureRef.current.reports = { deterministic: '', llm: '' };
       
       addAssistantMessage(`🏁 **Analysis Complete**${note ? `: ${note}` : ''}.`);
-      updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
-      setLastJobId(jobId);
-      userStorage.removeItem('activeJob');
+      console.log('🏁 Analysis completed, clearing job state for job:', jobId);
+      
+      // Add a small delay before clearing to ensure UI updates properly
+      setTimeout(() => {
+        updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
+        setLastJobId(jobId);
+        userStorage.removeItem('activeJob');
+        console.log('✅ Job state cleared after completion');
+      }, 1000); // 1 second delay
       (async () => {
         try {
           const detail = await api.getDetailedStatus(jobId);
@@ -929,8 +1052,14 @@ ${JSON.stringify(analysisRequest, null, 2)}
     const finalizeFail = (status = 'failed', detail) => {
       flush();
       addAssistantMessage(`❌ **Analysis Failed** (status: ${status})${detail ? `\n\n${detail}` : ''}`);
-      updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
-      userStorage.removeItem('activeJob');
+      console.log('❌ Analysis failed, clearing job state for job:', jobId);
+      
+      // Add a small delay before clearing to ensure UI updates properly
+      setTimeout(() => {
+        updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
+        userStorage.removeItem('activeJob');
+        console.log('✅ Job state cleared after failure');
+      }, 1000); // 1 second delay
       if (eventSourceRef.current) { try { eventSourceRef.current.close(); } catch {} eventSourceRef.current = null; }
       if (progressPollRef.current) {
         clearInterval(progressPollRef.current);
@@ -947,9 +1076,22 @@ ${JSON.stringify(analysisRequest, null, 2)}
       },
       onStatus: (payload) => {
         const { message, progress } = payload || {};
-        // Update conversation progress
-        if (progress) {
-          updateCurrentConversationJobState(getCurrentConversationJobId(), getCurrentConversationStreamingState(), progress);
+        console.log('📡 SSE onStatus received:', { message, progress, payload });
+        
+        // Update conversation progress - prefer progress field, fallback to message
+        const progressText = progress || message;
+        if (progressText && typeof progressText === 'string') {
+          // Clean up the progress text
+          const cleanProgress = progressText
+            .replace(/^\*\*Status[^:]*:\s*/i, '') // Remove "**Status:** " prefix
+            .replace(/^\*\*[^:]*:\s*/i, '') // Remove any "**...:** " prefix
+            .replace(/\*\*/g, '') // Remove ** markdown
+            .trim();
+          
+          if (cleanProgress && cleanProgress.length > 0) {
+            console.log('� Progress update:', cleanProgress);
+            updateCurrentConversationJobState(getCurrentConversationJobId(), getCurrentConversationStreamingState(), cleanProgress);
+          }
         }
         queue(progress ? `**Status Update:** ${progress}` : `**Status:** ${message}`, 'status');
       },
@@ -980,12 +1122,34 @@ ${JSON.stringify(analysisRequest, null, 2)}
         finalizeFail(status || 'failed', detail || message || 'Server signaled error');
       },
       onErrorEvent: () => {
+        console.log('🔌 SSE Error Event - ReadyState:', es.readyState);
         if (es.readyState === 2) { // CLOSED
           flush();
-          addAssistantMessage('ℹ️ **Stream closed by server. Finalizing…**');
-          updateCurrentConversationJobState(null, false, null);
-          setLastJobId(jobId);
-          userStorage.removeItem('activeJob');
+          console.log('🔌 SSE Connection closed by server');
+          
+          // Don't immediately clear job state - the job might still be running
+          // Instead, check job status first
+          setTimeout(async () => {
+            try {
+              const status = await api.getJobStatus(jobId);
+              console.log('📊 Job status after SSE close:', status);
+              
+              if (status && (status.status === 'completed' || status.status === 'failed')) {
+                addAssistantMessage('ℹ️ **Analysis completed. Connection closed.**');
+                updateCurrentConversationJobState(null, false, null);
+                setLastJobId(jobId);
+                userStorage.removeItem('activeJob');
+              } else {
+                addAssistantMessage('⚠️ **Connection lost. Monitoring may resume automatically.**');
+                // Keep job state but mark as not streaming
+                updateCurrentConversationJobState(jobId, false, "Connection lost - monitoring...");
+              }
+            } catch (error) {
+              console.log('Failed to check job status after SSE close:', error);
+              addAssistantMessage('ℹ️ **Connection closed.**');
+            }
+          }, 500);
+          
           try { es.close(); } catch {}
           eventSourceRef.current = null;
         } else {
@@ -996,6 +1160,49 @@ ${JSON.stringify(analysisRequest, null, 2)}
     });
 
     eventSourceRef.current = es;
+  };
+
+  // ---------- Periodic Status Check ----------
+  const startPeriodicStatusCheck = (jobId) => {
+    // Clear any existing status check interval
+    if (progressPollRef.current) {
+      clearInterval(progressPollRef.current);
+      progressPollRef.current = null;
+    }
+    
+    console.log('🔄 Starting periodic status check for job:', jobId);
+    
+    progressPollRef.current = setInterval(async () => {
+      try {
+        const status = await api.getJobStatus(jobId);
+        console.log('📊 Periodic status check result:', status);
+        
+        if (status) {
+          // Update progress if available
+          if (status.progress && status.progress !== getCurrentConversationProgress()) {
+            console.log('📈 Updating progress from status check:', status.progress);
+            updateCurrentConversationJobState(jobId, true, status.progress);
+          }
+          
+          // Check if job is complete
+          if (status.status === 'completed' || status.status === 'failed') {
+            console.log('🏁 Job completed via status check:', status.status);
+            clearInterval(progressPollRef.current);
+            progressPollRef.current = null;
+            
+            // Don't clear job state immediately - let the SSE handler do it
+            // or give a delay for UI to show completion state
+          }
+        } else {
+          console.log('❌ Job status check returned null - job may be gone');
+          clearInterval(progressPollRef.current);
+          progressPollRef.current = null;
+        }
+      } catch (error) {
+        console.log('❌ Error checking job status:', error);
+        // Don't clear on error - the job might still be running
+      }
+    }, 3000); // Check every 3 seconds
   };
 
   // ---------- Downloads ----------
@@ -1383,44 +1590,83 @@ ${JSON.stringify(analysisRequest, null, 2)}
     );
   };
 
-  // Shining Text Animation Component
-  const ShiningText = ({ text, className = "" }) => {
-    if (!text) return null;
-    
-    const words = text.split(' ');
+  // OpenAI-style Progress Text Animation Component
+  const ProgressText = ({ text, className = "" }) => {
+    if (!text || typeof text !== 'string') return null;
     
     return (
       <>
         <style>
           {`
-            @keyframes shine {
+            @keyframes gradient-flow {
+              0% {
+                background-position: -300% 0;
+              }
+              100% {
+                background-position: 300% 0;
+              }
+            }
+            .progress-text {
+              background: linear-gradient(
+                110deg,
+                #9ca3af 0%,
+                #6b7280 25%,
+                #4b5563 35%,
+                #374151 45%,
+                #1f2937 55%,
+                #374151 65%,
+                #4b5563 75%,
+                #6b7280 85%,
+                #9ca3af 100%
+              );
+              background-size: 300% 100%;
+              background-clip: text;
+              -webkit-background-clip: text;
+              -webkit-text-fill-color: transparent;
+              animation: gradient-flow 6s linear infinite;
+              font-weight: 500;
+              letter-spacing: 0.01em;
+            }
+            .progress-container {
+              position: relative;
+              overflow: hidden;
+            }
+            .progress-dots::before,
+            .progress-dots::after {
+              content: '';
+              position: absolute;
+              top: 50%;
+              width: 4px;
+              height: 4px;
+              border-radius: 50%;
+              background: #9ca3af;
+              animation: dot-pulse 1.5s ease-in-out infinite;
+              transform: translateY(-50%);
+            }
+            .progress-dots::before {
+              left: -12px;
+              animation-delay: 0s;
+            }
+            .progress-dots::after {
+              right: -12px;
+              animation-delay: 0.75s;
+            }
+            @keyframes dot-pulse {
               0%, 100% {
-                opacity: 0.7;
-                filter: brightness(0.8);
+                opacity: 0.3;
+                transform: translateY(-50%) scale(0.8);
               }
               50% {
                 opacity: 1;
-                filter: brightness(1.2) drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+                transform: translateY(-50%) scale(1.2);
               }
-            }
-            .shine-word {
-              animation: shine 2s ease-in-out infinite;
-              display: inline-block;
             }
           `}
         </style>
-        <div className={`inline-flex items-center gap-1 ${className}`}>
-          {words.map((word, index) => (
-            <span
-              key={index}
-              className="shine-word text-emerald-600 font-medium"
-              style={{
-                animationDelay: `${index * 0.3}s`,
-              }}
-            >
-              {word}
-            </span>
-          ))}
+        <div className={`progress-container progress-dots ${className}`}>
+          <span className="progress-text">
+            {text}
+          </span>
         </div>
       </>
     );
@@ -1522,12 +1768,11 @@ ${JSON.stringify(analysisRequest, null, 2)}
         <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
           <div className="text-lg font-semibold text-gray-700 flex items-center gap-3">
             AI Stock Analyst
-            {getCurrentConversationJobId() && getCurrentConversationProgress() && (
-              <div className="flex items-center gap-2 rounded-full bg-emerald-50/50 px-3 py-2 ring-1 ring-emerald-200/50 backdrop-blur-sm">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <ShiningText 
-                  text={getCurrentConversationProgress()} 
-                  className="text-sm font-medium"
+            {getCurrentConversationJobId() && (
+              <div className="flex items-center gap-3 rounded-full bg-white/80 px-4 py-2 ring-1 ring-gray-200/80 shadow-sm backdrop-blur-sm">
+                <ProgressText 
+                  text={getCurrentConversationProgress() || "Starting analysis..."} 
+                  className="text-sm"
                 />
               </div>
             )}
