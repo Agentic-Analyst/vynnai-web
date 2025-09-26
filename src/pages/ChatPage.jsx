@@ -82,6 +82,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     return null;
   });
   const eventSourceRef = useRef(null);
+  const progressPollRef = useRef(null);
   const [availableFiles, setAvailableFiles] = useState({});
   const [lastJobId, setLastJobId] = useState(null);
   const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
@@ -146,14 +147,20 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       const idx = prev.findIndex((c) => c.id === id);
       if (idx === -1) return prev;
 
-      // if deleting the active convo, stop streaming + close SSE
+      // if deleting the active convo, check if it has a running job and clean up
       if (idx === currentConversationIndex) {
-        setIsStreaming(false);
-        setActiveJobId(null);
-        userStorage.removeItem("activeJob");
-        if (eventSourceRef.current) {
-          try { eventSourceRef.current.close(); } catch {}
-          eventSourceRef.current = null;
+        const conversation = prev[idx];
+        if (conversation?.activeJobId) {
+          // Clean up job state for this conversation
+          userStorage.removeItem("activeJob");
+          if (eventSourceRef.current) {
+            try { eventSourceRef.current.close(); } catch {}
+            eventSourceRef.current = null;
+          }
+          if (progressPollRef.current) {
+            clearInterval(progressPollRef.current);
+            progressPollRef.current = null;
+          }
         }
       }
 
@@ -211,12 +218,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       setAnalysisParams(newAnalysisParams);
       setCurrentConversationIndex(0);
       
-      // Handle active job
-      if (newActiveJob && newActiveJob.status === 'running') {
-        setActiveJobId(newActiveJob.id);
-      } else {
-        setActiveJobId(null);
-      }
+      // Active job handling is now per-conversation, no global state needed
       
       // Reset other state
       setCollapsedLogs(new Set());
@@ -259,22 +261,25 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       if (!cached.id || cached.status !== 'running') return;
       if (eventSourceRef.current) return;
 
+      // Check if the cached job belongs to the current conversation
+      const currentConversation = conversations[currentConversationIndex];
+      if (!currentConversation || cached.conversationId !== currentConversation.id) {
+        return; // Job belongs to a different conversation
+      }
+
       try {
         const status = await api.getJobStatus(cached.id);
         if (!status) {
           userStorage.removeItem('activeJob');
-          setActiveJobId(null);
-          setIsStreaming(false);
+          updateCurrentConversationJobState(null, false, null);
           return;
         }
         if (status.status === 'running' || status.status === 'pending') {
-          setActiveJobId(cached.id);
-          setIsStreaming(true);
+          updateCurrentConversationJobState(cached.id, true);
           startJobMonitoring(cached.id, { fromReconnect: true });
         } else {
           userStorage.removeItem('activeJob');
-          setActiveJobId(null);
-          setIsStreaming(false);
+          updateCurrentConversationJobState(null, false, null);
         }
       } catch {
         /* ignore */
@@ -293,6 +298,10 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       if (eventSourceRef.current) {
         try { eventSourceRef.current.close(); } catch {}
         eventSourceRef.current = null;
+      }
+      if (progressPollRef.current) {
+        clearInterval(progressPollRef.current);
+        progressPollRef.current = null;
       }
     };
   }, []);
@@ -407,6 +416,36 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       if (v !== undefined && v !== null && v !== '') req[k] = v;
     });
     return req;
+  };
+
+  // Get current conversation's job state
+  const getCurrentConversationJobId = () => {
+    return conversations[currentConversationIndex]?.activeJobId || null;
+  };
+
+  const getCurrentConversationStreamingState = () => {
+    return conversations[currentConversationIndex]?.isStreaming || false;
+  };
+
+  const getCurrentConversationProgress = () => {
+    return conversations[currentConversationIndex]?.jobProgress || null;
+  };
+
+  // Update current conversation's job state
+  const updateCurrentConversationJobState = (jobId, streaming = false, progress = null) => {
+    setConversations(prev => {
+      const updated = [...prev];
+      const convo = updated[currentConversationIndex];
+      if (convo) {
+        updated[currentConversationIndex] = {
+          ...convo,
+          activeJobId: jobId,
+          isStreaming: streaming,
+          jobProgress: progress
+        };
+      }
+      return updated;
+    });
   };
 
   // Manual scroll to bottom function for user interaction
@@ -533,7 +572,10 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     const newConversation = { 
       id: Date.now(), 
       title: 'New Analysis', 
-      messages: [createWelcomeMessage()] 
+      messages: [createWelcomeMessage()],
+      activeJobId: null, // Each conversation tracks its own job
+      isStreaming: false,
+      jobProgress: null
     };
     setConversations([...conversations, newConversation]);
     setCurrentConversationIndex(conversations.length);
@@ -542,6 +584,9 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     setUnreadMessages(0);
     setIsUserAtBottom(true);
     setAutoScrollEnabled(true);
+    
+    // Only clear UI states, don't affect running jobs in other conversations
+    setIsStoppingJob(false);
     
     // Reset report capture state
     reportCaptureRef.current = { 
@@ -636,18 +681,21 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
   // ---------- Job Control ----------
   const handleStopJob = async () => {
-    if (!activeJobId || isStoppingJob) return;
+    const currentJobId = getCurrentConversationJobId();
+    if (!currentJobId || isStoppingJob) return;
     
     setIsStoppingJob(true);
     try {
-      const result = await api.stopJob(activeJobId);
+      const result = await api.stopJob(currentJobId);
+            
+      // Clear current conversation's job state
+      updateCurrentConversationJobState(null, false, null);
       
-      // Add a system message about stopping
-      addAssistantMessage(`🛑 **Job stopped by user**\n\nJob ${activeJobId.slice(0, 8)} has been stopped. The analysis was interrupted and may be incomplete.`);
-      
-      // Clear active job state
-      setActiveJobId(null);
-      userStorage.remove('activeJob');
+      // Only clear global storage if this is the current active job
+      const cachedJob = userStorage.getJSON('activeJob');
+      if (cachedJob && cachedJob.id === currentJobId) {
+        userStorage.removeItem('activeJob');
+      }
       
       // Close event source if open
       if (eventSourceRef.current) {
@@ -667,13 +715,17 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // If there's an active job, stop it instead of starting a new one
-    if (activeJobId) {
+    // Get current conversation's job state
+    const currentJobId = getCurrentConversationJobId();
+    const currentStreaming = getCurrentConversationStreamingState();
+    
+    // If there's an active job in this conversation, stop it instead of starting a new one
+    if (currentJobId) {
       await handleStopJob();
       return;
     }
     
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim() || currentStreaming) return;
 
     const userMessage = { role: 'user', content: input };
     setConversations(prev => {
@@ -687,7 +739,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
     const currentInput = input;
     setInput('');
-    setIsStreaming(true);
+    updateCurrentConversationJobState(null, true); // Mark as streaming
 
     try {      
       const analysisRequest = parseAnalysisRequest(currentInput);
@@ -704,8 +756,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
       );
 
       const result = await api.startAnalysis(analysisRequest);
-      setActiveJobId(result.job_id);
-      userStorage.setJSON('activeJob', { id: result.job_id, started: Date.now(), status: 'running' });
+      updateCurrentConversationJobState(result.job_id, true); // Set job ID and streaming
+      userStorage.setJSON('activeJob', { id: result.job_id, started: Date.now(), status: 'running', conversationId: conversations[currentConversationIndex].id });
       startJobMonitoring(result.job_id);
 
       if (conversations[currentConversationIndex].title === 'New Analysis') {
@@ -718,7 +770,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
       }
     } catch (error) {
       addAssistantMessage(`❌ **Analysis Failed:** ${error.message}`);
-      setIsStreaming(false);
+      updateCurrentConversationJobState(null, false, null); // Clear job state on error
     }
   };
 
@@ -727,6 +779,10 @@ ${JSON.stringify(analysisRequest, null, 2)}
     if (eventSourceRef.current) {
       try { eventSourceRef.current.close(); } catch {}
       eventSourceRef.current = null;
+    }
+    if (progressPollRef.current) {
+      clearInterval(progressPollRef.current);
+      progressPollRef.current = null;
     }
 
     const BATCH_LATENCY_MS = 200;
@@ -844,8 +900,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
       reportCaptureRef.current.reports = { deterministic: '', llm: '' };
       
       addAssistantMessage(`🏁 **Analysis Complete**${note ? `: ${note}` : ''}.`);
-      setIsStreaming(false);
-      setActiveJobId(null);
+      updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
       setLastJobId(jobId);
       userStorage.removeItem('activeJob');
       (async () => {
@@ -865,15 +920,22 @@ ${JSON.stringify(analysisRequest, null, 2)}
         } catch {/* ignore */}
       })();
       if (eventSourceRef.current) { try { eventSourceRef.current.close(); } catch {} eventSourceRef.current = null; }
+      if (progressPollRef.current) {
+        clearInterval(progressPollRef.current);
+        progressPollRef.current = null;
+      }
     };
 
     const finalizeFail = (status = 'failed', detail) => {
       flush();
       addAssistantMessage(`❌ **Analysis Failed** (status: ${status})${detail ? `\n\n${detail}` : ''}`);
-      setIsStreaming(false);
-      setActiveJobId(null);
+      updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
       userStorage.removeItem('activeJob');
       if (eventSourceRef.current) { try { eventSourceRef.current.close(); } catch {} eventSourceRef.current = null; }
+      if (progressPollRef.current) {
+        clearInterval(progressPollRef.current);
+        progressPollRef.current = null;
+      }
     };
 
     // open EventSource via API helper
@@ -885,6 +947,10 @@ ${JSON.stringify(analysisRequest, null, 2)}
       },
       onStatus: (payload) => {
         const { message, progress } = payload || {};
+        // Update conversation progress
+        if (progress) {
+          updateCurrentConversationJobState(getCurrentConversationJobId(), getCurrentConversationStreamingState(), progress);
+        }
         queue(progress ? `**Status Update:** ${progress}` : `**Status:** ${message}`, 'status');
       },
       onLog: (payload) => {
@@ -917,8 +983,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
         if (es.readyState === 2) { // CLOSED
           flush();
           addAssistantMessage('ℹ️ **Stream closed by server. Finalizing…**');
-          setIsStreaming(false);
-          setActiveJobId(null);
+          updateCurrentConversationJobState(null, false, null);
           setLastJobId(jobId);
           userStorage.removeItem('activeJob');
           try { es.close(); } catch {}
@@ -1318,6 +1383,49 @@ ${JSON.stringify(analysisRequest, null, 2)}
     );
   };
 
+  // Shining Text Animation Component
+  const ShiningText = ({ text, className = "" }) => {
+    if (!text) return null;
+    
+    const words = text.split(' ');
+    
+    return (
+      <>
+        <style>
+          {`
+            @keyframes shine {
+              0%, 100% {
+                opacity: 0.7;
+                filter: brightness(0.8);
+              }
+              50% {
+                opacity: 1;
+                filter: brightness(1.2) drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+              }
+            }
+            .shine-word {
+              animation: shine 2s ease-in-out infinite;
+              display: inline-block;
+            }
+          `}
+        </style>
+        <div className={`inline-flex items-center gap-1 ${className}`}>
+          {words.map((word, index) => (
+            <span
+              key={index}
+              className="shine-word text-emerald-600 font-medium"
+              style={{
+                animationDelay: `${index * 0.3}s`,
+              }}
+            >
+              {word}
+            </span>
+          ))}
+        </div>
+      </>
+    );
+  };
+
   const getItemSize = (index) => rowHeightsRef.current[index] || DEFAULT_ROW_HEIGHT;
 
   // ---------- UI ----------
@@ -1414,11 +1522,14 @@ ${JSON.stringify(analysisRequest, null, 2)}
         <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
           <div className="text-lg font-semibold text-gray-700 flex items-center gap-3">
             AI Stock Analyst
-            {activeJobId && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Job {activeJobId.slice(0, 8)} running
-              </span>
+            {getCurrentConversationJobId() && getCurrentConversationProgress() && (
+              <div className="flex items-center gap-2 rounded-full bg-emerald-50/50 px-3 py-2 ring-1 ring-emerald-200/50 backdrop-blur-sm">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <ShiningText 
+                  text={getCurrentConversationProgress()} 
+                  className="text-sm font-medium"
+                />
+              </div>
             )}
           </div>
           <SettingsModal analysisParams={analysisParams} setAnalysisParams={setAnalysisParams} />
@@ -1481,18 +1592,18 @@ ${JSON.stringify(analysisRequest, null, 2)}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask me to analyze any stock or company."
               className="flex-grow rounded-xl"
-              disabled={activeJobId || isStreaming}
+              disabled={getCurrentConversationJobId() || getCurrentConversationStreamingState()}
             />
             <Button 
               type="submit" 
-              disabled={isStoppingJob || (!activeJobId && (!input.trim() || isStreaming))}
+              disabled={isStoppingJob || (!getCurrentConversationJobId() && (!input.trim() || getCurrentConversationStreamingState()))}
               className={`rounded-xl ${
-                activeJobId 
+                getCurrentConversationJobId() 
                   ? 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800' 
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700'
               }`}
             >
-              {activeJobId ? (
+              {getCurrentConversationJobId() ? (
                 isStoppingJob ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

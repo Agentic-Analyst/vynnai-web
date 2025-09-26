@@ -15,6 +15,14 @@ const contentDispositionName = (cdHeader) => {
 export const api = {
   base: API_BASE_URL,
 
+  async getJobLogs(jobId) {
+    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/logs`, {
+      credentials: 'include',
+    });
+    if (!resp.ok) return null;
+    return resp.json();
+  },
+
   async startAnalysis(payload) {
     const resp = await fetch(`${API_BASE_URL}/nl/request`, {
       method: 'POST',
@@ -137,14 +145,6 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
       suggestedName: 'info.log'
     });
   }
-  if (files?.peer_financials) {
-    entries.push({
-      key: 'peer_financials',
-      label: `${T}_peer_financials_annual.zip`,
-      url: `${base}/download/peer-financials`,
-      suggestedName: `${T}_peer_financials_annual.zip`
-    });
-  }
   if (files?.financial_model) {
     entries.push({
       key: 'financial_model',
@@ -161,12 +161,20 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
       suggestedName: `${T}_financial_model_comparable_latest.xlsx`
     });
   }
-  if (files?.price_adjustment_explanation) {
+  if (files?.technical_analysis) {
     entries.push({
-      key: 'price_adjustment_explanation',
-      label: `${T}_price_adjustment_explanation_latest.pdf`,
-      url: `${base}/download/price-adjustment-explanation`,
-      suggestedName: `${T}_price_adjustment_explanation_latest.pdf`
+      key: 'technical_analysis',
+      label: `${T}_technical_analysis_latest.pdf`,
+      url: `${base}/download/technical-analysis`,
+      suggestedName: `${T}_technical_analysis_latest.pdf`
+    });
+  }
+  if (files?.professional_analyst_report) {
+    entries.push({
+      key: 'professional_analyst_report',
+      label: `${T}_professional_analyst_report_latest.pdf`,
+      url: `${base}/download/professional-analyst-report`,
+      suggestedName: `${T}_professional_analyst_report_latest.pdf`
     });
   }
 
