@@ -5,9 +5,19 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import ChatPage from "./pages/ChatPage.jsx";
-import DashboardPage from "./pages/DashboardPage.jsx";
+import StockDashboardLayout from "./pages/StockDashboardLayout.tsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import OAuthCallback from "./pages/OAuthCallback.jsx";
+
+// Stock Dashboard Pages
+import Stocks from "./pages/Stocks.tsx";
+import Markets from "./pages/Markets.tsx";
+import Currencies from "./pages/Currencies.tsx";
+import Global from "./pages/Global.tsx";
+import Portfolio from "./pages/Portfolio.tsx";
+import Performance from "./pages/Performance.tsx";
+import Analysis from "./pages/Analysis.tsx";
+import Settings from "./pages/Settings.tsx";
 import Navigation from "./components/Navigation.jsx";
 import { API_BASE_URL } from "@/lib/apiBase";
 
@@ -87,8 +97,20 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={isAuthed ? <Navigate to="/chat" replace /> : <LandingPage />} />
                   <Route path="/chat" element={isAuthed ? <ChatPage /> : <Navigate to="/" replace />} />
-                  <Route path="/dashboard" element={isAuthed ? <DashboardPage /> : <Navigate to="/" replace />} />
                   <Route path="/analyst" element={isAuthed ? <ChatPage /> : <Navigate to="/" replace />} />
+
+                  {/* Stock Dashboard Routes */}
+                  <Route path="/dashboard/*" element={isAuthed ? <StockDashboardLayout /> : <Navigate to="/" replace />}>
+                    <Route path="stocks" element={<Stocks />} />
+                    <Route path="markets" element={<Markets />} />
+                    <Route path="currencies" element={<Currencies />} />
+                    <Route path="global" element={<Global />} />
+                    <Route path="portfolio" element={<Portfolio />} />
+                    <Route path="performance" element={<Performance />} />
+                    <Route path="analysis" element={<Analysis />} />
+                    <Route path="settings" element={<Settings />} />
+                  </Route>
+                  <Route path="/dashboard" element={isAuthed ? <StockDashboardLayout /> : <Navigate to="/" replace />} />
 
                   {/* OAuth finishes here */}
                   <Route path="/auth/callback" element={<OAuthCallback />} />

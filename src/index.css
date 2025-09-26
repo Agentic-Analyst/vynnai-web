@@ -28,6 +28,15 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
+    --success: 142 72% 52%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --danger: 0 84% 60%;
+    --danger-foreground: 0 0% 100%;
+
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
@@ -100,10 +109,35 @@
     max-width: 100%;
   }
 
-  .prose code {
+    .prose code {
     overflow-wrap: break-word;
     word-break: break-all;
   }
+
+  /* Stock Dashboard Animations */
+  .animate-fade-in {
+    @apply animate-in fade-in duration-500;
+  }
+
+  .animate-slide-up {
+    @apply animate-in slide-in-from-bottom-4 duration-700;
+    animation-delay: var(--delay, 0ms);
+  }
+
+  /* Stock price trends */
+  .trend-up {
+    color: hsl(var(--success));
+  }
+  
+  .trend-down {
+    color: hsl(var(--danger));
+  }
+
+  /* Chart container */
+  .chart-container {
+    @apply w-full h-full min-h-[200px] rounded-lg overflow-hidden;
+  }
+}
 
   /* Ensure long URLs and text break properly */
   .break-long-words {
@@ -111,4 +145,3 @@
     word-break: break-word;
     hyphens: auto;
   }
-}

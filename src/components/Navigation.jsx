@@ -18,7 +18,7 @@ const Navigation = () => {
       label: "Dashboard",
       icon: BarChart3,
       path: "/dashboard",
-      description: "View analytics"
+      description: "Stock Market Dashboard"
     }
   ];
 
