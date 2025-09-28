@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, WifiOff } from 'lucide-react';
 
 import { useStockData, mockStocks } from '@/utils/stocksApi';
 import { usePortfolio, PortfolioHolding } from '@/hooks/usePortfolio';
+import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
 import { PieChart, Cell, Pie, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,23 @@ const Portfolio = () => {
   const { holdings, addHolding, updateHolding, deleteHolding } = usePortfolio();
   const { toast } = useToast();
   
+  // Get symbols from holdings for real-time subscription
+  const symbols = useMemo(() => {
+    return holdings.map(h => h.symbol);
+  }, [holdings]);
+  
+  const { prices: realTimePrices, isConnected, connectionStatus } = useRealTimeStockPrices(symbols);
+  
+  // Show toast when real-time connection is established
+  React.useEffect(() => {
+    if (isConnected && symbols.length > 0) {
+      toast({
+        title: 'Live Prices Connected',
+        description: `Real-time price updates enabled for ${symbols.length} holdings`,
+      });
+    }
+  }, [isConnected, symbols.length, toast]);
+  
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -26,29 +44,42 @@ const Portfolio = () => {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   
 
-  // Calculate portfolio values
+  // Calculate portfolio values with real-time prices
   const portfolioItems = holdings.map(item => {
     const stock = stocks.find(s => s.symbol === item.symbol);
+    const realTimePrice = realTimePrices[item.symbol];
     
-    // Handle unknown stocks with placeholder data
-    const stockData = stock || {
-      name: `${item.symbol} (Unknown)`,
-      price: item.costBasis, // Use cost basis as current price for unknown stocks
-    };
+    // Prioritize real-time price, then mock data, then cost basis as fallback
+    let currentPrice = item.costBasis; // Default fallback
+    let stockName = `${item.symbol} (Unknown)`;
+    let priceSource = 'cost-basis';
     
-    const currentValue = stockData.price * item.shares;
+    if (realTimePrice) {
+      currentPrice = realTimePrice.current_price;
+      stockName = stock?.name || item.symbol;
+      priceSource = 'real-time';
+    } else if (stock) {
+      currentPrice = stock.price;
+      stockName = stock.name;
+      priceSource = 'mock-data';
+    }
+    
+    const currentValue = currentPrice * item.shares;
     const totalCostBasis = item.costBasis * item.shares;
     const gain = currentValue - totalCostBasis;
     const gainPercent = totalCostBasis > 0 ? (gain / totalCostBasis) * 100 : 0;
     
     return {
       ...item,
-      name: stockData.name,
-      currentPrice: stockData.price,
+      name: stockName,
+      currentPrice,
       currentValue,
       totalCostBasis,
       gain,
-      gainPercent
+      gainPercent,
+      isRealTime: !!realTimePrice,
+      priceChange: realTimePrice?.change_percent || 0,
+      priceSource
     };
   });
   
@@ -101,7 +132,22 @@ const Portfolio = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Portfolio</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Portfolio</h1>
+          <div className="flex items-center gap-2 text-sm">
+            {isConnected ? (
+              <>
+                <Wifi className="h-4 w-4 text-green-500" />
+                <span className="text-green-600">Live Prices ({Object.keys(realTimePrices).length} active)</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="h-4 w-4 text-orange-500" />
+                <span className="text-orange-600 capitalize">{connectionStatus}</span>
+              </>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <div className="flex border rounded-lg p-1">
             <Button
@@ -241,11 +287,27 @@ const Portfolio = () => {
                             <td className="py-3 px-4">{item.name}</td>
                             <td className="py-3 px-4 text-right">{item.shares}</td>
                             <td className="py-3 px-4 text-right">${item.costBasis.toFixed(2)}</td>
-                            <td className="py-3 px-4 text-right">${item.currentPrice.toFixed(2)}</td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <span>${item.currentPrice.toFixed(2)}</span>
+                                {item.isRealTime ? (
+                                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live Price from WebSocket" />
+                                ) : (
+                                  <div className="text-xs text-muted-foreground" title={`Source: ${(item as any).priceSource}`}>
+                                    {(item as any).priceSource === 'mock-data' ? 'M' : 'CB'}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
                             <td className="py-3 px-4 text-right">${item.currentValue.toFixed(2)}</td>
                             <td className="py-3 px-4 text-right">
                               <div className={item.gain >= 0 ? 'text-green-500' : 'text-red-500'}>
-                                ${item.gain.toFixed(2)} ({item.gain >= 0 ? '+' : ''}{item.gainPercent.toFixed(2)}%)
+                                <div>${item.gain.toFixed(2)} ({item.gain >= 0 ? '+' : ''}{item.gainPercent.toFixed(2)}%)</div>
+                                {item.isRealTime && item.priceChange !== 0 && (
+                                  <div className={`text-xs ${item.priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    Today: {item.priceChange >= 0 ? '+' : ''}{item.priceChange.toFixed(2)}%
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="py-3 px-4 text-right">

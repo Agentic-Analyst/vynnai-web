@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Edit2, Trash2, TrendingUp, TrendingDown, Wifi } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +50,12 @@ export function HoldingCard({ holding, onEdit, onDelete }: HoldingCardProps) {
           
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">Current Price</span>
-            <span className="font-medium">${holding.currentPrice.toFixed(2)}</span>
+            <div className="flex items-center gap-1">
+              <span className="font-medium">${holding.currentPrice.toFixed(2)}</span>
+              {(holding as any).isRealTime && (
+                <Wifi className="h-3 w-3 text-green-500" />
+              )}
+            </div>
           </div>
           
           <div className="flex justify-between">
