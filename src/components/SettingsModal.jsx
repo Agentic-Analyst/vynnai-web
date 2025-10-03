@@ -132,7 +132,7 @@ const SettingsModal = ({
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Analysis Pipeline</CardTitle>
-                  <CardDescription>Choose the type of analysis to perform</CardDescription>
+                  <CardDescription>Choose the type of analysis to perform and select your preferred LLM model</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -171,6 +171,27 @@ const SettingsModal = ({
                           <SelectItem value="conservative">Conservative - Lower risk</SelectItem>
                           <SelectItem value="moderate">Moderate - Balanced</SelectItem>
                           <SelectItem value="aggressive">Aggressive - Growth focused</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="llm">LLM Model</Label>
+                      <Select 
+                        value={analysisParams.llm || 'default'} 
+                        onValueChange={(value) => updateAnalysisParam('llm', value === 'default' ? undefined : value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select LLM model (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">Use API Default (GPT-4o Mini)</SelectItem>
+                          <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                          <SelectItem value="claude-3.5-sonnet">Claude 3.5 Sonnet</SelectItem>
+                          <SelectItem value="claude-3.5-haiku">Claude 3.5 Haiku</SelectItem>
+                          <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
