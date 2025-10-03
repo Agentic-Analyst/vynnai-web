@@ -15,6 +15,7 @@ import Markets from "./pages/Markets.tsx";
 import Currencies from "./pages/Currencies.tsx";
 import Global from "./pages/Global.tsx";
 import Portfolio from "./pages/Portfolio.tsx";
+import PortfolioList from "./pages/PortfolioList.tsx";
 import Performance from "./pages/Performance.tsx";
 import Analysis from "./pages/Analysis.tsx";
 import Settings from "./pages/Settings.tsx";
@@ -105,7 +106,8 @@ const App = () => {
                     <Route path="markets" element={<Markets />} />
                     <Route path="currencies" element={<Currencies />} />
                     <Route path="global" element={<Global />} />
-                    <Route path="portfolio" element={<Portfolio />} />
+                    <Route path="portfolio" element={<PortfolioList />} />
+                    <Route path="portfolio/:portfolioId" element={<Portfolio />} />
                     <Route path="performance" element={<Performance />} />
                     <Route path="analysis" element={<Analysis />} />
                     <Route path="settings" element={<Settings />} />

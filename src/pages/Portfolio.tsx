@@ -1,9 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, WifiOff } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, WifiOff, ArrowLeft } from 'lucide-react';
 
 import { useStockData, mockStocks } from '@/utils/stocksApi';
-import { usePortfolio, PortfolioHolding } from '@/hooks/usePortfolio';
+import { usePortfolios } from '@/hooks/usePortfolios';
+import { PortfolioHolding } from '@/hooks/usePortfolio';
 import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
 import { PieChart, Cell, Pie, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -14,9 +16,75 @@ import { DeleteConfirmation } from '@/components/portfolio/DeleteConfirmation';
 import { HoldingCard } from '@/components/portfolio/HoldingCard';
 
 const Portfolio = () => {
+  const { portfolioId } = useParams<{ portfolioId: string }>();
+  const navigate = useNavigate();
   const stocks = useStockData(mockStocks);
-  const { holdings, addHolding, updateHolding, deleteHolding } = usePortfolio();
+  const { getPortfolio, updatePortfolio } = usePortfolios();
   const { toast } = useToast();
+
+  // Get the specific portfolio
+  const portfolio = portfolioId ? getPortfolio(portfolioId) : null;
+
+  // Debug logging
+  console.log('Portfolio Debug:', {
+    portfolioId,
+    portfolio: portfolio ? { id: portfolio.id, name: portfolio.name } : null,
+    hasPortfolio: !!portfolio
+  });
+
+  if (!portfolio) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-64">
+        <h2 className="text-2xl font-bold mb-4">Portfolio Not Found</h2>
+        <p className="text-muted-foreground mb-4">
+          The portfolio you're looking for doesn't exist or has been deleted.
+        </p>
+        <Button onClick={() => navigate('/dashboard/portfolio')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Portfolios
+        </Button>
+      </div>
+    );
+  }
+
+  const holdings = portfolio.holdings;
+
+  // Portfolio management functions
+  const addHolding = (newHolding: Omit<PortfolioHolding, 'id' | 'dateAdded'>) => {
+    const holding: PortfolioHolding = {
+      ...newHolding,
+      id: `holding_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      dateAdded: new Date().toISOString(),
+    };
+    
+    const updatedHoldings = [...holdings, holding];
+    updatePortfolio(portfolio.id, { holdings: updatedHoldings });
+    
+    toast({
+      title: 'Success',
+      description: `${holding.symbol} holding added successfully`,
+    });
+  };
+
+  const updateHolding = (id: string, updates: Partial<PortfolioHolding>) => {
+    const updatedHoldings = holdings.map(h => 
+      h.id === id ? { ...h, ...updates } : h
+    );
+    updatePortfolio(portfolio.id, { holdings: updatedHoldings });
+    
+    const updatedHolding = updatedHoldings.find(h => h.id === id);
+    if (updatedHolding) {
+      toast({
+        title: 'Success',
+        description: `${updatedHolding.symbol} holding updated successfully`,
+      });
+    }
+  };
+
+  const deleteHolding = (holdingId: string) => {
+    const updatedHoldings = holdings.filter(h => h.id !== holdingId);
+    updatePortfolio(portfolio.id, { holdings: updatedHoldings });
+  };
   
   // Get symbols from holdings for real-time subscription
   const symbols = useMemo(() => {
@@ -133,7 +201,20 @@ const Portfolio = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Portfolio</h1>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/dashboard/portfolio')}
+            className="mr-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">{portfolio.name}</h1>
+            {portfolio.description && (
+              <p className="text-muted-foreground text-sm">{portfolio.description}</p>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-sm">
             {isConnected ? (
               <>
@@ -176,25 +257,27 @@ const Portfolio = () => {
       </div>
       
       {holdings.length === 0 ? (
-        <Card className="p-12 text-center">
-          <CardContent>
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                <TrendingUp className="h-8 w-8 text-muted-foreground" />
+        <div className="flex items-center justify-center min-h-[500px]">
+          <Card className="w-full max-w-md mx-auto">
+            <CardContent className="p-12 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                  <TrendingUp className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">No Holdings Yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Start building your portfolio by adding your first stock holding.
+                  </p>
+                  <Button onClick={handleAddHolding} className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Your First Holding
+                  </Button>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2">No Holdings Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start building your portfolio by adding your first stock holding.
-                </p>
-                <Button onClick={handleAddHolding} className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Your First Holding
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
