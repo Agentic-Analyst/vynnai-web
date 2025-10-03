@@ -112,44 +112,52 @@ export function useRealTimeStockPrices(symbols: string[]) {
               
             case 'price_update':
               console.log('🔍 DEBUG: Received price_update:', message.data);
-              if (message.data) {
-                // Backend sends price data directly in message.data
-                const priceData = {
-                  symbol: message.data.symbol,
-                  current_price: message.data.current_price,
-                  change_amount: message.data.change_amount,
-                  change_percent: message.data.change_percent,
-                  timestamp: message.data.timestamp || new Date().toISOString()
-                };
-                
-                setPrices(prev => ({
-                  ...prev,
-                  [message.data.symbol]: priceData
-                }));
-                
-                console.log(`💰 PRICE UPDATE: ${message.data.symbol} = $${message.data.current_price} (${message.data.change_percent >= 0 ? '+' : ''}${message.data.change_percent?.toFixed(2)}%)`);
+              if (message.data && message.data.symbol) {
+                try {
+                  // Backend sends price data directly in message.data
+                  const priceData = {
+                    symbol: message.data.symbol,
+                    current_price: message.data.current_price,
+                    change_amount: message.data.change_amount,
+                    change_percent: message.data.change_percent,
+                    timestamp: message.data.timestamp || new Date().toISOString()
+                  };
+                  
+                  setPrices(prev => ({
+                    ...prev,
+                    [message.data.symbol]: priceData
+                  }));
+                  
+                  console.log(`💰 PRICE UPDATE: ${message.data.symbol} = $${message.data.current_price} (${message.data.change_percent >= 0 ? '+' : ''}${message.data.change_percent?.toFixed(2)}%)`);
+                } catch (priceUpdateError) {
+                  console.error('❌ Error processing price update:', priceUpdateError);
+                }
               }
               break;
               
             case 'current_price':
               console.log('🔍 DEBUG: Received current_price:', message.data);
-              if (message.data?.price) {
-                // Backend sends price object nested in message.data.price
-                const priceInfo = message.data.price;
-                const priceData = {
-                  symbol: priceInfo.symbol,
-                  current_price: priceInfo.current_price,
-                  change_amount: priceInfo.change_amount || 0,
-                  change_percent: priceInfo.change_percent || 0,
-                  timestamp: priceInfo.last_updated || new Date().toISOString()
-                };
-                
-                setPrices(prev => ({
-                  ...prev,
-                  [priceInfo.symbol]: priceData
-                }));
-                
-                console.log(`💰 CURRENT PRICE: ${priceInfo.symbol} = $${priceInfo.current_price}`);
+              if (message.data?.price && message.data.price.symbol) {
+                try {
+                  // Backend sends price object nested in message.data.price
+                  const priceInfo = message.data.price;
+                  const priceData = {
+                    symbol: priceInfo.symbol,
+                    current_price: priceInfo.current_price,
+                    change_amount: priceInfo.change_amount || 0,
+                    change_percent: priceInfo.change_percent || 0,
+                    timestamp: priceInfo.last_updated || new Date().toISOString()
+                  };
+                  
+                  setPrices(prev => ({
+                    ...prev,
+                    [priceInfo.symbol]: priceData
+                  }));
+                  
+                  console.log(`💰 CURRENT PRICE: ${priceInfo.symbol} = $${priceInfo.current_price}`);
+                } catch (currentPriceError) {
+                  console.error('❌ Error processing current price:', currentPriceError);
+                }
               }
               break;
               

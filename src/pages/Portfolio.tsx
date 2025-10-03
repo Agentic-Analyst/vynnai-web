@@ -86,22 +86,27 @@ const Portfolio = () => {
     updatePortfolio(portfolio.id, { holdings: updatedHoldings });
   };
   
-  // Get symbols from holdings for real-time subscription
+  // Get symbols from holdings for real-time subscription (stabilize to prevent unnecessary reconnections)
   const symbols = useMemo(() => {
-    return holdings.map(h => h.symbol);
-  }, [holdings]);
+    if (!holdings || !Array.isArray(holdings)) return [];
+    return holdings.map(h => h.symbol).filter(Boolean);
+  }, [holdings?.length, holdings?.map(h => h.symbol).join(',')]);
   
   const { prices: realTimePrices, isConnected, connectionStatus } = useRealTimeStockPrices(symbols);
   
-  // Show toast when real-time connection is established
-  React.useEffect(() => {
+  // Show toast when real-time connection is established (use useCallback to stabilize)
+  const showConnectionToast = React.useCallback(() => {
     if (isConnected && symbols.length > 0) {
       toast({
         title: 'Live Prices Connected',
         description: `Real-time price updates enabled for ${symbols.length} holdings`,
       });
     }
-  }, [isConnected, symbols.length, toast]);
+  }, [isConnected, symbols.length]);
+
+  React.useEffect(() => {
+    showConnectionToast();
+  }, [showConnectionToast]);
   
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -112,12 +117,25 @@ const Portfolio = () => {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   
 
-  // Calculate portfolio values with real-time prices
-  const portfolioItems = holdings.map(item => {
-    const stock = stocks.find(s => s.symbol === item.symbol);
-    const realTimePrice = realTimePrices[item.symbol];
-    
-    // Prioritize real-time price, then mock data, then cost basis as fallback
+  // Debug logging for WebSocket state changes
+  React.useEffect(() => {
+    console.log('🔍 WebSocket State Change:', {
+      isConnected,
+      connectionStatus,
+      symbolsCount: symbols.length,
+      symbols: symbols.slice(0, 3), // Log first 3 symbols only
+      pricesCount: Object.keys(realTimePrices).length
+    });
+  }, [isConnected, connectionStatus, symbols.length, Object.keys(realTimePrices).length]);
+
+  // Calculate portfolio values with real-time prices (add error handling)
+  const portfolioItems = useMemo(() => {
+    try {
+      return holdings.map(item => {
+        const stock = stocks.find(s => s.symbol === item.symbol);
+        const realTimePrice = realTimePrices[item.symbol];
+        
+        // Prioritize real-time price, then mock data, then cost basis as fallback
     let currentPrice = item.costBasis; // Default fallback
     let stockName = `${item.symbol} (Unknown)`;
     let priceSource = 'cost-basis';
@@ -137,20 +155,25 @@ const Portfolio = () => {
     const gain = currentValue - totalCostBasis;
     const gainPercent = totalCostBasis > 0 ? (gain / totalCostBasis) * 100 : 0;
     
-    return {
-      ...item,
-      name: stockName,
-      currentPrice,
-      currentValue,
-      totalCostBasis,
-      gain,
-      gainPercent,
-      isRealTime: !!realTimePrice,
-      priceChange: realTimePrice?.change_percent || 0,
-      priceSource
-    };
-  });
-  
+        return {
+          ...item,
+          name: stockName,
+          currentPrice,
+          currentValue,
+          totalCostBasis,
+          gain,
+          gainPercent,
+          isRealTime: !!realTimePrice,
+          priceChange: realTimePrice?.change_percent || 0,
+          priceSource
+        };
+      });
+    } catch (error) {
+      console.error('Error calculating portfolio items:', error);
+      return [];
+    }
+  }, [holdings, stocks, realTimePrices]);
+
   const totalValue = portfolioItems.reduce((sum, item) => sum + item.currentValue, 0);
   const totalCost = portfolioItems.reduce((sum, item) => sum + item.totalCostBasis, 0);
   const totalGain = totalValue - totalCost;
