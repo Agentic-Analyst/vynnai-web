@@ -471,12 +471,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const updateCurrentConversationJobState = (jobId, streaming = false, progress = null) => {
     console.log('🔄 Updating conversation job state:', { jobId, streaming, progress, currentConversationIndex });
     
-    // If we're trying to clear the job state but there's still an active connection, be more cautious
-    if (!jobId && !streaming && eventSourceRef.current) {
-      console.log('⚠️ Trying to clear job state but EventSource is still active. Delaying...');
-      return; // Don't clear immediately if connection is still active
-    }
-    
     setConversations(prev => {
       const updated = [...prev];
       const convo = updated[currentConversationIndex];
@@ -736,33 +730,61 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     const currentJobId = getCurrentConversationJobId();
     if (!currentJobId || isStoppingJob) return;
     
+    console.log('🛑 Stopping job:', currentJobId);
     setIsStoppingJob(true);
+    
     try {
-      const result = await api.stopJob(currentJobId);
-            
-      // Clear current conversation's job state
-      updateCurrentConversationJobState(null, false, null);
-      
-      // Only clear global storage if this is the current active job
-      const cachedJob = userStorage.getJSON('activeJob');
-      if (cachedJob && cachedJob.id === currentJobId) {
-        userStorage.removeItem('activeJob');
-      }
-      
-      // Close event source and status check if open
+      // FIRST: Close connections immediately to prevent state conflicts
       if (eventSourceRef.current) {
+        console.log('🛑 Closing EventSource connection');
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
       
       if (progressPollRef.current) {
+        console.log('🛑 Clearing periodic status check');
         clearInterval(progressPollRef.current);
         progressPollRef.current = null;
       }
       
-      console.log('Job stopped successfully:', result);
+      // SECOND: Check if job still exists and is stoppable
+      const status = await api.getJobStatus(currentJobId).catch(() => null);
+      console.log('🛑 Current job status before stopping:', status);
+      
+      if (!status || status.status === 'completed' || status.status === 'failed' || status.status === 'stopped') {
+        console.log('🛑 Job already finished, cleaning up UI state');
+        // Job already finished, just clean up UI state
+        updateCurrentConversationJobState(null, false, null);
+        
+        // Clear global storage if this is the current active job
+        const cachedJob = userStorage.getJSON('activeJob');
+        if (cachedJob && cachedJob.id === currentJobId) {
+          userStorage.removeItem('activeJob');
+        }
+        
+        return;
+      }
+      
+      // THIRD: Attempt to stop the job
+      const result = await api.stopJob(currentJobId);
+      console.log('🛑 Stop job result:', result);
+            
+      // FOURTH: Clear current conversation's job state (now that connections are closed)
+      updateCurrentConversationJobState(null, false, null);
+      
+      // FIFTH: Clear global storage if this is the current active job
+      const cachedJob = userStorage.getJSON('activeJob');
+      if (cachedJob && cachedJob.id === currentJobId) {
+        userStorage.removeItem('activeJob');
+      }
+      
+      console.log('🛑 Job stopped successfully:', result);
     } catch (error) {
-      console.error('Failed to stop job:', error);
+      console.error('🛑 Failed to stop job:', error);
+      
+      // Even if stop failed, clean up UI state to prevent stuck state
+      console.log('🛑 Cleaning up UI state despite stop failure');
+      updateCurrentConversationJobState(null, false, null);
     } finally {
       setIsStoppingJob(false);
     }
@@ -803,8 +825,8 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
     const currentInput = input;
     setInput('');
-    // Don't clear jobId here, just mark as starting analysis
-    updateCurrentConversationJobState(null, true, "Starting analysis..."); // Mark as streaming with initial progress
+    // Don't clear jobId initially - keep existing job state during transition
+    updateCurrentConversationJobState(currentJobId, true, "Starting analysis..."); // Keep current job ID if any, mark as streaming
 
     try {      
       const analysisRequest = parseAnalysisRequest(currentInput);
@@ -822,7 +844,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
       const result = await api.startAnalysis(analysisRequest);
       console.log('🎯 Analysis started with job ID:', result.job_id);
-      updateCurrentConversationJobState(result.job_id, true, "Initializing analysis..."); // Set job ID, streaming, and initial progress
+      updateCurrentConversationJobState(result.job_id, true, "Initializing analysis..."); // Set new job ID, streaming, and initial progress
       userStorage.setJSON('activeJob', { id: result.job_id, started: Date.now(), status: 'running', conversationId: conversations[currentConversationIndex].id });
       
       // Start both SSE monitoring and periodic status checking
@@ -904,11 +926,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
           
           if (progressText.length >= 5 && progressText.length <= 80) { // Reasonable length
             console.log('📈 Extracted progress from log:', `"${progressText}"` , 'from line:', s.substring(0, 100));
-            updateCurrentConversationJobState(
-              getCurrentConversationJobId(), 
-              getCurrentConversationStreamingState(), 
-              progressText
-            );
+            // Use the jobId parameter to maintain consistency
+            updateCurrentConversationJobState(jobId, true, progressText);
             break; // Use first match
           }
         }
@@ -1089,8 +1108,9 @@ ${JSON.stringify(analysisRequest, null, 2)}
             .trim();
           
           if (cleanProgress && cleanProgress.length > 0) {
-            console.log('� Progress update:', cleanProgress);
-            updateCurrentConversationJobState(getCurrentConversationJobId(), getCurrentConversationStreamingState(), cleanProgress);
+            console.log('📈 Progress update:', cleanProgress);
+            // Use the jobId parameter to avoid race conditions with state reads
+            updateCurrentConversationJobState(jobId, true, cleanProgress);
           }
         }
         queue(progress ? `**Status Update:** ${progress}` : `**Status:** ${message}`, 'status');
@@ -1171,21 +1191,34 @@ ${JSON.stringify(analysisRequest, null, 2)}
     }
     
     console.log('🔄 Starting periodic status check for job:', jobId);
+    let failureCount = 0;
+    const maxFailures = 3;
     
     progressPollRef.current = setInterval(async () => {
       try {
+        // Add timeout to prevent hanging requests
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(() => timeoutController.abort(), 5000);
+        
         const status = await api.getJobStatus(jobId);
+        clearTimeout(timeoutId);
+        
         console.log('📊 Periodic status check result:', status);
         
         if (status) {
-          // Update progress if available
+          failureCount = 0; // Reset failure count on success
+          
+          // Update progress if available, but preserve current streaming state
           if (status.progress && status.progress !== getCurrentConversationProgress()) {
             console.log('📈 Updating progress from status check:', status.progress);
-            updateCurrentConversationJobState(jobId, true, status.progress);
+            // Only update if job is still running/active
+            if (status.status === 'running' || status.status === 'processing' || status.status === 'active') {
+              updateCurrentConversationJobState(jobId, true, status.progress);
+            }
           }
           
           // Check if job is complete
-          if (status.status === 'completed' || status.status === 'failed') {
+          if (status.status === 'completed' || status.status === 'failed' || status.status === 'stopped') {
             console.log('🏁 Job completed via status check:', status.status);
             clearInterval(progressPollRef.current);
             progressPollRef.current = null;
@@ -1194,13 +1227,24 @@ ${JSON.stringify(analysisRequest, null, 2)}
             // or give a delay for UI to show completion state
           }
         } else {
-          console.log('❌ Job status check returned null - job may be gone');
+          failureCount++;
+          console.log(`❌ Job status check returned null (failure ${failureCount}/${maxFailures}) - job may be gone`);
+          
+          if (failureCount >= maxFailures) {
+            console.log('❌ Too many status check failures, stopping periodic check');
+            clearInterval(progressPollRef.current);
+            progressPollRef.current = null;
+          }
+        }
+      } catch (error) {
+        failureCount++;
+        console.log(`❌ Error checking job status (failure ${failureCount}/${maxFailures}):`, error);
+        
+        if (failureCount >= maxFailures) {
+          console.log('❌ Too many status check errors, stopping periodic check');
           clearInterval(progressPollRef.current);
           progressPollRef.current = null;
         }
-      } catch (error) {
-        console.log('❌ Error checking job status:', error);
-        // Don't clear on error - the job might still be running
       }
     }, 3000); // Check every 3 seconds
   };

@@ -55,15 +55,39 @@ export const api = {
   },
 
   async stopJob(jobId) {
-    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/stop`, {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (!resp.ok) {
-      const t = await resp.text().catch(() => '');
-      throw new Error(`Stop job failed ${resp.status}: ${t}`);
+    console.log('🛑 Attempting to stop job:', jobId);
+    
+    try {
+      const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/stop`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+      
+      console.log('🛑 Stop job response status:', resp.status);
+      
+      if (!resp.ok) {
+        const errorText = await resp.text().catch(() => '');
+        console.error('🛑 Stop job failed:', resp.status, errorText);
+        
+        // If job is already stopped or not found, don't throw error
+        if (resp.status === 404 || resp.status === 400) {
+          console.log('🛑 Job may already be stopped or not found, treating as success');
+          return { status: 'already_stopped', message: 'Job was already stopped or not found' };
+        }
+        
+        throw new Error(`Stop job failed ${resp.status}: ${errorText}`);
+      }
+      
+      const result = await resp.json().catch(() => ({ status: 'stopped' }));
+      console.log('🛑 Stop job successful:', result);
+      return result;
+    } catch (error) {
+      console.error('🛑 Stop job error:', error);
+      throw error;
     }
-    return resp.json();
   },
 
   async getStoppableJobs() {
