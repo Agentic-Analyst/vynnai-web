@@ -177,34 +177,32 @@ const PortfolioList = () => {
 
       {/* Portfolio Cards/List */}
       {filteredAndSortedPortfolios.length === 0 ? (
-        <div className="flex items-center justify-center min-h-[500px]">
-          <Card className="w-full max-w-md mx-auto">
-            <CardContent className="p-12 text-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                  <Briefcase className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">
-                    {searchQuery ? 'No portfolios found' : 'No portfolios yet'}
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    {searchQuery
-                      ? 'Try adjusting your search criteria'
-                      : 'Create your first portfolio to start tracking your investments'
-                    }
-                  </p>
-                  {!searchQuery && (
-                    <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      Create Your First Portfolio
-                    </Button>
-                  )}
-                </div>
+        <Card className="p-12 text-center">
+          <CardContent>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                <Briefcase className="h-8 w-8 text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">
+                  {searchQuery ? 'No portfolios found' : 'No portfolios yet'}
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery
+                    ? 'Try adjusting your search criteria'
+                    : 'Create your first portfolio to start tracking your investments'
+                  }
+                </p>
+                {!searchQuery && (
+                  <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 mx-auto">
+                    <Plus className="h-4 w-4" />
+                    Create Your First Portfolio
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAndSortedPortfolios.map((portfolio) => (

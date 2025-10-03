@@ -257,27 +257,25 @@ const Portfolio = () => {
       </div>
       
       {holdings.length === 0 ? (
-        <div className="flex items-center justify-center min-h-[500px]">
-          <Card className="w-full max-w-md mx-auto">
-            <CardContent className="p-12 text-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                  <TrendingUp className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">No Holdings Yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Start building your portfolio by adding your first stock holding.
-                  </p>
-                  <Button onClick={handleAddHolding} className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Your First Holding
-                  </Button>
-                </div>
+        <Card className="p-12 text-center">
+          <CardContent>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                <TrendingUp className="h-8 w-8 text-muted-foreground" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">No Holdings Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Start building your portfolio by adding your first stock holding.
+                </p>
+                <Button onClick={handleAddHolding} className="flex items-center gap-2 mx-auto">
+                  <Plus className="h-4 w-4" />
+                  Add Your First Holding
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
