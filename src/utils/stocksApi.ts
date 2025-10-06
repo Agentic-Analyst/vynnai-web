@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/apiBase';
 
 export interface Stock {
   symbol: string;
@@ -567,4 +568,92 @@ export function useCryptoData(initialData: Cryptocurrency[], updateInterval = 70
   }, [initialData, updateInterval]);
   
   return cryptos;
+}
+
+// Historical data interfaces and API
+export interface HistoricalDataPoint {
+  timestamp: string;
+  price: number;
+  volume: number;
+}
+
+export interface HistoricalDataResponse {
+  symbol: string;
+  timeframe: string;
+  data: HistoricalDataPoint[];
+}
+
+export type Timeframe = '1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL';
+
+// Fetch historical data from real-time API
+export async function fetchHistoricalData(symbol: string, timeframe: Timeframe = '1M'): Promise<HistoricalDataPoint[]> {
+  try {
+    const url = `${API_BASE_URL}/api/realtime/historical/${symbol}?timeframe=${timeframe}`;
+    
+    console.log(`🔍 Fetching historical data: ${url}`);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data: HistoricalDataResponse = await response.json();
+    console.log(`📊 Historical data received for ${symbol}:`, data.data?.length || 0, 'points');
+    
+    return data.data || [];
+  } catch (error) {
+    console.error(`❌ Error fetching historical data for ${symbol}:`, error);
+    // Return empty array on error - component will handle fallback
+    return [];
+  }
+}
+
+// React hook for historical data
+export function useHistoricalData(symbol: string, timeframe: Timeframe = '1M') {
+  const [data, setData] = useState<HistoricalDataPoint[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!symbol) {
+      setData([]);
+      return;
+    }
+
+    let isCancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetchHistoricalData(symbol, timeframe)
+      .then((historicalData) => {
+        if (!isCancelled) {
+          setData(historicalData);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.error('Historical data fetch error:', err);
+          setError(err.message || 'Failed to fetch historical data');
+          setData([]); // Clear data on error
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [symbol, timeframe]);
+
+  return { data, loading, error };
 }

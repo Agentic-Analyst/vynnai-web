@@ -3,10 +3,22 @@ import { API_BASE_URL } from '@/lib/apiBase';
 
 interface StockPrice {
   symbol: string;
+  name?: string;
   current_price: number;
   change_amount: number;
   change_percent: number;
+  volume?: number;
+  market_cap?: number;
   timestamp: string;
+  bid?: number;
+  ask?: number;
+  high_52w?: number;
+  low_52w?: number;
+  day_high?: number;
+  day_low?: number;
+  avg_volume?: number;
+  pe_ratio?: number;
+  dividend_yield?: number;
 }
 
 interface WebSocketMessage {
@@ -114,13 +126,25 @@ export function useRealTimeStockPrices(symbols: string[]) {
               console.log('🔍 DEBUG: Received price_update:', message.data);
               if (message.data && message.data.symbol) {
                 try {
-                  // Backend sends price data directly in message.data
+                  // Backend sends comprehensive price data directly in message.data
                   const priceData = {
                     symbol: message.data.symbol,
+                    name: message.data.name,
                     current_price: message.data.current_price,
                     change_amount: message.data.change_amount,
                     change_percent: message.data.change_percent,
-                    timestamp: message.data.timestamp || new Date().toISOString()
+                    volume: message.data.volume,
+                    market_cap: message.data.market_cap,
+                    timestamp: message.data.timestamp || new Date().toISOString(),
+                    bid: message.data.bid,
+                    ask: message.data.ask,
+                    high_52w: message.data.high_52w,
+                    low_52w: message.data.low_52w,
+                    day_high: message.data.day_high,
+                    day_low: message.data.day_low,
+                    avg_volume: message.data.avg_volume,
+                    pe_ratio: message.data.pe_ratio,
+                    dividend_yield: message.data.dividend_yield
                   };
                   
                   setPrices(prev => ({
@@ -128,7 +152,7 @@ export function useRealTimeStockPrices(symbols: string[]) {
                     [message.data.symbol]: priceData
                   }));
                   
-                  console.log(`💰 PRICE UPDATE: ${message.data.symbol} = $${message.data.current_price} (${message.data.change_percent >= 0 ? '+' : ''}${message.data.change_percent?.toFixed(2)}%)`);
+                  console.log(`💰 PRICE UPDATE: ${message.data.symbol} = $${message.data.current_price} (${message.data.change_percent >= 0 ? '+' : ''}${message.data.change_percent?.toFixed(2)}%) Vol: ${message.data.volume ? (message.data.volume / 1000000).toFixed(1) + 'M' : 'N/A'}`);
                 } catch (priceUpdateError) {
                   console.error('❌ Error processing price update:', priceUpdateError);
                 }
@@ -143,10 +167,22 @@ export function useRealTimeStockPrices(symbols: string[]) {
                   const priceInfo = message.data.price;
                   const priceData = {
                     symbol: priceInfo.symbol,
+                    name: priceInfo.name,
                     current_price: priceInfo.current_price,
                     change_amount: priceInfo.change_amount || 0,
                     change_percent: priceInfo.change_percent || 0,
-                    timestamp: priceInfo.last_updated || new Date().toISOString()
+                    volume: priceInfo.volume,
+                    market_cap: priceInfo.market_cap,
+                    timestamp: priceInfo.last_updated || new Date().toISOString(),
+                    bid: priceInfo.bid,
+                    ask: priceInfo.ask,
+                    high_52w: priceInfo.high_52w,
+                    low_52w: priceInfo.low_52w,
+                    day_high: priceInfo.day_high,
+                    day_low: priceInfo.day_low,
+                    avg_volume: priceInfo.avg_volume,
+                    pe_ratio: priceInfo.pe_ratio,
+                    dividend_yield: priceInfo.dividend_yield
                   };
                   
                   setPrices(prev => ({
