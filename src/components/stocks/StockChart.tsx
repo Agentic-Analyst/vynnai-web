@@ -67,7 +67,7 @@ export function StockChart({
   };
   
   return (
-    <Card className={cn("overflow-hidden h-full", className)}>
+    <Card className={cn("overflow-hidden h-full flex flex-col", className)}>
       <CardHeader className="flex-row items-center justify-between pb-4">
         <div>
           <CardTitle className="leading-none">{symbol}</CardTitle>
@@ -87,8 +87,8 @@ export function StockChart({
           ))}
         </div>
       </CardHeader>
-      <CardContent className="p-0 pb-4">
-        <div className="h-[300px] w-full px-4">
+      <CardContent className="p-0 pb-4 flex-1">
+        <div className="h-full min-h-[300px] w-full px-4">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={chartData}

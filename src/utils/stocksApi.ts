@@ -395,7 +395,8 @@ export function generatePriceHistory(days: number = 30, startPrice: number = 100
   const prices: number[] = [startPrice];
   
   for (let i = 1; i < days; i++) {
-    const change = (Math.random() - 0.5) * volatility;
+    // Reduce volatility for more realistic price movements - cap at 0.5% daily change
+    const change = (Math.random() - 0.5) * Math.min(volatility * 0.25, 0.5);
     const newPrice = Math.max(prices[i-1] * (1 + change / 100), 0.1);
     prices.push(parseFloat(newPrice.toFixed(2)));
   }
@@ -457,7 +458,8 @@ export function useStockData(initialData: Stock[], updateInterval = 5000) {
     const intervalId = setInterval(() => {
       setStocks(prevStocks => 
         prevStocks.map(stock => {
-          const changeAmount = (Math.random() - 0.5) * (stock.price * 0.01);
+          // Much more realistic price movements - 0.1% max change per update
+          const changeAmount = (Math.random() - 0.5) * (stock.price * 0.001);
           const newPrice = Math.max(stock.price + changeAmount, 0.01);
           const newChange = stock.change + changeAmount;
           const newChangePercent = (newChange / (newPrice - newChange)) * 100;
