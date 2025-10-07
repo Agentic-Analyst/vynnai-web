@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
+import { useStockWatchlist } from '@/hooks/useStockWatchlist';
 import { StockCard } from '@/components/stocks/StockCard';
 import { StockChart } from '@/components/stocks/StockChart';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -39,9 +40,9 @@ const availableStocks = [
 ];
 
 const Stocks = () => {
-  const [watchedSymbols, setWatchedSymbols] = useState<string[]>([
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA' // Default initial stocks
-  ]);
+  // Use persistent watchlist instead of hardcoded state
+  const { watchedSymbols, addStock: addToWatchlist, removeStock: removeFromWatchlist, hasStocks } = useStockWatchlist();
+  
   const [newSymbol, setNewSymbol] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -228,8 +229,8 @@ const Stocks = () => {
         return;
       }
       
-      if (!watchedSymbols.includes(symbolToAdd)) {
-        setWatchedSymbols(prev => [...prev, symbolToAdd]);
+      const success = addToWatchlist(symbolToAdd);
+      if (success) {
         setNewSymbol('');
         setShowAddInput(false);
         setSearchQuery('');
@@ -270,11 +271,8 @@ const Stocks = () => {
       setDeletingStocks(prev => new Set([...prev, symbol]));
 
       // Prevent rapid successive deletions
-      setWatchedSymbols(prev => {
-        const newSymbols = prev.filter(s => s !== symbol);
-        console.log('Removing stock:', symbol, 'Remaining:', newSymbols);
-        return newSymbols;
-      });
+      removeFromWatchlist(symbol);
+      console.log('Removed stock:', symbol);
       
       // Safely update selected stock after a brief delay to let state settle
       setTimeout(() => {
@@ -321,7 +319,7 @@ const Stocks = () => {
         return newSet;
       });
     }
-  }, [stocks, deletingStocks]);
+  }, [stocks, deletingStocks, removeFromWatchlist]);
 
   // Update selected stock when stocks data changes (with better error handling)
   React.useEffect(() => {
@@ -509,8 +507,24 @@ const Stocks = () => {
             <Card className="flex-1 flex items-center justify-center">
               <CardContent className="text-center py-8">
                 <TrendingUp className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No stocks in watchlist</h3>
-                <p className="text-muted-foreground mb-4">Click the + button to add stocks</p>
+                <h3 className="text-lg font-semibold mb-2">
+                  {searchQuery ? 'No stocks found' : 'Start Building Your Watchlist'}
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery 
+                    ? `No stocks match "${searchQuery}". Try a different search term.`
+                    : 'Add stocks to your watchlist to track their real-time prices and performance.'
+                  }
+                </p>
+                {!searchQuery && (
+                  <Button 
+                    onClick={() => setShowAddInput(true)} 
+                    className="flex items-center gap-2 mx-auto"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Your First Stock
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
