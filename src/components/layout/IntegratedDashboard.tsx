@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   useStockData, useMarketIndices, useCurrencyPairs, 
-  mockStocks, mockIndices, mockCurrencies, mockNews,
-  generatePriceHistory 
+  mockStocks, mockIndices, mockCurrencies, mockNews
 } from '@/utils/stocksApi';
+import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
 import { StockCard } from '@/components/stocks/StockCard';
 import { StockChart } from '@/components/stocks/StockChart';
 import { MarketOverview } from '@/components/markets/MarketOverview';
@@ -13,23 +13,57 @@ import { StatsCard } from '@/components/ui/StatsCard';
 import { BarChart3, TrendingDown, TrendingUp, Wallet2 } from 'lucide-react';
 
 export function IntegratedDashboard() {
-  const [selectedStock, setSelectedStock] = useState(mockStocks[0]);
+  // Get mock stock data as base
+  const mockStocks_local = useStockData(mockStocks);
   
-  // Use our hooks to get real-time mock data
-  const stocks = useStockData(mockStocks);
+  // Get symbols for real-time prices
+  const symbols = useMemo(() => {
+    return mockStocks.map(stock => stock.symbol);
+  }, []);
+  
+  // Get real-time stock prices
+  const { prices: realTimePrices, isConnected } = useRealTimeStockPrices(symbols);
+  
+  // Combine real-time prices with mock data (same pattern as Stocks.tsx)
+  const stocks = useMemo(() => {
+    return mockStocks_local.map(mockStock => {
+      const realTimePrice = realTimePrices[mockStock.symbol];
+      
+      if (realTimePrice) {
+        // Use real-time data
+        return {
+          ...mockStock,
+          name: realTimePrice.name || mockStock.name,
+          price: realTimePrice.current_price,
+          change: realTimePrice.change_amount,
+          changePercent: realTimePrice.change_percent,
+          volume: realTimePrice.volume || mockStock.volume,
+          marketCap: realTimePrice.market_cap || mockStock.marketCap,
+          lastUpdated: new Date(),
+          isRealTime: true
+        };
+      } else {
+        // Use mock data as fallback
+        return {
+          ...mockStock,
+          isRealTime: false
+        };
+      }
+    });
+  }, [mockStocks_local, realTimePrices]);
+  
+  const [selectedStock, setSelectedStock] = useState(stocks[0]);
+  
+  // Use our hooks to get real-time mock data for other markets
   const indices = useMarketIndices(mockIndices);
   const currencies = useCurrencyPairs(mockCurrencies);
   
-  // Generate chart data for the selected stock
-  const selectedStockHistory = generatePriceHistory(30, selectedStock.price, 2);
-  
-  // Generate chart data for stock cards
-  const stocksWithHistory = stocks.map(stock => {
-    return {
-      ...stock,
-      priceHistory: generatePriceHistory(30, stock.price, 2)
-    };
-  });
+  // Update selected stock when stocks data changes
+  React.useEffect(() => {
+    if (stocks.length > 0 && (!selectedStock || !stocks.find(s => s.symbol === selectedStock.symbol))) {
+      setSelectedStock(stocks[0]);
+    }
+  }, [stocks, selectedStock]);
   
   // Calculate market statistics
   const gainers = stocks.filter(stock => stock.changePercent > 0);
@@ -86,13 +120,12 @@ export function IntegratedDashboard() {
           <div className="lg:col-span-1 space-y-4 animate-slide-up" style={{ '--delay': '200ms' } as React.CSSProperties}>
             <h2 className="text-xl font-semibold">Watchlist</h2>
             <div className="space-y-4">
-              {stocksWithHistory.slice(0, 5).map((stock) => (
+              {stocks.slice(0, 5).map((stock) => (
                 <StockCard 
                   key={stock.symbol} 
                   stock={stock} 
-                  priceHistory={stock.priceHistory}
                   onClick={() => setSelectedStock(stock)}
-                  className={selectedStock.symbol === stock.symbol ? "ring-2 ring-primary" : ""}
+                  className={selectedStock?.symbol === stock.symbol ? "ring-2 ring-primary" : ""}
                 />
               ))}
             </div>
@@ -100,12 +133,15 @@ export function IntegratedDashboard() {
           
           {/* Middle column - Chart and news */}
           <div className="lg:col-span-2 space-y-4 animate-slide-up" style={{ '--delay': '300ms' } as React.CSSProperties}>
-            <StockChart 
-              symbol={selectedStock.symbol} 
-              name={selectedStock.name} 
-              currentPrice={selectedStock.price}
-              volatility={2.5}
-            />
+            <div className="h-[400px]">
+              <StockChart 
+                symbol={selectedStock?.symbol || ''} 
+                name={selectedStock?.name || ''} 
+                currentPrice={selectedStock?.price || 0}
+                volatility={2.5}
+                className="h-full"
+              />
+            </div>
             <NewsCard news={mockNews} className="mt-6" />
           </div>
           
