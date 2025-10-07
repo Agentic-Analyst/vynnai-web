@@ -135,7 +135,7 @@ export function StockChart({
             {isUsingRealData ? (
               <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Live Data</span>
             ) : (
-              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">Mock Data</span>
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">Disconnected</span>
             )}
           </CardTitle>
           <p className="text-sm text-muted-foreground">{name}</p>

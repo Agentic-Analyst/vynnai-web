@@ -4,12 +4,12 @@ import { API_BASE_URL } from '@/lib/apiBase';
 export interface Stock {
   symbol: string;
   name: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  marketCap: number;
-  lastUpdated: Date;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  marketCap: number | null;
+  lastUpdated: Date | null;
 }
 
 export interface MarketIndex {

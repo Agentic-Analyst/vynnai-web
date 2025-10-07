@@ -1,15 +1,15 @@
 
 import React, { useState, useMemo } from 'react';
-import { useStockData, mockStocks as initialMockStocks } from '@/utils/stocksApi';
 import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
 import { StockCard } from '@/components/stocks/StockCard';
 import { StockChart } from '@/components/stocks/StockChart';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, X, TrendingUp, Wifi, WifiOff } from 'lucide-react';
+import { Search, Plus, X, TrendingUp, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -38,16 +38,13 @@ const availableStocks = [
 ];
 
 const Stocks = () => {
-  const [watchedSymbols, setWatchedSymbols] = useState<string[]>(
-    initialMockStocks.map(stock => stock.symbol)
-  );
+  const [watchedSymbols, setWatchedSymbols] = useState<string[]>([
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA' // Default initial stocks
+  ]);
   const [newSymbol, setNewSymbol] = useState('');
   const [showAddInput, setShowAddInput] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
-  
-  // Get mock stock data
-  const mockStocks = useStockData(initialMockStocks, 30000);
   
   // Stabilize symbols for WebSocket connection (following portfolio pattern)
   const symbols = useMemo(() => {
@@ -97,87 +94,68 @@ const Stocks = () => {
     });
   }, [isConnected, connectionStatus, symbols.length, Object.keys(realTimePrices).length]);
 
-  // Calculate stock data with real-time prices (following portfolio's exact pattern)
+  // Calculate stock data with real-time prices (no mock data fallback)
   const stocks = useMemo(() => {
     try {
       return watchedSymbols.map(symbol => {
-        const mockStock = mockStocks.find(s => s.symbol === symbol);
         const realTimePrice = realTimePrices[symbol];
         
-        // Prioritize real-time price, then mock data, then create fallback
-        let price = 100; // Default fallback
-        let name = `${symbol} Corporation`;
-        let change = 0;
-        let changePercent = 0;
-        let volume = 1000000;
-        let marketCap = 1000000000;
-        let priceSource = 'fallback';
-        
+        // Only use real-time data - no mock data fallback
         if (realTimePrice) {
-          price = realTimePrice.current_price;
-          name = realTimePrice.name || symbol; // Use name from API if available
-          change = realTimePrice.change_amount;
-          changePercent = realTimePrice.change_percent;
-          volume = realTimePrice.volume || 1000000; // Use API volume or fallback
-          marketCap = realTimePrice.market_cap || 1000000000; // Use API market cap or fallback
-          priceSource = 'real-time';
-        } else if (mockStock) {
-          price = mockStock.price;
-          name = mockStock.name;
-          change = mockStock.change;
-          changePercent = mockStock.changePercent;
-          volume = mockStock.volume;
-          marketCap = mockStock.marketCap;
-          priceSource = 'mock-data';
+          return {
+            symbol,
+            name: realTimePrice.name || symbol,
+            price: parseFloat(realTimePrice.current_price.toFixed(2)),
+            change: parseFloat(realTimePrice.change_amount.toFixed(2)),
+            changePercent: parseFloat(realTimePrice.change_percent.toFixed(2)),
+            volume: realTimePrice.volume || null,
+            marketCap: realTimePrice.market_cap || null,
+            lastUpdated: new Date(),
+            isRealTime: true,
+            priceSource: 'real-time',
+            // Additional real-time data from API
+            dayHigh: realTimePrice.day_high,
+            dayLow: realTimePrice.day_low,
+            high52w: realTimePrice.high_52w,
+            low52w: realTimePrice.low_52w,
+            peRatio: realTimePrice.pe_ratio,
+            dividendYield: realTimePrice.dividend_yield,
+            bid: realTimePrice.bid,
+            ask: realTimePrice.ask,
+            avgVolume: realTimePrice.avg_volume
+          };
         } else {
-          // Create deterministic mock data for unknown symbols
-          const hash = symbol.split('').reduce((a, b) => {
-            a = ((a << 5) - a) + b.charCodeAt(0);
-            return a & a;
-          }, 0);
-          
-          price = 50 + Math.abs(hash % 450);
-          changePercent = (Math.abs(hash % 200) - 100) / 20;
-          change = (price * changePercent) / 100;
-          volume = Math.abs(hash % 50000000) + 1000000;
-          marketCap = Math.abs(hash % 500000000000) + 1000000000;
-          priceSource = 'generated';
-          
-          // Use available stock name if exists
+          // Return loading state for stocks without real-time data
           const knownStock = availableStocks.find(s => s.symbol === symbol);
-          if (knownStock) {
-            name = knownStock.name;
-          }
+          return {
+            symbol,
+            name: knownStock?.name || symbol,
+            price: null, // Will show loading indicator
+            change: null,
+            changePercent: null,
+            volume: null,
+            marketCap: null,
+            lastUpdated: null,
+            isRealTime: false,
+            priceSource: 'loading',
+            // Additional data all null for loading state
+            dayHigh: null,
+            dayLow: null,
+            high52w: null,
+            low52w: null,
+            peRatio: null,
+            dividendYield: null,
+            bid: null,
+            ask: null,
+            avgVolume: null
+          };
         }
-        
-        return {
-          symbol,
-          name,
-          price: parseFloat(price.toFixed(2)),
-          change: parseFloat(change.toFixed(2)),
-          changePercent: parseFloat(changePercent.toFixed(2)),
-          volume,
-          marketCap,
-          lastUpdated: new Date(),
-          isRealTime: !!realTimePrice,
-          priceSource,
-          // Additional real-time data from API
-          dayHigh: realTimePrice?.day_high,
-          dayLow: realTimePrice?.day_low,
-          high52w: realTimePrice?.high_52w,
-          low52w: realTimePrice?.low_52w,
-          peRatio: realTimePrice?.pe_ratio,
-          dividendYield: realTimePrice?.dividend_yield,
-          bid: realTimePrice?.bid,
-          ask: realTimePrice?.ask,
-          avgVolume: realTimePrice?.avg_volume
-        };
       });
     } catch (error) {
       console.error('Error calculating stock data:', error);
       return [];
     }
-  }, [watchedSymbols, mockStocks, realTimePrices]);
+  }, [watchedSymbols, realTimePrices]);
 
   const isUsingRealTime = Object.keys(realTimePrices).length > 0;
   const lastUpdated = isUsingRealTime ? new Date() : null;
@@ -276,79 +254,151 @@ const Stocks = () => {
     }
   };
 
-  const removeStock = (symbol: string) => {
-    setWatchedSymbols(prev => prev.filter(s => s !== symbol));
-    // If removed stock was selected, select the first remaining stock
-    if (selectedStock?.symbol === symbol) {
-      const remainingStocks = filteredStocksForDisplay.filter(s => s.symbol !== symbol);
-      if (remainingStocks.length > 0) {
-        setSelectedStock(remainingStocks[0]);
-      } else {
-        setSelectedStock(null);
-      }
-    }
-  };
+  // Track deletion state to prevent rapid successive deletions
+  const [deletingStocks, setDeletingStocks] = useState<Set<string>>(new Set());
 
-  // Update selected stock when stocks data changes
+  const removeStock = React.useCallback((symbol: string) => {
+    try {
+      // Prevent removing if already being deleted
+      if (deletingStocks.has(symbol)) {
+        console.log('Stock already being deleted:', symbol);
+        return;
+      }
+
+      // Mark as being deleted
+      setDeletingStocks(prev => new Set([...prev, symbol]));
+
+      // Prevent rapid successive deletions
+      setWatchedSymbols(prev => {
+        const newSymbols = prev.filter(s => s !== symbol);
+        console.log('Removing stock:', symbol, 'Remaining:', newSymbols);
+        return newSymbols;
+      });
+      
+      // Safely update selected stock after a brief delay to let state settle
+      setTimeout(() => {
+        try {
+          setSelectedStock(current => {
+            // If the removed stock was selected, find a new one
+            if (current?.symbol === symbol) {
+              // Use the current filteredStocksForDisplay or recalculate safely
+              const availableStocks = stocks.filter(s => s && s.symbol && s.symbol !== symbol);
+              if (availableStocks.length > 0) {
+                console.log('Selecting new stock after deletion:', availableStocks[0].symbol);
+                return availableStocks[0];
+              } else {
+                console.log('No stocks remaining, clearing selection');
+                return null;
+              }
+            }
+            return current;
+          });
+          
+          // Remove from deleting set after operation completes
+          setDeletingStocks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(symbol);
+            return newSet;
+          });
+        } catch (error) {
+          console.error('Error updating selected stock after deletion:', error);
+          setSelectedStock(null);
+          // Still remove from deleting set
+          setDeletingStocks(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(symbol);
+            return newSet;
+          });
+        }
+      }, 100); // Slightly longer delay to ensure state stability
+    } catch (error) {
+      console.error('Error removing stock:', error);
+      // Remove from deleting set on error
+      setDeletingStocks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(symbol);
+        return newSet;
+      });
+    }
+  }, [stocks, deletingStocks]);
+
+  // Update selected stock when stocks data changes (with better error handling)
   React.useEffect(() => {
     try {
-      if (selectedStock) {
-        const updatedSelected = filteredStocksForDisplay.find(s => s.symbol === selectedStock.symbol);
+      if (selectedStock && selectedStock.symbol) {
+        const updatedSelected = filteredStocksForDisplay.find(s => s?.symbol === selectedStock.symbol);
         if (updatedSelected) {
-          setSelectedStock(updatedSelected);
+          // Only update if the data actually changed (to prevent infinite loops)
+          if (JSON.stringify(updatedSelected) !== JSON.stringify(selectedStock)) {
+            setSelectedStock(updatedSelected);
+          }
         } else if (filteredStocksForDisplay.length > 0) {
+          // Stock no longer exists, select first available
+          console.log('Selected stock no longer exists, selecting first available');
+          setSelectedStock(filteredStocksForDisplay[0]);
+        } else {
+          // No stocks left
+          console.log('No stocks available, clearing selection');
+          setSelectedStock(null);
+        }
+      } else if (!selectedStock && filteredStocksForDisplay.length > 0) {
+        // No stock selected but stocks are available
+        console.log('No stock selected, selecting first available');
+        setSelectedStock(filteredStocksForDisplay[0]);
+      }
+    } catch (error) {
+      console.error('Error updating selected stock:', error);
+      // Defensive fallback
+      try {
+        if (filteredStocksForDisplay.length > 0) {
           setSelectedStock(filteredStocksForDisplay[0]);
         } else {
           setSelectedStock(null);
         }
-      }
-    } catch (error) {
-      console.error('Error updating selected stock:', error);
-      // Fallback to first stock or null
-      if (filteredStocksForDisplay.length > 0) {
-        setSelectedStock(filteredStocksForDisplay[0]);
-      } else {
+      } catch (fallbackError) {
+        console.error('Error in fallback selected stock update:', fallbackError);
         setSelectedStock(null);
       }
     }
-  }, [filteredStocksForDisplay, selectedStock?.symbol]);
+  }, [filteredStocksForDisplay.length, selectedStock?.symbol]); // More specific dependencies
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 pb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold">Stocks</h1>
-          <div className="flex items-center gap-3">
-            {/* Connection Status Indicator */}
-            <div className="flex items-center gap-2 text-sm">
-              {isUsingRealTime ? (
-                <>
-                  <Wifi className={cn(
-                    "h-4 w-4",
-                    isConnected ? "text-green-500" : "text-orange-500"
-                  )} />
-                  <span className="text-muted-foreground">
-                    {isConnected ? 'Live Data' : 'Connecting...'}
+    <ErrorBoundary>
+      <div className="h-[calc(100vh-4rem)] flex flex-col">
+        {/* Header */}
+        <div className="flex-shrink-0 pb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold">Stocks</h1>
+            <div className="flex items-center gap-3">
+              {/* Connection Status Indicator */}
+              <div className="flex items-center gap-2 text-sm">
+                {isUsingRealTime ? (
+                  <>
+                    <Wifi className={cn(
+                      "h-4 w-4",
+                      isConnected ? "text-green-500" : "text-orange-500"
+                    )} />
+                    <span className="text-muted-foreground">
+                      {isConnected ? 'Live Data' : 'Connecting...'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Disconnected</span>
+                  </>
+                )}
+                {lastUpdated && (
+                  <span className="text-xs text-muted-foreground">
+                    Updated {lastUpdated.toLocaleTimeString()}
                   </span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Mock Data</span>
-                </>
-              )}
-              {lastUpdated && (
-                <span className="text-xs text-muted-foreground">
-                  Updated {lastUpdated.toLocaleTimeString()}
-                </span>
-              )}
+                )}
+              </div>
+              <Badge variant="secondary" className="text-sm">
+                {filteredStocksForDisplay.length} stocks tracked
+              </Badge>
             </div>
-            <Badge variant="secondary" className="text-sm">
-              {filteredStocksForDisplay.length} stocks tracked
-            </Badge>
           </div>
-        </div>
         
         {/* Search Bar */}
         <Card className="mb-4">
@@ -463,37 +513,62 @@ const Stocks = () => {
           ) : (
             <ScrollArea className="flex-1">
               <div className="space-y-3 pr-4">
-                {filteredStocksForDisplay.map((stock) => (
-                  <div key={stock.symbol} className="relative group">
-                    <StockCard 
-                      stock={stock} 
-                      onClick={() => setSelectedStock(stock)}
-                      className={cn(
-                        "transition-all duration-200",
-                        selectedStock?.symbol === stock.symbol 
-                          ? "ring-2 ring-primary shadow-md" 
-                          : "hover:shadow-sm"
-                      )}
-                    />
-                    {/* Real-time indicator */}
-                    {isUsingRealTime && isConnected && (
-                      <div className="absolute top-2 left-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" 
-                           title="Live data from real-time feed" />
-                    )}
-                    {/* Remove button */}
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeStock(stock.symbol);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
+                {filteredStocksForDisplay
+                  .filter(stock => stock && stock.symbol) // Safety filter
+                  .map((stock) => {
+                    try {
+                      return (
+                        <div key={stock.symbol} className="relative group">
+                          <StockCard 
+                            stock={stock} 
+                            onClick={() => {
+                              try {
+                                setSelectedStock(stock);
+                              } catch (error) {
+                                console.error('Error selecting stock:', error);
+                              }
+                            }}
+                            className={cn(
+                              "transition-all duration-200",
+                              selectedStock?.symbol === stock.symbol 
+                                ? "ring-2 ring-primary shadow-md" 
+                                : "hover:shadow-sm"
+                            )}
+                          />
+                          {/* Real-time indicator */}
+                          {isUsingRealTime && isConnected && stock.isRealTime && (
+                            <div className="absolute top-2 left-2 w-2 h-2 bg-green-500 rounded-full animate-pulse" 
+                                 title="Live data from real-time feed" />
+                          )}
+                          {/* Remove button */}
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              try {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                removeStock(stock.symbol);
+                              } catch (error) {
+                                console.error('Error removing stock:', error);
+                              }
+                            }}
+                            disabled={deletingStocks.has(stock.symbol)} // Prevent deleting if already in progress
+                          >
+                            {deletingStocks.has(stock.symbol) ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <X className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    } catch (error) {
+                      console.error('Error rendering stock card:', stock?.symbol, error);
+                      return null; // Skip problematic stock cards
+                    }
+                  })}
               </div>
             </ScrollArea>
           )}
@@ -501,13 +576,13 @@ const Stocks = () => {
         
         {/* Chart and Details - Sticky */}
         <div className="lg:col-span-8 flex flex-col min-h-0">
-          {selectedStock ? (
+          {selectedStock && selectedStock.symbol ? (
             <>
               {/* Chart */}
               <div className="flex-1 min-h-[400px] mb-4">
                 <StockChart 
                   symbol={selectedStock.symbol} 
-                  name={selectedStock.name} 
+                  name={selectedStock.name || selectedStock.symbol} 
                   currentPrice={selectedStock.price}
                   volatility={2.5}
                   className="h-full"
@@ -521,7 +596,13 @@ const Stocks = () => {
                     <CardContent className="p-4">
                       <h3 className="font-medium text-sm text-muted-foreground">Market Cap</h3>
                       <p className="text-xl font-semibold mt-1">
-                        ${(selectedStock.marketCap / 1000000000).toFixed(2)}B
+                        {selectedStock.marketCap !== null && typeof selectedStock.marketCap === 'number' ? 
+                          `$${(selectedStock.marketCap / 1000000000).toFixed(2)}B` :
+                          <span className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading...
+                          </span>
+                        }
                       </p>
                     </CardContent>
                   </Card>
@@ -529,7 +610,13 @@ const Stocks = () => {
                     <CardContent className="p-4">
                       <h3 className="font-medium text-sm text-muted-foreground">Volume</h3>
                       <p className="text-xl font-semibold mt-1">
-                        {(selectedStock.volume / 1000000).toFixed(2)}M
+                        {selectedStock.volume !== null ? 
+                          `${(selectedStock.volume / 1000000).toFixed(1)}M` :
+                          <span className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading...
+                          </span>
+                        }
                       </p>
                       {selectedStock.avgVolume && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -545,7 +632,10 @@ const Stocks = () => {
                         {selectedStock.low52w && selectedStock.high52w ? (
                           `$${selectedStock.low52w.toFixed(2)} - $${selectedStock.high52w.toFixed(2)}`
                         ) : (
-                          `$${(selectedStock.price * 0.8).toFixed(2)} - $${(selectedStock.price * 1.2).toFixed(2)}`
+                          <span className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading...
+                          </span>
                         )}
                       </p>
                     </CardContent>
@@ -553,18 +643,28 @@ const Stocks = () => {
                   <Card>
                     <CardContent className="p-4">
                       <h3 className="font-medium text-sm text-muted-foreground">Change</h3>
-                      <p className={cn(
-                        "text-xl font-semibold mt-1",
-                        selectedStock.change >= 0 ? "text-green-600" : "text-red-600"
-                      )}>
-                        {selectedStock.change >= 0 ? '+' : ''}${selectedStock.change.toFixed(2)}
+                      <p className="text-xl font-semibold mt-1">
+                        {selectedStock.change !== null ? (
+                          <span className={cn(
+                            selectedStock.change >= 0 ? "text-green-600" : "text-red-600"
+                          )}>
+                            {selectedStock.change >= 0 ? '+' : ''}${selectedStock.change.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading...
+                          </span>
+                        )}
                       </p>
-                      <p className={cn(
-                        "text-sm mt-1",
-                        selectedStock.changePercent >= 0 ? "text-green-600" : "text-red-600"
-                      )}>
-                        {selectedStock.changePercent >= 0 ? '+' : ''}{selectedStock.changePercent.toFixed(2)}%
-                      </p>
+                      {selectedStock.changePercent !== null && (
+                        <p className={cn(
+                          "text-sm mt-1",
+                          selectedStock.changePercent >= 0 ? "text-green-600" : "text-red-600"
+                        )}>
+                          {selectedStock.changePercent >= 0 ? '+' : ''}{selectedStock.changePercent.toFixed(2)}%
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                   
@@ -631,6 +731,7 @@ const Stocks = () => {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 };
 

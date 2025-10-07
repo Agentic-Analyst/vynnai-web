@@ -72,14 +72,31 @@ export function useRealTimeStockPrices(symbols: string[]) {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
+  const isConnectingRef = useRef(false); // FIXED: Track connection attempts
 
   const connect = async () => {
     try {
+      // FIXED: Prevent multiple concurrent connections
+      if (isConnectingRef.current) {
+        console.log('🔍 DEBUG: Connection already in progress, skipping');
+        return;
+      }
+
+      if (wsRef.current && 
+          (wsRef.current.readyState === WebSocket.CONNECTING || 
+           wsRef.current.readyState === WebSocket.OPEN)) {
+        console.log('🔍 DEBUG: WebSocket already connecting/connected, skipping new connection');
+        return;
+      }
+
+      isConnectingRef.current = true;
+
       // FIXED: Always check API health first
       const apiHealthy = await checkRealTimeAPIHealth();
       if (!apiHealthy) {
         console.log('❌ DEBUG: Real-time API not available, cannot connect WebSocket');
         setConnectionStatus('disconnected');
+        isConnectingRef.current = false;
         return;
       }
       
@@ -91,25 +108,28 @@ export function useRealTimeStockPrices(symbols: string[]) {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('📡 Connected to real-time stock price feed at:', wsUrl);
+        console.log('✅ Connected to real-time stock price feed at:', wsUrl);
         setIsConnected(true);
         setConnectionStatus('connected');
         reconnectAttempts.current = 0;
-
-        // Subscribe to symbols when connection opens
-        if (symbols.length > 0) {
-          const subscribeMessage = {
-            type: 'subscribe',
-            symbols: symbols,
-            user_id: 'portfolio_user'
-          };
-          console.log('🔍 DEBUG: Sending subscription message:', subscribeMessage);
-          ws.send(JSON.stringify(subscribeMessage));
-          console.log('📊 DEBUG: Subscription sent for symbols:', symbols);
+        isConnectingRef.current = false;
+        
+        // Send subscription for symbols with proper state checking
+        if (symbols.length > 0 && ws.readyState === WebSocket.OPEN) {
+          try {
+            const subscribeMessage = {
+              type: 'subscribe',
+              symbols: symbols,
+              user_id: 'portfolio_user'
+            };
+            console.log('🔍 DEBUG: Sending subscription message:', subscribeMessage);
+            ws.send(JSON.stringify(subscribeMessage));
+            console.log('📊 DEBUG: Subscription sent for symbols:', symbols);
+          } catch (error) {
+            console.error('❌ Error sending initial subscription:', error);
+          }
         }
-      };
-
-      ws.onmessage = (event) => {
+      };      ws.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           
@@ -214,9 +234,15 @@ export function useRealTimeStockPrices(symbols: string[]) {
         setIsConnected(false);
         setConnectionStatus('disconnected');
         wsRef.current = null;
+        isConnectingRef.current = false;
         
-        // FIXED: Better reconnection logic
-        if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
+        // FIXED: Only reconnect for unexpected closures and if we still have symbols
+        const wasUnexpectedClose = event.code !== 1000 && event.code !== 1001; // Normal closure codes
+        const shouldReconnect = wasUnexpectedClose && 
+                               symbols.length > 0 && 
+                               reconnectAttempts.current < maxReconnectAttempts;
+        
+        if (shouldReconnect) {
           const delay = Math.min(Math.pow(2, reconnectAttempts.current) * 1000, 30000); // Cap at 30s
           console.log(`🔄 Reconnecting in ${delay/1000}s (attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
           
@@ -224,8 +250,10 @@ export function useRealTimeStockPrices(symbols: string[]) {
             reconnectAttempts.current++;
             connect();
           }, delay);
-        } else if (event.code !== 1000) {
-          console.error('❌ Max reconnection attempts reached or connection manually closed');
+        } else if (wasUnexpectedClose) {
+          console.error('❌ Max reconnection attempts reached or no symbols to reconnect for');
+        } else {
+          console.log('✅ WebSocket connection closed normally');
         }
       };
 
@@ -234,75 +262,156 @@ export function useRealTimeStockPrices(symbols: string[]) {
         console.error('❌ Failed WebSocket URL:', wsUrl);
         console.error('❌ API Base URL:', API_BASE_URL);
         setConnectionStatus('disconnected');
+        isConnectingRef.current = false;
       };
 
     } catch (error) {
       console.error('❌ Failed to create WebSocket connection:', error);
       setConnectionStatus('disconnected');
+      isConnectingRef.current = false;
     }
   };
 
   const disconnect = () => {
+    console.log('🔍 DEBUG: Disconnect called');
+    
+    // Clear any pending reconnection attempts
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
     
+    // Reset connection state
+    isConnectingRef.current = false;
+    
+    // Close WebSocket connection safely
     if (wsRef.current) {
-      wsRef.current.close(1000, 'Manual disconnect'); // Normal closure
+      const currentState = wsRef.current.readyState;
+      console.log('🔍 DEBUG: WebSocket state before close:', currentState);
+      
+      if (currentState === WebSocket.OPEN || currentState === WebSocket.CONNECTING) {
+        try {
+          wsRef.current.close(1000, 'Manual disconnect'); // Normal closure
+        } catch (error) {
+          console.error('❌ Error closing WebSocket:', error);
+        }
+      }
+      
       wsRef.current = null;
     }
     
     setIsConnected(false);
     setConnectionStatus('disconnected');
+    reconnectAttempts.current = 0;
   };
 
   const updateSubscription = (newSymbols: string[]) => {
-    if (wsRef.current && isConnected && newSymbols.length > 0) {
-      const subscribeMessage = {
-        type: 'subscribe',
-        symbols: newSymbols,
-        user_id: 'portfolio_user'
-      };
+    // FIXED: Check both connection state and WebSocket ready state
+    if (wsRef.current && 
+        wsRef.current.readyState === WebSocket.OPEN && 
+        isConnected && 
+        newSymbols.length > 0) {
       
-      console.log('🔍 DEBUG: Updating subscription:', subscribeMessage);
-      wsRef.current.send(JSON.stringify(subscribeMessage));
+      try {
+        const subscribeMessage = {
+          type: 'subscribe',
+          symbols: newSymbols,
+          user_id: 'portfolio_user'
+        };
+        
+        console.log('🔍 DEBUG: Updating subscription:', subscribeMessage);
+        wsRef.current.send(JSON.stringify(subscribeMessage));
+      } catch (error) {
+        console.error('❌ Error sending subscription update:', error);
+      }
+    } else {
+      console.log('🔍 DEBUG: Skipping subscription update - WebSocket not ready:', {
+        hasWebSocket: !!wsRef.current,
+        readyState: wsRef.current?.readyState,
+        isConnected,
+        symbolsLength: newSymbols.length
+      });
     }
   };
 
-  // Connect when component mounts and symbols are available
+  // Connect when component mounts and symbols are available  
   useEffect(() => {
     console.log('🔍 DEBUG: WebSocket useEffect triggered, symbols:', symbols);
-    if (symbols.length > 0) {
-      console.log('🔍 DEBUG: Calling connect() with symbols:', symbols);
-      connect();
-    } else {
-      console.log('🔍 DEBUG: No symbols provided, skipping WebSocket connection');
-    }
     
+    if (symbols.length > 0) {
+      // Don't reconnect if already connected - just update subscription
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && isConnected) {
+        console.log('🔍 DEBUG: WebSocket already connected, updating subscription only');
+        updateSubscription(symbols);
+        return;
+      }
+      
+      // Only connect if not already connecting or connected
+      if (!wsRef.current || 
+          (wsRef.current.readyState !== WebSocket.CONNECTING && 
+           wsRef.current.readyState !== WebSocket.OPEN)) {
+        console.log('🔍 DEBUG: Calling connect() with symbols:', symbols);
+        
+        // Small delay to prevent rapid reconnections when symbols change quickly
+        const connectTimer = setTimeout(() => {
+          connect();
+        }, 200); // Increased delay for more stability
+        
+        return () => clearTimeout(connectTimer);
+      }
+    } else {
+      console.log('🔍 DEBUG: No symbols provided, disconnecting if connected');
+      disconnect();
+    }
+  }, [symbols.join(',')]); // FIXED: Use stable dependency
+
+  // FIXED: Add debounced subscription updates to prevent rapid-fire updates
+  useEffect(() => {
+    // Only update subscription if we have a stable connection
+    if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // Debounce subscription updates to prevent rapid-fire API calls
+    const timeoutId = setTimeout(() => {
+      if (symbols.length > 0 && isConnected && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        console.log('🔍 DEBUG: Debounced subscription update for symbols:', symbols);
+        updateSubscription(symbols);
+      }
+      
+      // Clean up prices for symbols no longer in the list
+      setPrices(prev => {
+        const newPrices: Record<string, StockPrice> = {};
+        symbols.forEach(symbol => {
+          if (prev[symbol]) {
+            newPrices[symbol] = prev[symbol];
+          }
+        });
+        
+        // Only update if the prices actually changed
+        const prevKeys = Object.keys(prev).sort();
+        const newKeys = Object.keys(newPrices).sort();
+        const hasChanges = prevKeys.length !== newKeys.length || 
+                          prevKeys.some((key, index) => key !== newKeys[index]);
+        
+        if (hasChanges) {
+          console.log('🔍 DEBUG: Cleaning up prices, removed:', prevKeys.filter(key => !newKeys.includes(key)));
+        }
+        
+        return hasChanges ? newPrices : prev;
+      });
+    }, 300); // Increased debounce time for more stability
+
+    return () => clearTimeout(timeoutId);
+  }, [symbols.join(','), isConnected]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      console.log('🔍 DEBUG: WebSocket cleanup - disconnecting');
+      console.log('🔍 DEBUG: Component unmounting, cleaning up WebSocket');
       disconnect();
     };
-  }, [symbols]); // FIXED: React when symbols change
-
-  // Update subscription when symbols change and cleanup old prices
-  useEffect(() => {
-    if (symbols.length > 0 && isConnected) {
-      updateSubscription(symbols);
-    }
-    
-    // Clean up prices for symbols no longer in the portfolio
-    setPrices(prev => {
-      const newPrices: Record<string, StockPrice> = {};
-      symbols.forEach(symbol => {
-        if (prev[symbol]) {
-          newPrices[symbol] = prev[symbol];
-        }
-      });
-      return newPrices;
-    });
-  }, [symbols, isConnected]);
+  }, []);
 
   return {
     prices,

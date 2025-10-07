@@ -1,9 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, WifiOff, ArrowLeft } from 'lucide-react';
+import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, WifiOff, ArrowLeft, Loader2 } from 'lucide-react';
 
-import { useStockData, mockStocks } from '@/utils/stocksApi';
 import { usePortfolios } from '@/hooks/usePortfolios';
 import { PortfolioHolding } from '@/hooks/usePortfolio';
 import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
@@ -18,7 +17,6 @@ import { HoldingCard } from '@/components/portfolio/HoldingCard';
 const Portfolio = () => {
   const { portfolioId } = useParams<{ portfolioId: string }>();
   const navigate = useNavigate();
-  const stocks = useStockData(mockStocks);
   const { getPortfolio, updatePortfolio } = usePortfolios();
   const { toast } = useToast();
 
@@ -128,61 +126,68 @@ const Portfolio = () => {
     });
   }, [isConnected, connectionStatus, symbols.length, Object.keys(realTimePrices).length]);
 
-  // Calculate portfolio values with real-time prices (add error handling)
+  // Calculate portfolio values with real-time prices only (no mock data fallback)
   const portfolioItems = useMemo(() => {
     try {
       return holdings.map(item => {
-        const stock = stocks.find(s => s.symbol === item.symbol);
         const realTimePrice = realTimePrices[item.symbol];
         
-        // Prioritize real-time price, then mock data, then cost basis as fallback
-    let currentPrice = item.costBasis; // Default fallback
-    let stockName = `${item.symbol} (Unknown)`;
-    let priceSource = 'cost-basis';
-    
-    if (realTimePrice) {
-      currentPrice = realTimePrice.current_price;
-      stockName = stock?.name || item.symbol;
-      priceSource = 'real-time';
-    } else if (stock) {
-      currentPrice = stock.price;
-      stockName = stock.name;
-      priceSource = 'mock-data';
-    }
-    
-    const currentValue = currentPrice * item.shares;
-    const totalCostBasis = item.costBasis * item.shares;
-    const gain = currentValue - totalCostBasis;
-    const gainPercent = totalCostBasis > 0 ? (gain / totalCostBasis) * 100 : 0;
-    
-        return {
-          ...item,
-          name: stockName,
-          currentPrice,
-          currentValue,
-          totalCostBasis,
-          gain,
-          gainPercent,
-          isRealTime: !!realTimePrice,
-          priceChange: realTimePrice?.change_percent || 0,
-          priceSource
-        };
+        // Only use real-time price or show loading state
+        if (realTimePrice) {
+          const currentPrice = realTimePrice.current_price;
+          const stockName = realTimePrice.name || item.symbol;
+          const currentValue = currentPrice * item.shares;
+          const totalCostBasis = item.costBasis * item.shares;
+          const gain = currentValue - totalCostBasis;
+          const gainPercent = totalCostBasis > 0 ? (gain / totalCostBasis) * 100 : 0;
+          
+          return {
+            ...item,
+            name: stockName,
+            currentPrice,
+            currentValue,
+            totalCostBasis,
+            gain,
+            gainPercent,
+            isRealTime: true,
+            priceChange: realTimePrice.change_percent || 0,
+            priceSource: 'real-time'
+          };
+        } else {
+          // Show loading state when no real-time data available
+          const totalCostBasis = item.costBasis * item.shares;
+          
+          return {
+            ...item,
+            name: item.symbol,
+            currentPrice: null, // Will show loading indicator
+            currentValue: null,
+            totalCostBasis,
+            gain: null,
+            gainPercent: null,
+            isRealTime: false,
+            priceChange: null,
+            priceSource: 'loading'
+          };
+        }
       });
     } catch (error) {
       console.error('Error calculating portfolio items:', error);
       return [];
     }
-  }, [holdings, stocks, realTimePrices]);
+  }, [holdings, realTimePrices]);
 
-  const totalValue = portfolioItems.reduce((sum, item) => sum + item.currentValue, 0);
+  // Calculate totals only from real-time data (exclude loading items)
+  const realTimeItems = portfolioItems.filter(item => item.isRealTime);
+  const totalValue = realTimeItems.reduce((sum, item) => sum + (item.currentValue || 0), 0);
   const totalCost = portfolioItems.reduce((sum, item) => sum + item.totalCostBasis, 0);
   const totalGain = totalValue - totalCost;
   const totalGainPercent = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
   
-  // Data for pie chart
-  const pieData = portfolioItems.map(item => ({
+  // Data for pie chart (only include real-time data)
+  const pieData = realTimeItems.map(item => ({
     name: item.symbol,
-    value: item.currentValue
+    value: item.currentValue || 0
   }));
   
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -317,7 +322,14 @@ const Portfolio = () => {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Total Value</p>
-                    <p className="text-2xl font-bold">${totalValue.toFixed(2)}</p>
+                    {realTimeItems.length > 0 ? (
+                      <p className="text-2xl font-bold">${totalValue.toFixed(2)}</p>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-2xl font-bold text-muted-foreground">Loading...</span>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Cost Basis</p>
@@ -325,18 +337,25 @@ const Portfolio = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Gain/Loss</p>
-                    <div className="flex items-center">
-                      <p className={`text-xl font-bold ${totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        ${totalGain.toFixed(2)}
-                      </p>
-                      <p className={`ml-2 ${totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        ({totalGain >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%)
-                      </p>
-                    </div>
+                    {realTimeItems.length > 0 ? (
+                      <div className="flex items-center">
+                        <p className={`text-xl font-bold ${totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          ${totalGain.toFixed(2)}
+                        </p>
+                        <p className={`ml-2 ${totalGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          ({totalGain >= 0 ? '+' : ''}{totalGainPercent.toFixed(2)}%)
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-xl font-bold text-muted-foreground">Loading...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
-                {pieData.length > 0 && (
+                {pieData.length > 0 ? (
                   <div className="mt-6 h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -358,7 +377,14 @@ const Portfolio = () => {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                )}
+                ) : portfolioItems.length > 0 ? (
+                  <div className="mt-6 h-64 flex items-center justify-center">
+                    <div className="text-center">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Loading portfolio data...</p>
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </div>
@@ -393,26 +419,47 @@ const Portfolio = () => {
                             <td className="py-3 px-4 text-right">${item.costBasis.toFixed(2)}</td>
                             <td className="py-3 px-4 text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <span>${item.currentPrice.toFixed(2)}</span>
-                                {item.isRealTime ? (
-                                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live Price from WebSocket" />
+                                {item.currentPrice !== null ? (
+                                  <>
+                                    <span>${item.currentPrice.toFixed(2)}</span>
+                                    {item.isRealTime && (
+                                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Live Price from WebSocket" />
+                                    )}
+                                  </>
                                 ) : (
-                                  <div className="text-xs text-muted-foreground" title={`Source: ${(item as any).priceSource}`}>
-                                    {(item as any).priceSource === 'mock-data' ? 'M' : 'CB'}
+                                  <div className="flex items-center gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span className="text-muted-foreground text-sm">Loading...</span>
                                   </div>
                                 )}
                               </div>
                             </td>
-                            <td className="py-3 px-4 text-right">${item.currentValue.toFixed(2)}</td>
                             <td className="py-3 px-4 text-right">
-                              <div className={item.gain >= 0 ? 'text-green-500' : 'text-red-500'}>
-                                <div>${item.gain.toFixed(2)} ({item.gain >= 0 ? '+' : ''}{item.gainPercent.toFixed(2)}%)</div>
-                                {item.isRealTime && item.priceChange !== 0 && (
-                                  <div className={`text-xs ${item.priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    Today: {item.priceChange >= 0 ? '+' : ''}{item.priceChange.toFixed(2)}%
-                                  </div>
-                                )}
-                              </div>
+                              {item.currentValue !== null ? (
+                                `$${item.currentValue.toFixed(2)}`
+                              ) : (
+                                <div className="flex items-center justify-end gap-1">
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <span className="text-muted-foreground text-sm">Loading...</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              {item.gain !== null && item.gainPercent !== null ? (
+                                <div className={item.gain >= 0 ? 'text-green-500' : 'text-red-500'}>
+                                  <div>${item.gain.toFixed(2)} ({item.gain >= 0 ? '+' : ''}{item.gainPercent.toFixed(2)}%)</div>
+                                  {item.isRealTime && item.priceChange !== null && item.priceChange !== 0 && (
+                                    <div className={`text-xs ${item.priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      Today: {item.priceChange >= 0 ? '+' : ''}{item.priceChange.toFixed(2)}%
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-1">
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <span className="text-muted-foreground text-sm">Loading...</span>
+                                </div>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-right">
                               <div className="flex justify-end gap-2">
