@@ -33,7 +33,10 @@ const Navigation = () => {
           <div className="flex items-center space-x-2">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              // Fix: Check if current path starts with the item path for dashboard sections
+              const isActive = item.path === "/chat" 
+                ? location.pathname === "/chat" 
+                : location.pathname.startsWith("/dashboard");
               
               return (
                 <Button

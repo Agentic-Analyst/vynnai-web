@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Breadcrumb } from '@/components/Breadcrumb';
-import { navItems } from '@/lib/navigation';
+import { getCurrentDashboardPage } from '@/lib/navigation';
 
 interface PageHeaderProps {
   title?: string;
@@ -20,7 +20,7 @@ export const PageHeader = ({
   showBreadcrumb = true 
 }: PageHeaderProps) => {
   const location = useLocation();
-  const currentItem = navItems.find(item => item.href === location.pathname);
+  const currentItem = getCurrentDashboardPage(location.pathname);
   
   // Use provided title or fallback to nav item title
   const pageTitle = title || currentItem?.title || 'Page';

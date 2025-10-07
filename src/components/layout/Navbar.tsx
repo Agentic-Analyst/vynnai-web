@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { navItems } from '@/lib/navigation';
+import { getCurrentTopLevelSection } from '@/lib/navigation';
 
 interface NavbarProps {
   className?: string;
@@ -14,7 +14,7 @@ interface NavbarProps {
 
 export function Navbar({ className }: NavbarProps) {
   const location = useLocation();
-  const currentItem = navItems.find(item => item.href === location.pathname);
+  const currentSection = getCurrentTopLevelSection(location.pathname);
   
   return (
     <header className={cn("bg-background/95 backdrop-blur-sm sticky top-0 z-30 border-b", className)}>
@@ -22,12 +22,12 @@ export function Navbar({ className }: NavbarProps) {
         <div className="flex items-center gap-4 lg:gap-6">
           <h1 className="text-lg font-semibold tracking-tight lg:text-xl">VYNN</h1>
           
-          {/* Page Title with Icon */}
-          {currentItem && (
+          {/* Top-level Section Indicator (Chat vs Dashboard) */}
+          {currentSection && (
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
-              <currentItem.icon className="h-4 w-4 text-primary" />
+              <currentSection.icon className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-foreground">
-                {currentItem.title}
+                {currentSection.title}
               </span>
             </div>
           )}

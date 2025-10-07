@@ -1,9 +1,26 @@
 import { 
   BarChart, PieChart, BarChart3, Wallet, LineChart, Globe, 
-  DollarSign, Settings, Home
+  DollarSign, Settings, Home, MessageSquare
 } from 'lucide-react';
 
-export const navItems = [
+// Top-level navigation (Chat vs Dashboard)
+export const topLevelNavItems = [
+  {
+    title: 'Chat',
+    icon: MessageSquare,
+    href: '/chat',
+    pathPattern: '/chat'
+  },
+  {
+    title: 'Dashboard',
+    icon: BarChart3,
+    href: '/dashboard',
+    pathPattern: '/dashboard'
+  }
+];
+
+// Dashboard internal navigation
+export const dashboardNavItems = [
   {
     title: 'Dashboard',
     icon: Home,
@@ -51,8 +68,27 @@ export const navItems = [
   }
 ];
 
+// For backward compatibility
+export const navItems = dashboardNavItems;
+
 export type NavItem = {
   title: string;
   icon: React.ElementType;
   href: string;
+  pathPattern?: string;
+};
+
+// Helper functions
+export const getCurrentTopLevelSection = (pathname: string) => {
+  if (pathname.startsWith('/chat')) {
+    return topLevelNavItems.find(item => item.pathPattern === '/chat');
+  }
+  if (pathname.startsWith('/dashboard')) {
+    return topLevelNavItems.find(item => item.pathPattern === '/dashboard');
+  }
+  return null;
+};
+
+export const getCurrentDashboardPage = (pathname: string) => {
+  return dashboardNavItems.find(item => item.href === pathname);
 };

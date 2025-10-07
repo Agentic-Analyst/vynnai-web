@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { navItems } from '@/lib/navigation';
+import { getCurrentDashboardPage } from '@/lib/navigation';
 
 interface SectionIndicatorProps {
   className?: string;
@@ -9,7 +9,7 @@ interface SectionIndicatorProps {
 
 export const SectionIndicator = ({ className }: SectionIndicatorProps) => {
   const location = useLocation();
-  const currentItem = navItems.find(item => item.href === location.pathname);
+  const currentItem = getCurrentDashboardPage(location.pathname);
   
   if (!currentItem) return null;
   

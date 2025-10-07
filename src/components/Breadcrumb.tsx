@@ -2,13 +2,15 @@ import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { navItems } from '@/lib/navigation';
+import { getCurrentTopLevelSection, getCurrentDashboardPage } from '@/lib/navigation';
 
 export const Breadcrumb = ({ className }) => {
   const location = useLocation();
   
-  // Find the current nav item
-  const currentItem = navItems.find(item => item.href === location.pathname);
+  // Get the current top-level section (Chat vs Dashboard)
+  const currentTopLevel = getCurrentTopLevelSection(location.pathname);
+  // Get the current dashboard page (if in dashboard)
+  const currentDashboardPage = getCurrentDashboardPage(location.pathname);
   
   // Create breadcrumb items
   const breadcrumbItems = [
@@ -20,14 +22,26 @@ export const Breadcrumb = ({ className }) => {
     }
   ];
   
-  // Add current page if it's not home
-  if (currentItem && currentItem.href !== '/') {
+  // Add top-level section (Chat or Dashboard)
+  if (currentTopLevel) {
     breadcrumbItems.push({
-      label: currentItem.title,
-      href: currentItem.href,
-      icon: currentItem.icon,
+      label: currentTopLevel.title,
+      href: currentTopLevel.href,
+      icon: currentTopLevel.icon,
       isHome: false
     });
+    
+    // If we're in dashboard and on a specific page (not the main dashboard)
+    if (currentTopLevel.pathPattern === '/dashboard' && 
+        currentDashboardPage && 
+        currentDashboardPage.href !== '/dashboard') {
+      breadcrumbItems.push({
+        label: currentDashboardPage.title,
+        href: currentDashboardPage.href,
+        icon: currentDashboardPage.icon,
+        isHome: false
+      });
+    }
   }
   
   return (
