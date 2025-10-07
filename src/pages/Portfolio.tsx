@@ -6,6 +6,7 @@ import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, Wif
 import { usePortfolios } from '@/hooks/usePortfolios';
 import { PortfolioHolding } from '@/hooks/usePortfolio';
 import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
+import { PageHeader } from '@/components/PageHeader';
 import { PieChart, Cell, Pie, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -227,62 +228,63 @@ const Portfolio = () => {
   
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/dashboard/portfolio')}
-            className="mr-2"
+      <PageHeader 
+        title={portfolio.name}
+        description={portfolio.description}
+        showBreadcrumb={false}
+      >
+        {/* Back Button */}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => navigate('/dashboard/portfolio')}
+          className="mr-2"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Portfolios
+        </Button>
+        
+        {/* Connection Status */}
+        <div className="flex items-center gap-2 text-sm">
+          {isConnected ? (
+            <>
+              <Wifi className="h-4 w-4 text-green-500" />
+              <span className="text-green-600">Live Prices ({Object.keys(realTimePrices).length} active)</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-4 w-4 text-orange-500" />
+              <span className="text-orange-600 capitalize">{connectionStatus}</span>
+            </>
+          )}
+        </div>
+        
+        {/* View Mode Toggle */}
+        <div className="flex border rounded-lg p-1">
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className="h-8 w-8 p-0"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <List className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{portfolio.name}</h1>
-            {portfolio.description && (
-              <p className="text-muted-foreground text-sm">{portfolio.description}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            {isConnected ? (
-              <>
-                <Wifi className="h-4 w-4 text-green-500" />
-                <span className="text-green-600">Live Prices ({Object.keys(realTimePrices).length} active)</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-4 w-4 text-orange-500" />
-                <span className="text-orange-600 capitalize">{connectionStatus}</span>
-              </>
-            )}
-          </div>
+          <Button
+            variant={viewMode === 'cards' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('cards')}
+            className="h-8 w-8 p-0"
+          >
+            <Grid3X3 className="h-4 w-4" />
+          </Button>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex border rounded-lg p-1">
-            <Button
-              variant={viewMode === 'table' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
-              className="h-8 w-8 p-0"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'cards' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('cards')}
-              className="h-8 w-8 p-0"
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </Button>
-          </div>
 
-          <Button onClick={handleAddHolding} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Holding
-          </Button>
-        </div>
-      </div>
+        {/* Add Holding Button */}
+        <Button onClick={handleAddHolding} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Holding
+        </Button>
+      </PageHeader>
       
       {holdings.length === 0 ? (
         <Card className="p-12 text-center">

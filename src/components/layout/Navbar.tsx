@@ -1,21 +1,36 @@
 
 import React from 'react';
 import { Search, Bell, User } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { navItems } from '@/lib/navigation';
 
 interface NavbarProps {
   className?: string;
 }
 
 export function Navbar({ className }: NavbarProps) {
+  const location = useLocation();
+  const currentItem = navItems.find(item => item.href === location.pathname);
+  
   return (
     <header className={cn("bg-background/95 backdrop-blur-sm sticky top-0 z-30 border-b", className)}>
       <div className="container flex items-center justify-between h-16 px-4">
-        <div className="flex items-center gap-2 lg:gap-4">
+        <div className="flex items-center gap-4 lg:gap-6">
           <h1 className="text-lg font-semibold tracking-tight lg:text-xl">VYNN</h1>
+          
+          {/* Page Title with Icon */}
+          {currentItem && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50 border">
+              <currentItem.icon className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">
+                {currentItem.title}
+              </span>
+            </div>
+          )}
           
           <div className="relative hidden md:flex items-center h-9 rounded-md px-3 text-muted-foreground focus-within:text-foreground bg-muted/50">
             <Search className="h-4 w-4 mr-2" />

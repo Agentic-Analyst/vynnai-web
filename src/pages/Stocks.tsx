@@ -4,6 +4,7 @@ import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
 import { StockCard } from '@/components/stocks/StockCard';
 import { StockChart } from '@/components/stocks/StockChart';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -366,9 +367,11 @@ const Stocks = () => {
     <ErrorBoundary>
       <div className="h-[calc(100vh-4rem)] flex flex-col">
         {/* Header */}
-        <div className="flex-shrink-0 pb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">Stocks</h1>
+        <div className="flex-shrink-0">
+          <PageHeader 
+            description="Monitor and track your favorite stocks in real-time"
+          >
+            {/* Connection Status and Add Stock Button */}
             <div className="flex items-center gap-3">
               {/* Connection Status Indicator */}
               <div className="flex items-center gap-2 text-sm">
@@ -398,7 +401,7 @@ const Stocks = () => {
                 {filteredStocksForDisplay.length} stocks tracked
               </Badge>
             </div>
-          </div>
+          </PageHeader>
         
         {/* Search Bar */}
         <Card className="mb-4">

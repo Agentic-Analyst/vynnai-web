@@ -1,13 +1,11 @@
 
 import React from 'react';
-import { 
-  BarChart, PieChart, BarChart3, Wallet, LineChart, Globe, 
-  DollarSign, Settings, ChevronRight, ChevronLeft, Home
-} from 'lucide-react';
+import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Link, useLocation } from 'react-router-dom';
+import { navItems, type NavItem } from '@/lib/navigation';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -15,62 +13,8 @@ interface SidebarProps {
   className?: string;
 }
 
-interface NavItem {
-  title: string;
-  icon: React.ElementType;
-  href: string;
-}
-
 export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
   const location = useLocation();
-  
-  const navItems = [
-    {
-      title: 'Dashboard',
-      icon: Home,
-      href: '/dashboard',
-    },
-    {
-      title: 'Stocks',
-      icon: BarChart,
-      href: '/dashboard/stocks',
-    },
-    {
-      title: 'Markets',
-      icon: BarChart3,
-      href: '/dashboard/markets',
-    },
-    {
-      title: 'Currencies',
-      icon: DollarSign,
-      href: '/dashboard/currencies',
-    },
-    {
-      title: 'Global',
-      icon: Globe,
-      href: '/dashboard/global',
-    },
-    {
-      title: 'Portfolio',
-      icon: Wallet,
-      href: '/dashboard/portfolio',
-    },
-    {
-      title: 'Performance',
-      icon: LineChart,
-      href: '/dashboard/performance',
-    },
-    {
-      title: 'Analysis',
-      icon: PieChart,
-      href: '/dashboard/analysis',
-    },
-    {
-      title: 'Settings',
-      icon: Settings,
-      href: '/dashboard/settings',
-    }
-  ];
 
   return (
     <aside className={cn(
@@ -108,18 +52,43 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
                 key={index}
                 to={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground",
+                  "relative flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200 group",
+                  "hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground hover:shadow-sm",
+                  isActive 
+                    ? "bg-gradient-to-r from-primary/20 to-primary/5 text-primary border-l-3 border-primary shadow-sm" 
+                    : "text-sidebar-foreground hover:translate-x-1",
                   isCollapsed && "justify-center px-0"
                 )}
               >
-                <item.icon className={cn("h-5 w-5 shrink-0")} />
+                {/* Active indicator dot for collapsed state */}
+                {isActive && isCollapsed && (
+                  <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full shadow-lg" />
+                )}
+                
+                {/* Left border indicator for expanded state */}
+                {isActive && !isCollapsed && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full shadow-md" />
+                )}
+                
+                <item.icon className={cn(
+                  "h-5 w-5 shrink-0 transition-all duration-200",
+                  isActive ? "text-primary scale-110" : "group-hover:scale-105"
+                )} />
                 <span className={cn(
-                  "text-sm font-medium transition-opacity duration-200",
-                  isCollapsed ? "opacity-0 w-0" : "opacity-100"
+                  "text-sm font-medium transition-all duration-200",
+                  isCollapsed ? "opacity-0 w-0" : "opacity-100",
+                  isActive ? "font-semibold" : "group-hover:font-medium"
                 )}>
                   {item.title}
                 </span>
+                
+                {/* Modern hover indicator */}
+                {!isActive && (
+                  <div className={cn(
+                    "absolute inset-0 rounded-lg border border-transparent transition-all duration-200",
+                    "group-hover:border-sidebar-accent/50 group-hover:bg-gradient-to-r group-hover:from-sidebar-accent/5 group-hover:to-transparent"
+                  )} />
+                )}
               </Link>
             );
           })}

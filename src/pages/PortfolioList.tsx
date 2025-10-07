@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Edit2, Trash2, TrendingUp, TrendingDown, Calendar, DollarSign, Briefcase } from 'lucide-react';
 import { usePortfolios, PortfolioSummary } from '@/hooks/usePortfolios';
+import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,18 +125,14 @@ const PortfolioList = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Portfolios</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your investment portfolios
-          </p>
-        </div>
+      <PageHeader 
+        description="Manage your investment portfolios"
+      >
         <Button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           New Portfolio
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Search and Filter Controls */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
