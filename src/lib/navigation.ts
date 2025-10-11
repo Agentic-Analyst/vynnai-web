@@ -1,6 +1,6 @@
 import { 
   BarChart, PieChart, BarChart3, Wallet, LineChart, Globe, 
-  DollarSign, Settings, Home, MessageSquare
+  DollarSign, Settings, MessageSquare, Newspaper
 } from 'lucide-react';
 
 // Top-level navigation (Chat vs Dashboard)
@@ -22,9 +22,9 @@ export const topLevelNavItems = [
 // Dashboard internal navigation
 export const dashboardNavItems = [
   {
-    title: 'Dashboard',
-    icon: Home,
-    href: '/dashboard',
+    title: 'News',
+    icon: Newspaper,
+    href: '/dashboard/news',
   },
   {
     title: 'Stocks',

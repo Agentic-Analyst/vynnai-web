@@ -11,6 +11,7 @@ import OAuthCallback from "./pages/OAuthCallback.jsx";
 
 // Stock Dashboard Pages
 import Stocks from "./pages/Stocks.tsx";
+import { NewsPage } from "./pages/NewsPage.tsx";
 import Markets from "./pages/Markets.tsx";
 import Currencies from "./pages/Currencies.tsx";
 import Global from "./pages/Global.tsx";
@@ -102,6 +103,8 @@ const App = () => {
 
                   {/* Stock Dashboard Routes */}
                   <Route path="/dashboard/*" element={isAuthed ? <StockDashboardLayout /> : <Navigate to="/" replace />}>
+                    <Route index element={<Navigate to="/dashboard/news" replace />} />
+                    <Route path="news" element={<NewsPage />} />
                     <Route path="stocks" element={<Stocks />} />
                     <Route path="markets" element={<Markets />} />
                     <Route path="currencies" element={<Currencies />} />
@@ -112,7 +115,6 @@ const App = () => {
                     <Route path="analysis" element={<Analysis />} />
                     <Route path="settings" element={<Settings />} />
                   </Route>
-                  <Route path="/dashboard" element={isAuthed ? <StockDashboardLayout /> : <Navigate to="/" replace />} />
 
                   {/* OAuth finishes here */}
                   <Route path="/auth/callback" element={<OAuthCallback />} />

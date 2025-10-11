@@ -1,11 +1,10 @@
 
 import React from 'react';
-import { Search, Bell, User } from 'lucide-react';
+import { Search, Bell } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getCurrentTopLevelSection } from '@/lib/navigation';
 
 interface NavbarProps {
@@ -51,12 +50,6 @@ export function Navbar({ className }: NavbarProps) {
             <Bell className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
           </Button>
-          
-          <Avatar className="h-9 w-9 transition-transform duration-200 hover:scale-105">
-            <AvatarFallback className="bg-primary/10 text-primary">
-              <User className="h-5 w-5" />
-            </AvatarFallback>
-          </Avatar>
         </div>
       </div>
     </header>

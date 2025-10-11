@@ -298,6 +298,70 @@ export const mockNews: NewsItem[] = [
     imageUrl: 'https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=1632&auto=format&fit=crop',
     publishedAt: new Date(Date.now() - 3600000 * 12),
     relatedSymbols: ['TSLA']
+  },
+  {
+    id: '6',
+    title: 'Microsoft Azure AI Services See 40% Growth in Q4',
+    summary: 'Microsoft reported strong growth in its Azure AI and cloud services division, driven by increased enterprise adoption of AI tools and infrastructure.',
+    source: 'Cloud Computing Weekly',
+    url: '#',
+    publishedAt: new Date(Date.now() - 3600000 * 14),
+    relatedSymbols: ['MSFT']
+  },
+  {
+    id: '7',
+    title: 'Google Unveils Next-Generation Quantum Computing Chip',
+    summary: 'Alphabet\'s Google announced a breakthrough in quantum computing with a new chip that could revolutionize complex problem-solving capabilities.',
+    source: 'Tech Innovations',
+    url: '#',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?q=80&w=1625&auto=format&fit=crop',
+    publishedAt: new Date(Date.now() - 3600000 * 16),
+    relatedSymbols: ['GOOGL']
+  },
+  {
+    id: '8',
+    title: 'Banking Sector Faces Regulatory Pressure on Digital Assets',
+    summary: 'Major banks are under increased scrutiny from regulators regarding their involvement in cryptocurrency and digital asset services.',
+    source: 'Financial Regulation Today',
+    url: '#',
+    publishedAt: new Date(Date.now() - 3600000 * 18),
+  },
+  {
+    id: '9',
+    title: 'Amazon Warehouse Automation Reaches New Milestone',
+    summary: 'Amazon announced that its fulfillment centers now use 50% more robotic systems than last year, improving efficiency and reducing delivery times.',
+    source: 'Logistics Daily',
+    url: '#',
+    imageUrl: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=1470&auto=format&fit=crop',
+    publishedAt: new Date(Date.now() - 3600000 * 20),
+    relatedSymbols: ['AMZN']
+  },
+  {
+    id: '10',
+    title: 'Semiconductor Shortage Shows Signs of Easing',
+    summary: 'Industry analysts report that global semiconductor supply chains are beginning to stabilize, though full recovery may take until next year.',
+    source: 'Chip Industry News',
+    url: '#',
+    publishedAt: new Date(Date.now() - 3600000 * 22),
+    relatedSymbols: ['NVDA', 'AMD', 'INTC']
+  },
+  {
+    id: '11',
+    title: 'Renewable Energy Stocks Surge on New Climate Legislation',
+    summary: 'Clean energy companies saw significant gains after Congress passed new legislation providing additional tax incentives for renewable energy projects.',
+    source: 'Green Finance Report',
+    url: '#',
+    publishedAt: new Date(Date.now() - 3600000 * 24),
+  },
+  {
+    id: '12',
+    title: 'Meta Platforms Launches New VR Headset for Enterprise',
+    summary: 'Meta announced a new virtual reality headset specifically designed for business applications, targeting the growing enterprise VR market.',
+    source: 'VR Business Weekly',
+    url: '#',
+    imageUrl: 'https://images.unsplash.com/photo-1622979135225-d2ba269cf1ac?q=80&w=1470&auto=format&fit=crop',
+    publishedAt: new Date(Date.now() - 3600000 * 26),
+    relatedSymbols: ['META']
   }
 ];
 
