@@ -496,7 +496,7 @@ const Stocks = () => {
                   value={newSymbol}
                   onChange={(e) => setNewSymbol(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  className="w-32 h-8 text-sm"
+                  className="w-40 h-8 text-sm"
                   autoFocus
                 />
                 <Button 

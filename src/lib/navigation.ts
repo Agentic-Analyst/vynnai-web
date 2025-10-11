@@ -32,6 +32,11 @@ export const dashboardNavItems = [
     href: '/dashboard/stocks',
   },
   {
+    title: 'Portfolio',
+    icon: Wallet,
+    href: '/dashboard/portfolio',
+  },
+  {
     title: 'Markets',
     icon: BarChart3,
     href: '/dashboard/markets',
@@ -45,11 +50,6 @@ export const dashboardNavItems = [
     title: 'Global',
     icon: Globe,
     href: '/dashboard/global',
-  },
-  {
-    title: 'Portfolio',
-    icon: Wallet,
-    href: '/dashboard/portfolio',
   },
   {
     title: 'Performance',
