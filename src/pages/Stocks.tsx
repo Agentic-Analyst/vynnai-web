@@ -6,6 +6,7 @@ import { StockCard } from '@/components/stocks/StockCard';
 import { StockChart } from '@/components/stocks/StockChart';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PageHeader } from '@/components/PageHeader';
+import { MarketStats } from '@/components/markets/MarketStats';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, Plus, X, TrendingUp, Wifi, WifiOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { mockStocks } from '@/utils/stocksApi';
 
 // Popular stocks for search suggestions
 const availableStocks = [
@@ -107,24 +109,24 @@ const Stocks = () => {
           return {
             symbol,
             name: realTimePrice.name || symbol,
-            price: parseFloat(realTimePrice.current_price.toFixed(2)),
-            change: parseFloat(realTimePrice.change_amount.toFixed(2)),
-            changePercent: parseFloat(realTimePrice.change_percent.toFixed(2)),
+            price: realTimePrice.current_price ? parseFloat(realTimePrice.current_price.toFixed(2)) : null,
+            change: realTimePrice.change_amount ? parseFloat(realTimePrice.change_amount.toFixed(2)) : null,
+            changePercent: realTimePrice.change_percent ? parseFloat(realTimePrice.change_percent.toFixed(2)) : null,
             volume: realTimePrice.volume || null,
             marketCap: realTimePrice.market_cap || null,
             lastUpdated: new Date(),
             isRealTime: true,
             priceSource: 'real-time',
             // Additional real-time data from API
-            dayHigh: realTimePrice.day_high,
-            dayLow: realTimePrice.day_low,
-            high52w: realTimePrice.high_52w,
-            low52w: realTimePrice.low_52w,
-            peRatio: realTimePrice.pe_ratio,
-            dividendYield: realTimePrice.dividend_yield,
-            bid: realTimePrice.bid,
-            ask: realTimePrice.ask,
-            avgVolume: realTimePrice.avg_volume
+            dayHigh: realTimePrice.day_high || null,
+            dayLow: realTimePrice.day_low || null,
+            high52w: realTimePrice.high_52w || null,
+            low52w: realTimePrice.low_52w || null,
+            peRatio: realTimePrice.pe_ratio || null,
+            dividendYield: realTimePrice.dividend_yield || null,
+            bid: realTimePrice.bid || null,
+            ask: realTimePrice.ask || null,
+            avgVolume: realTimePrice.avg_volume || null
           };
         } else {
           // Return loading state for stocks without real-time data
@@ -161,6 +163,17 @@ const Stocks = () => {
 
   const isUsingRealTime = Object.keys(realTimePrices).length > 0;
   const lastUpdated = isUsingRealTime ? new Date() : null;
+
+  // Market stats data: Show empty states when user has no stocks, use their data when they do
+  const marketStatsData = useMemo(() => {
+    if (hasStocks && stocks.length > 0) {
+      // Use user's watchlist for market stats
+      return stocks.filter(stock => stock && stock.price !== null);
+    } else {
+      // Return empty array when user has no stocks - MarketStats will handle empty state
+      return [];
+    }
+  }, [hasStocks, stocks]);
 
   // Filter stocks based on search query
   const filteredStocks = useMemo(() => {
@@ -448,6 +461,12 @@ const Stocks = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Market Overview Stats - Always show */}
+        <MarketStats 
+          stocks={marketStatsData} 
+          className="mb-6"
+        />
       </div>
 
       {/* Main Content */}
