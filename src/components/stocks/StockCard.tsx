@@ -38,8 +38,9 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
         )}
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
+        {/* Price and Change */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="space-y-1">
             <div className="text-2xl font-bold">
               {isLoading ? (
                 <div className="flex items-center gap-2">
@@ -66,25 +67,13 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
                 </span>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-1 text-xs">
-              <div className="text-muted-foreground">Volume:</div>
-              <div className="text-right">
-                {isLoading || stock.volume === null ? "N/A" : formatNumber(stock.volume)}
-              </div>
-              <div className="text-muted-foreground">Mkt Cap:</div>
-              <div className="text-right">
-                {isLoading || stock.marketCap === null ? "N/A" : formatNumber(stock.marketCap)}
-              </div>
-              <div className="text-muted-foreground">Updated:</div>
-              <div className="text-right">
-                {isLoading || !stock.lastUpdated ? "N/A" : formatDate(stock.lastUpdated)}
-              </div>
-            </div>
           </div>
-          <div className="h-24">
+          
+          {/* Chart in top right */}
+          <div className="h-16 w-24 flex-shrink-0">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
             ) : priceHistory && priceHistory.length > 0 ? (
               <Sparkline 
@@ -92,6 +81,76 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
                 color={isPositive ? 'rgb(var(--success))' : 'rgb(var(--danger))'}
               />
             ) : null}
+          </div>
+        </div>
+
+        {/* Main Info Grid - Better distributed layout */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3">
+          <div className="text-muted-foreground">Volume:</div>
+          <div className="text-right">
+            {isLoading || stock.volume === null ? "N/A" : formatNumber(stock.volume)}
+          </div>
+          <div className="text-muted-foreground">Mkt Cap:</div>
+          <div className="text-right">
+            {isLoading || stock.marketCap === null ? "N/A" : formatNumber(stock.marketCap)}
+          </div>
+          <div className="text-muted-foreground">Updated:</div>
+          <div className="text-right">
+            {isLoading || !stock.lastUpdated ? "N/A" : formatDate(stock.lastUpdated)}
+          </div>
+        </div>
+        
+        {/* Analysis Section */}
+        <div className="space-y-2 pt-2 border-t border-border/50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Short-term:</span>
+            <div>
+              {(() => {
+                if (isLoading) return <span className="text-xs text-muted-foreground">N/A</span>;
+                
+                // Mock recommendation logic based on stock symbol
+                const recommendations = ['Buy', 'Hold', 'Sell'];
+                const recommendationIndex = Math.abs(stock.symbol.charCodeAt(0)) % 3;
+                const recommendation = recommendations[recommendationIndex];
+                
+                const getRecommendationColor = (rec: string) => {
+                  switch(rec) {
+                    case 'Buy': return 'bg-green-100 text-green-800 border-green-200';
+                    case 'Sell': return 'bg-red-100 text-red-800 border-red-200';
+                    case 'Hold': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                    default: return 'bg-gray-100 text-gray-800 border-gray-200';
+                  }
+                };
+                
+                return (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getRecommendationColor(recommendation)}`}>
+                    {recommendation}
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Intrinsic Value:</span>
+            <div className="text-right">
+              {(() => {
+                if (isLoading || stock.price === null) return <span className="text-xs text-muted-foreground">N/A</span>;
+                
+                // Mock intrinsic value - slightly different from current price
+                const intrinsicMultiplier = 0.95 + (Math.abs(stock.symbol.charCodeAt(1)) % 20) / 100; // Between 0.95 and 1.15
+                const intrinsicValue = stock.price * intrinsicMultiplier;
+                
+                return (
+                  <div className="text-right">
+                    <div className="text-xs font-medium">{formatCurrency(intrinsicValue)}</div>
+                    <div className={`text-xs ${intrinsicValue > stock.price ? 'text-green-600' : 'text-red-600'}`}>
+                      {intrinsicValue > stock.price ? 'Undervalued' : 'Overvalued'}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         </div>
       </CardContent>

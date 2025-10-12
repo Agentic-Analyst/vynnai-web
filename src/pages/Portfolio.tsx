@@ -307,7 +307,7 @@ const Portfolio = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
@@ -358,7 +358,7 @@ const Portfolio = () => {
                 </div>
                 
                 {pieData.length > 0 ? (
-                  <div className="mt-6 h-64">
+                  <div className="mt-6 h-48">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -366,7 +366,7 @@ const Portfolio = () => {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          outerRadius={80}
+                          outerRadius={60}
                           fill="#8884d8"
                           dataKey="value"
                         >
@@ -380,7 +380,7 @@ const Portfolio = () => {
                     </ResponsiveContainer>
                   </div>
                 ) : portfolioItems.length > 0 ? (
-                  <div className="mt-6 h-64 flex items-center justify-center">
+                  <div className="mt-6 h-48 flex items-center justify-center">
                     <div className="text-center">
                       <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground">Loading portfolio data...</p>
@@ -391,7 +391,7 @@ const Portfolio = () => {
             </Card>
           </div>
           
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <Card>
               <CardHeader>
                 <CardTitle>Holdings</CardTitle>
@@ -409,6 +409,8 @@ const Portfolio = () => {
                           <th className="text-right py-2 px-4">Current Price</th>
                           <th className="text-right py-2 px-4">Value</th>
                           <th className="text-right py-2 px-4">Gain/Loss</th>
+                          <th className="text-center py-2 px-4">Short-term</th>
+                          <th className="text-right py-2 px-4">Intrinsic Value</th>
                           <th className="text-right py-2 px-4">Actions</th>
                         </tr>
                       </thead>
@@ -462,6 +464,54 @@ const Portfolio = () => {
                                   <span className="text-muted-foreground text-sm">Loading...</span>
                                 </div>
                               )}
+                            </td>
+                            {/* Short-term Column */}
+                            <td className="py-3 px-4 text-center">
+                              {(() => {
+                                // Mock recommendation logic based on gain/loss
+                                const recommendations = ['Buy', 'Hold', 'Sell'];
+                                const recommendationIndex = Math.abs(item.symbol.charCodeAt(0)) % 3;
+                                const recommendation = recommendations[recommendationIndex];
+                                
+                                const getRecommendationColor = (rec: string) => {
+                                  switch(rec) {
+                                    case 'Buy': return 'bg-green-100 text-green-800 border-green-200';
+                                    case 'Sell': return 'bg-red-100 text-red-800 border-red-200';
+                                    case 'Hold': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                                    default: return 'bg-gray-100 text-gray-800 border-gray-200';
+                                  }
+                                };
+                                
+                                return (
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getRecommendationColor(recommendation)}`}>
+                                    {recommendation}
+                                  </span>
+                                );
+                              })()}
+                            </td>
+                            {/* Intrinsic Value Column */}
+                            <td className="py-3 px-4 text-right">
+                              {(() => {
+                                // Mock intrinsic value - slightly different from current price
+                                const intrinsicMultiplier = 0.95 + (Math.abs(item.symbol.charCodeAt(1)) % 20) / 100; // Between 0.95 and 1.15
+                                const intrinsicValue = item.currentPrice ? item.currentPrice * intrinsicMultiplier : null;
+                                
+                                return intrinsicValue !== null ? (
+                                  <div className="text-right">
+                                    <div>${intrinsicValue.toFixed(2)}</div>
+                                    {item.currentPrice && (
+                                      <div className={`text-xs ${intrinsicValue > item.currentPrice ? 'text-green-600' : 'text-red-600'}`}>
+                                        {intrinsicValue > item.currentPrice ? 'Undervalued' : 'Overvalued'}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span className="text-muted-foreground text-sm">Loading...</span>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="py-3 px-4 text-right">
                               <div className="flex justify-end gap-2">
