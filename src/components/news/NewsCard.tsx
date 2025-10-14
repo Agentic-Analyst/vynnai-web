@@ -27,11 +27,13 @@ export function NewsCard({ news, className }: NewsCardProps) {
               <div className="flex justify-between items-start mb-2">
                 <h4 className="font-medium text-base">{item.title}</h4>
                 <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-                  {formatDate(item.publishedAt)}
+                  {item.publish_date || formatDate(item.publishedAt)}
                 </span>
               </div>
               
-              <p className="text-sm text-muted-foreground mb-3">{item.summary}</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                {item.serpapi_snippet || item.summary}
+              </p>
               
               {item.imageUrl && (
                 <div className="relative h-32 mb-3 overflow-hidden rounded-md">
@@ -51,7 +53,15 @@ export function NewsCard({ news, className }: NewsCardProps) {
                     </Badge>
                   ))}
                 </div>
-                <span className="text-xs font-medium text-primary">{item.source}</span>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium text-primary">{item.source}</span>
+                  {item.search_category && (
+                    <span className="text-muted-foreground">• {item.search_category}</span>
+                  )}
+                  {item.word_count && (
+                    <span className="text-muted-foreground">• {item.word_count} words</span>
+                  )}
+                </div>
               </div>
             </div>
           ))}

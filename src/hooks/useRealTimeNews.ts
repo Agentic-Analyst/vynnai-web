@@ -474,6 +474,19 @@ export function useRealTimeNews() {
       return;
     }
 
+    // Update connection settings if new options provided
+    if (options?.limit !== undefined || options?.days_back !== undefined || options?.force_refresh !== undefined) {
+      setConnectionState(prev => ({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          ...(options.limit !== undefined && { limit: options.limit }),
+          ...(options.days_back !== undefined && { days_back: options.days_back }),
+          ...(options.force_refresh !== undefined && { force_refresh: options.force_refresh })
+        }
+      }));
+    }
+
     const subscribeMessage = {
       type: 'subscribe',
       tickers: tickers.map(t => t.toUpperCase()),

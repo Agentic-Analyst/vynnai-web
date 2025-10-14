@@ -249,7 +249,12 @@ export function convertNewsArticleToNewsItem(article: NewsArticle): import('@/ut
     url: article.url || article.source_url,
     imageUrl: article.serpapi_thumbnail || undefined,
     publishedAt: publishedAt,
-    relatedSymbols: [article.ticker]
+    relatedSymbols: [article.ticker],
+    // Additional fields from WebSocket data
+    publish_date: article.publish_date,
+    search_category: article.search_category,
+    word_count: article.word_count,
+    serpapi_snippet: article.serpapi_snippet
   };
 }
 

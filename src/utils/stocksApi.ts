@@ -41,6 +41,11 @@ export interface NewsItem {
   imageUrl?: string;
   publishedAt: Date;
   relatedSymbols?: string[];
+  // Additional fields from WebSocket data
+  publish_date?: string; // Raw publish date string from WebSocket
+  search_category?: string; // Search category from WebSocket
+  word_count?: string; // Word count from WebSocket
+  serpapi_snippet?: string; // Snippet for summary display
 }
 
 export interface Cryptocurrency {

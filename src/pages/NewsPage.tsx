@@ -152,7 +152,7 @@ export function NewsPage() {
       <div className="text-center mb-6">
         <div className="flex items-center justify-center gap-3 mb-4">
           <NewspaperIcon className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Real-Time News Feed</h1>
+          <h1 className="text-3xl font-bold">Value Your Next News</h1>
         </div>
         <div className="flex items-center justify-center gap-4 text-sm">
           <div className={`flex items-center gap-2 ${
@@ -420,7 +420,7 @@ export function NewsPage() {
                           {article.title}
                         </h2>
                         <p className="text-muted-foreground mb-4 line-clamp-3">
-                          {article.summary}
+                          {article.serpapi_snippet || article.summary}
                         </p>
                       </div>
                       <ExternalLink className="h-4 w-4 text-muted-foreground ml-4 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -431,7 +431,7 @@ export function NewsPage() {
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {formatDate(article.publishedAt)}
+                          {article.publish_date || formatDate(article.publishedAt)}
                         </div>
                         <div className="flex items-center gap-2">
                           {/* Source icon if available */}
@@ -439,6 +439,12 @@ export function NewsPage() {
                             <span className="text-sm font-medium text-primary">
                               {article.source}
                             </span>
+                          )}
+                          {article.search_category && (
+                            <span className="text-sm text-muted-foreground">• {article.search_category}</span>
+                          )}
+                          {article.word_count && (
+                            <span className="text-sm text-muted-foreground">• {article.word_count} words</span>
                           )}
                         </div>
                       </div>
