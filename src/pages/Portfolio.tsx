@@ -5,7 +5,7 @@ import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, Wif
 
 import { usePortfolios } from '@/hooks/usePortfolios';
 import { PortfolioHolding } from '@/hooks/usePortfolio';
-import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
+import { useStockPricesSubscription } from '@/contexts/StockPricesWebSocketContext';
 import { PageHeader } from '@/components/PageHeader';
 import { PieChart, Cell, Pie, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -91,7 +91,7 @@ const Portfolio = () => {
     return holdings.map(h => h.symbol).filter(Boolean);
   }, [holdings?.length, holdings?.map(h => h.symbol).join(',')]);
   
-  const { prices: realTimePrices, isConnected, connectionStatus } = useRealTimeStockPrices(symbols);
+  const { prices: realTimePrices, isConnected, connectionStatus } = useStockPricesSubscription(symbols, `portfolio-${portfolioId}`);
   
   // Show toast when real-time connection is established (use useCallback to stabilize)
   const showConnectionToast = React.useCallback(() => {

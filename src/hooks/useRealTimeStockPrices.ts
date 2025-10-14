@@ -405,13 +405,8 @@ export function useRealTimeStockPrices(symbols: string[]) {
     return () => clearTimeout(timeoutId);
   }, [symbols.join(','), isConnected]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      console.log('🔍 DEBUG: Component unmounting, cleaning up WebSocket');
-      disconnect();
-    };
-  }, []);
+  // Note: Auto-cleanup removed to support persistent connections
+  // Connection is now managed by StockPricesWebSocketProvider context
 
   return {
     prices,

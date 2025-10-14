@@ -3,7 +3,7 @@ import {
   useStockData, useMarketIndices, useCurrencyPairs, 
   mockStocks, mockIndices, mockCurrencies, mockNews
 } from '@/utils/stocksApi';
-import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
+import { useStockPricesSubscription } from '@/contexts/StockPricesWebSocketContext';
 import { StockCard } from '@/components/stocks/StockCard';
 import { StockChart } from '@/components/stocks/StockChart';
 import { MarketOverview } from '@/components/markets/MarketOverview';
@@ -21,8 +21,8 @@ export function IntegratedDashboard() {
     return mockStocks.map(stock => stock.symbol);
   }, []);
   
-  // Get real-time stock prices
-  const { prices: realTimePrices, isConnected } = useRealTimeStockPrices(symbols);
+  // Get real-time stock prices using subscription hook
+  const { prices: realTimePrices, isConnected } = useStockPricesSubscription(symbols, 'integrated-dashboard');
   
   // Combine real-time prices with mock data (same pattern as Stocks.tsx)
   const stocks = useMemo(() => {

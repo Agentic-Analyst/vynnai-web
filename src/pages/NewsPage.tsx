@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useRealTimeNews } from '@/hooks/useRealTimeNews';
+import { useNewsWebSocket } from '@/contexts/NewsWebSocketContext';
 import { useStockWatchlist } from '@/hooks/useStockWatchlist';
 import { formatDate } from '@/utils/stocksApi';
 import { cn } from '@/lib/utils';
@@ -38,7 +38,7 @@ export function NewsPage() {
   // Get stocks from watchlist to subscribe to news
   const { watchedSymbols, hasStocks } = useStockWatchlist();
   
-  // Real-time news WebSocket integration
+  // Real-time news WebSocket integration from context
   const {
     connectionState,
     getAllArticles,
@@ -48,7 +48,7 @@ export function NewsPage() {
     lastError,
     clearError,
     tickerStatuses
-  } = useRealTimeNews();
+  } = useNewsWebSocket();
 
   // Auto-subscribe to watchlist tickers when connection is ready
   useEffect(() => {
@@ -56,7 +56,7 @@ export function NewsPage() {
       // Check if we need to update subscriptions
       const currentTickers = Array.from(connectionState.subscribedTickers);
       const needsUpdate = watchedSymbols.some(ticker => !isSubscribedTo(ticker)) ||
-                         currentTickers.some(ticker => !watchedSymbols.includes(ticker));
+                         currentTickers.some((ticker: string) => !watchedSymbols.includes(ticker));
       
       if (needsUpdate) {
         console.log('📰 Subscribing to watchlist tickers:', watchedSymbols);

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useRealTimeNews } from '@/hooks/useRealTimeNews';
+import { useNewsWebSocket } from '@/contexts/NewsWebSocketContext';
 import { cn } from '@/lib/utils';
 import {
   Wifi,
@@ -28,21 +28,20 @@ import {
 export function NewsWebSocketTest() {
   const {
     connectionState,
-    articles,
-    tickerStatuses,
-    subscriptionStats,
-    lastError,
-    connect,
-    disconnect,
+    getAllArticles,
     subscribe,
     unsubscribe,
     refresh,
+    connect,
+    disconnect,
     clearError,
-    getAllArticles,
-    getArticlesForTicker,
-    getSubscribedTickers,
-    isSubscribedTo
-  } = useRealTimeNews();
+    lastError,
+    tickerStatuses,
+    subscriptionStats
+  } = useNewsWebSocket();
+
+  // Get articles using the function instead of direct state
+  const allArticles = getAllArticles();
 
   const [testTicker, setTestTicker] = useState('AAPL');
   const [testTickers, setTestTickers] = useState('AAPL,MSFT,GOOGL');
@@ -324,7 +323,7 @@ export function NewsWebSocketTest() {
       )}
 
       {/* Articles Preview */}
-      {Object.keys(articles).length > 0 && (
+      {allArticles.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Recent Articles ({getAllArticles().length})</CardTitle>

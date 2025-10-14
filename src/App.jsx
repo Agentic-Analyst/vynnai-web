@@ -1,4 +1,3 @@
-// App.jsx
 import React, { useEffect, useState } from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,9 @@ import ChatPage from "./pages/ChatPage.jsx";
 import StockDashboardLayout from "./pages/StockDashboardLayout.tsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import OAuthCallback from "./pages/OAuthCallback.jsx";
+import { NewsWebSocketProvider } from "./contexts/NewsWebSocketContext.tsx";
+import { StockPricesWebSocketProvider } from "./contexts/StockPricesWebSocketContext.tsx";
+import { HistoricalDataProvider } from "./contexts/HistoricalDataContext.tsx";
 
 // Stock Dashboard Pages
 import Stocks from "./pages/Stocks.tsx";
@@ -97,33 +99,47 @@ const App = () => {
           <BrowserRouter>
             <Shell>
               {(isAuthed) => (
-                <Routes>
-                  <Route path="/" element={isAuthed ? <Navigate to="/chat" replace /> : <LandingPage />} />
-                  <Route path="/chat" element={isAuthed ? <ChatPage /> : <Navigate to="/" replace />} />
-                  <Route path="/analyst" element={isAuthed ? <ChatPage /> : <Navigate to="/" replace />} />
+                isAuthed ? (
+                  <NewsWebSocketProvider>
+                    <StockPricesWebSocketProvider>
+                      <HistoricalDataProvider>
+                        <Routes>
+                          <Route path="/" element={<Navigate to="/chat" replace />} />
+                          <Route path="/chat" element={<ChatPage />} />
+                          <Route path="/analyst" element={<ChatPage />} />
 
-                  {/* Stock Dashboard Routes */}
-                  <Route path="/dashboard/*" element={isAuthed ? <StockDashboardLayout /> : <Navigate to="/" replace />}>
-                    <Route index element={<Navigate to="/dashboard/news" replace />} />
-                    <Route path="news" element={<NewsPage />} />
-                    <Route path="stocks" element={<Stocks />} />
-                    <Route path="markets" element={<Markets />} />
-                    <Route path="currencies" element={<Currencies />} />
-                    <Route path="global" element={<Global />} />
-                    <Route path="portfolio" element={<PortfolioList />} />
-                    <Route path="portfolio/:portfolioId" element={<Portfolio />} />
-                    <Route path="performance" element={<Performance />} />
-                    <Route path="analysis" element={<Analysis />} />
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="test/news-websocket" element={<NewsWebSocketTest />} />
-                  </Route>
+                          {/* Stock Dashboard Routes */}
+                          <Route path="/dashboard/*" element={<StockDashboardLayout />}>
+                            <Route index element={<Navigate to="/dashboard/news" replace />} />
+                            <Route path="news" element={<NewsPage />} />
+                            <Route path="stocks" element={<Stocks />} />
+                            <Route path="markets" element={<Markets />} />
+                            <Route path="currencies" element={<Currencies />} />
+                            <Route path="global" element={<Global />} />
+                            <Route path="portfolio" element={<PortfolioList />} />
+                            <Route path="portfolio/:portfolioId" element={<Portfolio />} />
+                            <Route path="performance" element={<Performance />} />
+                            <Route path="analysis" element={<Analysis />} />
+                            <Route path="settings" element={<Settings />} />
+                            <Route path="test/news-websocket" element={<NewsWebSocketTest />} />
+                          </Route>
 
-                  {/* OAuth finishes here */}
-                  <Route path="/auth/callback" element={<OAuthCallback />} />
+                          {/* OAuth finishes here */}
+                          <Route path="/auth/callback" element={<OAuthCallback />} />
 
-                  {/* Fallback */}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                          {/* Fallback */}
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                      </HistoricalDataProvider>
+                    </StockPricesWebSocketProvider>
+                  </NewsWebSocketProvider>
+                ) : (
+                  <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/auth/callback" element={<OAuthCallback />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                )
               )}
             </Shell>
           </BrowserRouter>

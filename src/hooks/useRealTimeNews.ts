@@ -520,16 +520,8 @@ export function useRealTimeNews() {
 
   // ===== Effects =====
 
-  // Auto-connect on mount
-  useEffect(() => {
-    console.log('🔍 DEBUG: News WebSocket useEffect triggered');
-    connect();
-
-    return () => {
-      console.log('🔍 DEBUG: News WebSocket component unmounting, cleaning up');
-      disconnect();
-    };
-  }, []);
+  // Note: Auto-connect removed to support persistent connections
+  // Connection is now managed by NewsWebSocketProvider context
 
   // ===== Return Hook API =====
 

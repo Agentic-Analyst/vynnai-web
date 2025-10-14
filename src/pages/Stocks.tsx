@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useRealTimeStockPrices } from '@/hooks/useRealTimeStockPrices';
+import { useStockPricesSubscription } from '@/contexts/StockPricesWebSocketContext';
 import { useStockWatchlist } from '@/hooks/useStockWatchlist';
 import { StockCard } from '@/components/stocks/StockCard';
 import { StockChart } from '@/components/stocks/StockChart';
@@ -50,13 +50,12 @@ const Stocks = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   
-  // Stabilize symbols for WebSocket connection (following portfolio pattern)
+  // Stabilize symbols for WebSocket connection - only update when symbols actually change
   const symbols = useMemo(() => {
-    return watchedSymbols.filter(Boolean);
-  }, [watchedSymbols.length, watchedSymbols.join(',')]);
-  
-  // Real-time stock prices (following portfolio's exact pattern)
-  const { prices: realTimePrices, isConnected, connectionStatus } = useRealTimeStockPrices(symbols);
+    const filtered = watchedSymbols.filter(Boolean).map(s => s.toUpperCase());
+    return [...new Set(filtered)]; // Remove duplicates and ensure uppercase
+  }, [watchedSymbols.join(',')]); // Simplified dependency array  // Real-time stock prices using subscription hook
+  const { prices: realTimePrices, isConnected, connectionStatus } = useStockPricesSubscription(symbols, 'stocks-page');
   
   // Show toast when real-time connection is established (following portfolio pattern)
   const showConnectionToast = React.useCallback(() => {

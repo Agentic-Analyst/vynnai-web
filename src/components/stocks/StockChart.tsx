@@ -4,7 +4,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, Legend 
 } from 'recharts';
-import { generatePriceHistory, useHistoricalData, type Timeframe } from '@/utils/stocksApi';
+import { generatePriceHistory, type Timeframe } from '@/utils/stocksApi';
+import { useCachedHistoricalData } from '@/contexts/HistoricalDataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -36,8 +37,8 @@ export function StockChart({
 }: StockChartProps) {
   const [selectedRange, setSelectedRange] = useState(timeRanges[2]); // Default to 1M
   
-  // Fetch real historical data from API
-  const { data: historicalData, loading, error } = useHistoricalData(symbol, selectedRange.timeframe);
+  // Fetch real historical data from cached context
+  const { data: historicalData, loading, error } = useCachedHistoricalData(symbol, selectedRange.timeframe);
   
   const chartData = useMemo(() => {
     // If we have real historical data, use it
