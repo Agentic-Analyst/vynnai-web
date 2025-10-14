@@ -21,6 +21,7 @@ import Performance from "./pages/Performance.tsx";
 import Analysis from "./pages/Analysis.tsx";
 import Settings from "./pages/Settings.tsx";
 import Navigation from "./components/Navigation.jsx";
+import { NewsWebSocketTest } from "./components/test/NewsWebSocketTest.tsx";
 import { API_BASE_URL } from "@/lib/apiBase";
 
 const queryClient = new QueryClient();
@@ -114,6 +115,7 @@ const App = () => {
                     <Route path="performance" element={<Performance />} />
                     <Route path="analysis" element={<Analysis />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="test/news-websocket" element={<NewsWebSocketTest />} />
                   </Route>
 
                   {/* OAuth finishes here */}
