@@ -259,33 +259,72 @@ export function convertNewsArticleToNewsItem(article: NewsArticle): import('@/ut
 }
 
 /**
- * Parse relative date strings like "5 days ago" into Date objects
+ * Parse various date string formats into Date objects
  */
-function parseRelativeDate(relativeDate: string): Date {
+function parseRelativeDate(dateString: string): Date {
   const now = new Date();
-  const lowerDate = relativeDate.toLowerCase();
+  const lowerDate = dateString.toLowerCase().trim();
   
-  if (lowerDate.includes('day') && lowerDate.includes('ago')) {
-    const days = parseInt(lowerDate.match(/(\d+)\s*day/)?.[1] || '0');
-    return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  // Handle relative dates like "X days ago", "X hours ago", etc.
+  if (lowerDate.includes('ago')) {
+    if (lowerDate.includes('day')) {
+      const days = parseInt(lowerDate.match(/(\d+)\s*day/)?.[1] || '0');
+      return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    }
+    
+    if (lowerDate.includes('hour')) {
+      const hours = parseInt(lowerDate.match(/(\d+)\s*hour/)?.[1] || '0');
+      return new Date(now.getTime() - hours * 60 * 60 * 1000);
+    }
+    
+    if (lowerDate.includes('minute')) {
+      const minutes = parseInt(lowerDate.match(/(\d+)\s*minute/)?.[1] || '0');
+      return new Date(now.getTime() - minutes * 60 * 1000);
+    }
+    
+    if (lowerDate.includes('week')) {
+      const weeks = parseInt(lowerDate.match(/(\d+)\s*week/)?.[1] || '0');
+      return new Date(now.getTime() - weeks * 7 * 24 * 60 * 60 * 1000);
+    }
+    
+    if (lowerDate.includes('month')) {
+      const months = parseInt(lowerDate.match(/(\d+)\s*month/)?.[1] || '0');
+      return new Date(now.getTime() - months * 30 * 24 * 60 * 60 * 1000);
+    }
+    
+    if (lowerDate.includes('year')) {
+      const years = parseInt(lowerDate.match(/(\d+)\s*year/)?.[1] || '0');
+      return new Date(now.getTime() - years * 365 * 24 * 60 * 60 * 1000);
+    }
   }
   
-  if (lowerDate.includes('hour') && lowerDate.includes('ago')) {
-    const hours = parseInt(lowerDate.match(/(\d+)\s*hour/)?.[1] || '0');
-    return new Date(now.getTime() - hours * 60 * 60 * 1000);
+  // Handle absolute date formats like "Apr 8, 2025", "Jul 15, 2025", "Oct 22, 2024"
+  try {
+    // Try to parse as a standard date string
+    const parsed = new Date(dateString);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  } catch (error) {
+    // Continue to fallback if parsing fails
   }
   
-  if (lowerDate.includes('minute') && lowerDate.includes('ago')) {
-    const minutes = parseInt(lowerDate.match(/(\d+)\s*minute/)?.[1] || '0');
-    return new Date(now.getTime() - minutes * 60 * 1000);
+  // Handle month abbreviation formats like "Apr 8, 2025"
+  const monthAbbrevMatch = dateString.match(/(\w{3})\s+(\d+),?\s+(\d{4})/);
+  if (monthAbbrevMatch) {
+    const [, monthStr, day, year] = monthAbbrevMatch;
+    const monthMap: Record<string, number> = {
+      'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+      'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+    };
+    const month = monthMap[monthStr.toLowerCase()];
+    if (month !== undefined) {
+      return new Date(parseInt(year), month, parseInt(day));
+    }
   }
   
-  if (lowerDate.includes('week') && lowerDate.includes('ago')) {
-    const weeks = parseInt(lowerDate.match(/(\d+)\s*week/)?.[1] || '0');
-    return new Date(now.getTime() - weeks * 7 * 24 * 60 * 60 * 1000);
-  }
-  
-  // If we can't parse, return current time minus 1 hour as fallback
+  // If we can't parse anything, return current time minus 1 hour as fallback
+  console.warn('Could not parse date string:', dateString);
   return new Date(now.getTime() - 60 * 60 * 1000);
 }
 

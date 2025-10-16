@@ -23,6 +23,50 @@ import {
   type NewsWebSocketMessageType
 } from '@/types/newsWebSocket';
 
+// ===== Utility Functions =====
+
+/**
+ * Robust sorting function for news articles by publication date
+ * Handles various date formats and edge cases
+ */
+const sortNewsByDate = (articles: NewsItem[]): NewsItem[] => {
+  return articles.sort((a, b) => {
+    try {
+      // Primary sort: by publishedAt timestamp (most recent first)
+      const timeA = a.publishedAt.getTime();
+      const timeB = b.publishedAt.getTime();
+      
+      if (!isNaN(timeA) && !isNaN(timeB)) {
+        return timeB - timeA;
+      }
+      
+      // Fallback: if publishedAt is invalid, use publish_date string comparison
+      if (a.publish_date && b.publish_date) {
+        // Try to create dates from publish_date strings for comparison
+        const dateA = new Date(a.publish_date);
+        const dateB = new Date(b.publish_date);
+        
+        if (!isNaN(dateA.getTime()) && !isNaN(dateB.getTime())) {
+          return dateB.getTime() - dateA.getTime();
+        }
+        
+        // Last resort: string comparison of publish_date
+        return b.publish_date.localeCompare(a.publish_date);
+      }
+      
+      // If one has a valid date and the other doesn't, prioritize the valid one
+      if (!isNaN(timeA) && isNaN(timeB)) return -1;
+      if (isNaN(timeA) && !isNaN(timeB)) return 1;
+      
+      // If both are invalid, maintain original order
+      return 0;
+    } catch (error) {
+      console.warn('Error sorting news articles:', error);
+      return 0;
+    }
+  });
+};
+
 // ===== WebSocket URL Generation =====
 
 const getNewsWebSocketUrl = () => {
@@ -68,8 +112,8 @@ export function useRealTimeNews() {
     connectionStatus: 'disconnected',
     subscribedTickers: new Set(),
     settings: {
-      limit: 20,
-      days_back: 7,
+      limit: 100,
+      days_back: 90, // 3 months (changed from 7 days)
       force_refresh: false
     },
     autoUpdatesEnabled: false
@@ -236,8 +280,7 @@ export function useRealTimeNews() {
       }
 
       // Add new article, keeping most recent first
-      const updatedArticles = [newsItem, ...currentArticles]
-        .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+      const updatedArticles = sortNewsByDate([newsItem, ...currentArticles])
         .slice(0, connectionState.settings.limit); // Respect limit
 
       return {
@@ -562,10 +605,13 @@ export function useRealTimeNews() {
       Object.values(articles).forEach(tickerArticles => {
         allArticles.push(...tickerArticles);
       });
-      return allArticles.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+      return sortNewsByDate(allArticles);
     },
     
-    getArticlesForTicker: (ticker: string) => articles[ticker.toUpperCase()] || [],
+    getArticlesForTicker: (ticker: string) => {
+      const tickerArticles = articles[ticker.toUpperCase()] || [];
+      return sortNewsByDate(tickerArticles);
+    },
     
     getSubscribedTickers: () => Array.from(connectionState.subscribedTickers),
     

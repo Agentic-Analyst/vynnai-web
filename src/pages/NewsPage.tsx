@@ -60,7 +60,7 @@ export function NewsPage() {
       
       if (needsUpdate) {
         console.log('📰 Subscribing to watchlist tickers:', watchedSymbols);
-        subscribe(watchedSymbols, { limit: 100, days_back: 7 }); // Increased limit for pagination
+        subscribe(watchedSymbols, { limit: 100, days_back: 90 }); // Increased limit for pagination, 3 months of news
       }
     }
   }, [connectionState.isConnected, hasStocks, watchedSymbols, subscribe, isSubscribedTo, connectionState.subscribedTickers]);
