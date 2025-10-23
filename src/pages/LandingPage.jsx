@@ -1,5 +1,5 @@
 // pages/LandingPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,160 @@ const LandingPage = () => {
   const [cooldown, setCooldown] = useState(0);
   const navigate = useNavigate();
   const FRONT_SESSION_KEY = 'client_session';
+
+  // Interactive background effect
+  const canvasRef = useRef(null);
+  const mousePos = useRef({ x: 0, y: 0 });
+  const particles = useRef([]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // Stock ticker symbols for particles
+    const symbols = ['$', '↗', '↘', '₿', '€', '¥', '£', '📈', '📊', '💹', '∞', '◆', '●'];
+    
+    // Create floating particles
+    class Particle {
+      constructor() {
+        this.reset();
+        this.y = Math.random() * canvas.height;
+        this.opacity = Math.random() * 0.5 + 0.1;
+      }
+
+      reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = -20;
+        this.speed = Math.random() * 0.5 + 0.2;
+        this.size = Math.random() * 20 + 10;
+        this.symbol = symbols[Math.floor(Math.random() * symbols.length)];
+        this.drift = (Math.random() - 0.5) * 0.5;
+        this.opacity = Math.random() * 0.3 + 0.1;
+      }
+
+      update() {
+        this.y += this.speed;
+        this.x += this.drift;
+        
+        // Magnetic effect towards cursor
+        const dx = mousePos.current.x - this.x;
+        const dy = mousePos.current.y - this.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < 200) {
+          const force = (200 - distance) / 200;
+          this.x += (dx / distance) * force * 2;
+          this.y += (dy / distance) * force * 2;
+          this.opacity = Math.min(0.8, this.opacity + force * 0.3);
+        } else {
+          this.opacity = Math.max(0.1, this.opacity - 0.01);
+        }
+
+        if (this.y > canvas.height + 20 || this.x < -20 || this.x > canvas.width + 20) {
+          this.reset();
+        }
+      }
+
+      draw() {
+        ctx.save();
+        ctx.font = `${this.size}px Arial`;
+        ctx.fillStyle = `rgba(96, 165, 250, ${this.opacity})`;
+        ctx.fillText(this.symbol, this.x, this.y);
+        ctx.restore();
+      }
+    }
+
+    // Initialize particles
+    for (let i = 0; i < 50; i++) {
+      particles.current.push(new Particle());
+    }
+
+    // Mouse connection lines
+    const drawConnections = () => {
+      particles.current.forEach((particle, i) => {
+        particles.current.slice(i + 1).forEach((otherParticle) => {
+          const dx = particle.x - otherParticle.x;
+          const dy = particle.y - otherParticle.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < 150) {
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(59, 130, 246, ${(1 - distance / 150) * 0.2})`;
+            ctx.lineWidth = 1;
+            ctx.moveTo(particle.x, particle.y);
+            ctx.lineTo(otherParticle.x, otherParticle.y);
+            ctx.stroke();
+          }
+        });
+
+        // Connect to mouse
+        const dx = particle.x - mousePos.current.x;
+        const dy = particle.y - mousePos.current.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 150) {
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(96, 165, 250, ${(1 - distance / 150) * 0.4})`;
+          ctx.lineWidth = 2;
+          ctx.moveTo(particle.x, particle.y);
+          ctx.lineTo(mousePos.current.x, mousePos.current.y);
+          ctx.stroke();
+        }
+      });
+    };
+
+    // Glow effect at cursor
+    const drawCursorGlow = () => {
+      const gradient = ctx.createRadialGradient(
+        mousePos.current.x, mousePos.current.y, 0,
+        mousePos.current.x, mousePos.current.y, 100
+      );
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.15)');
+      gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+
+    // Animation loop
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      drawCursorGlow();
+      drawConnections();
+      
+      particles.current.forEach(particle => {
+        particle.update();
+        particle.draw();
+      });
+
+      requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    // Event listeners
+    const handleMouseMove = (e) => {
+      mousePos.current = { x: e.clientX, y: e.clientY };
+    };
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const startCooldown = (sec = 30) => {
     setCooldown(sec);
@@ -76,8 +230,21 @@ const LandingPage = () => {
   const startGitHub = () => authApi.startOAuth('github', '/chat');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
-      <div className="w-full max-w-md rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-6 sm:p-8 text-white shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 relative overflow-hidden">
+      {/* Interactive Canvas Background */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ zIndex: 0 }}
+      />
+      
+      {/* Animated gradient orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+
+      <div className="w-full max-w-md rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-6 sm:p-8 text-white shadow-2xl relative" style={{ zIndex: 1 }}>
         <div className="mb-8 text-center">
           <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent mb-4">
             Welcome to VYNN AI Agent
