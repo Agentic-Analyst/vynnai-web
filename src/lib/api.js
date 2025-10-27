@@ -161,54 +161,20 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
 
   const entries = [];
 
-  if (files?.info_log) {
-    entries.push({
-      key: 'info_log',
-      label: 'info.log',
-      url: `${base}/files/info.log`,
-      suggestedName: 'info.log'
-    });
-  }
   if (files?.financial_model) {
     entries.push({
       key: 'financial_model',
-      label: `${T}_financial_model_comprehensive_latest.xlsx`,
+      label: `${T} financial model.xlsx`,
       url: `${base}/download/financial-model`,
-      suggestedName: `${T}_financial_model_comprehensive_latest.xlsx`
+      suggestedName: `${T} financial model.xlsx`
     });
   }
-  if (files?.financial_model_comparable) {
+  if (files?.professional_report) {
     entries.push({
-      key: 'financial_model_comparable',
-      label: `${T}_financial_model_comparable_latest.xlsx`,
-      url: `${base}/download/financial-model-comparable`,
-      suggestedName: `${T}_financial_model_comparable_latest.xlsx`
-    });
-  }
-  if (files?.technical_analysis) {
-    entries.push({
-      key: 'technical_analysis',
-      label: `${T}_technical_analysis_latest.pdf`,
-      url: `${base}/download/technical-analysis`,
-      suggestedName: `${T}_technical_analysis_latest.pdf`
-    });
-  }
-  if (files?.professional_analyst_report) {
-    entries.push({
-      key: 'professional_analyst_report',
-      label: `${T}_professional_analyst_report_latest.pdf`,
-      url: `${base}/download/professional-analyst-report`,
-      suggestedName: `${T}_professional_analyst_report_latest.pdf`
-    });
-  }
-
-  // bundle
-  if (entries.length > 0) {
-    entries.push({
-      key: 'all_results',
-      label: `${T}_complete_analysis.tar`,
-      url: `${base}/download/all-results`,
-      suggestedName: `${T}_complete_analysis.tar`
+      key: 'professional_report',
+      label: `${T} professional report.pdf`,
+      url: `${base}/download/professional-report`,
+      suggestedName: `${T} professional report.pdf`
     });
   }
 
