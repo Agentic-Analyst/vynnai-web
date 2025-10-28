@@ -1,11 +1,10 @@
 // ChatPage.jsx (refined UI)
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import SettingsModal from '@/components/SettingsModal';
 import { Loader2, PlusCircle, ChevronLeft, ChevronRight, Search, ChevronDown, ChevronUp, ArrowDown, StopCircle } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -1821,7 +1820,6 @@ ${JSON.stringify(analysisRequest, null, 2)}
               </div>
             )}
           </div>
-          <SettingsModal analysisParams={analysisParams} setAnalysisParams={setAnalysisParams} />
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
