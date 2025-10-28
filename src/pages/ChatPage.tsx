@@ -98,22 +98,9 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const DEFAULT_ROW_HEIGHT = 56;
 
   // job state
-  const [activeJobId, setActiveJobId] = useState(() => {
-    const cached = userStorage.getJSON("activeJob");
-    if (cached) {
-      try {
-        const { id, status } = cached;
-        return status === "running" ? id : null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
   const eventSourceRef = useRef(null);
   const progressPollRef = useRef(null);
   const [availableFiles, setAvailableFiles] = useState({});
-  const [lastJobId, setLastJobId] = useState(null);
   const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
   const [isStoppingJob, setIsStoppingJob] = useState(false);
 
@@ -131,7 +118,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
 
   // Deterministic explanation report state
-  const [capturedReport, setCapturedReport] = useState(null);
   const reportCaptureRef = useRef({
     isCapturing: false,
     content: "",
@@ -715,7 +701,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       reportType: "",
       reports: { deterministic: "", llm: "" },
     };
-    setCapturedReport(null);
 
     // Reset message count tracking for new conversation
     lastMessageCountRef.current = 1; // One welcome message
@@ -744,7 +729,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       reportType: "",
       reports: { deterministic: "", llm: "" },
     };
-    setCapturedReport(null);
 
     // Reset message count tracking for new conversation
     const msgs = conversations[index]?.messages ?? [];
@@ -1225,7 +1209,6 @@ ${JSON.stringify(analysisRequest, null, 2)}
       // Add a small delay before clearing to ensure UI updates properly
       setTimeout(() => {
         updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
-        setLastJobId(jobId);
         userStorage.removeItem("activeJob");
         console.log("✅ Job state cleared after completion");
       }, 1000); // 1 second delay
@@ -1239,7 +1222,6 @@ ${JSON.stringify(analysisRequest, null, 2)}
             const mapped = buildDownloadEntries(api.base, jobId, ticker, files);
             if (Object.keys(mapped).length > 0) {
               setAvailableFiles(mapped);
-              setLastJobId(jobId);
               addDownloadsMessage(jobId, mapped);
             }
           }
@@ -1378,7 +1360,6 @@ ${JSON.stringify(analysisRequest, null, 2)}
                   "ℹ️ **Analysis completed. Connection closed.**"
                 );
                 updateCurrentConversationJobState(null, false, null);
-                setLastJobId(jobId);
                 userStorage.removeItem("activeJob");
               } else {
                 addAssistantMessage(
