@@ -438,12 +438,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
       scrollContainer.removeEventListener("scroll", handleScroll);
       if (scrollTimeout) clearTimeout(scrollTimeout);
     };
-  }, [
-    conversations,
-    currentConversationIndex,
-    autoScrollEnabled,
-    isUserAtBottom,
-  ]);
+  }, [currentConversationIndex, autoScrollEnabled, isUserAtBottom]);
 
   // ---------- Track unread messages when new messages arrive ----------
   const lastMessageCountRef = useRef(0);
@@ -454,26 +449,17 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     lastMessageCountRef.current = msgs.length;
   }, []); // Only run on mount
 
+  const msgs = conversations[currentConversationIndex]?.messages ?? [];
+  const lastMessage = msgs[msgs.length - 1];
+
   useEffect(() => {
-    const msgs = conversations[currentConversationIndex]?.messages ?? [];
     const currentMessageCount = msgs.length;
 
-    // Only process if message count actually increased (new message arrived)
     if (currentMessageCount > lastMessageCountRef.current) {
       const newMessagesCount =
         currentMessageCount - lastMessageCountRef.current;
 
-      // If user is at bottom and auto-scroll is enabled, automatically scroll
-      if (isUserAtBottom && autoScrollEnabled) {
-        requestAnimationFrame(() => {
-          if (listRef.current) {
-            listRef.current.resetAfterIndex(currentMessageCount - 1, true);
-            listRef.current.scrollToItem(currentMessageCount - 1, "end");
-          }
-        });
-      }
-      // If user is not at bottom, increment unread count
-      else if (!isUserAtBottom) {
+      if (!isUserAtBottom) {
         setUnreadMessages((prev) => prev + newMessagesCount);
         console.log(
           `New messages detected: ${newMessagesCount}, Total unread: ${
@@ -481,15 +467,18 @@ Need financial statements, models, news, or insights? I’ve got you covered —
           }`
         );
       }
+      lastMessageCountRef.current = currentMessageCount;
     }
 
-    // Update the ref to current count
-    lastMessageCountRef.current = currentMessageCount;
-  }, [
-    conversations[currentConversationIndex]?.messages?.length,
-    isUserAtBottom,
-    autoScrollEnabled,
-  ]);
+    if (isUserAtBottom && autoScrollEnabled) {
+      requestAnimationFrame(() => {
+        if (listRef.current) {
+          listRef.current.resetAfterIndex(currentMessageCount - 1, true);
+          listRef.current.scrollToItem(currentMessageCount - 1, "end");
+        }
+      });
+    }
+  }, [lastMessage?.timestamp, isUserAtBottom, autoScrollEnabled, msgs.length]);
 
   // ---------- Helpers ----------
   const parseAnalysisRequest = (textIn) => {
