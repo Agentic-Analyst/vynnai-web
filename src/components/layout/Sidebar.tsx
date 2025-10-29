@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Link, useLocation } from 'react-router-dom';
 import { navItems, type NavItem } from '@/lib/navigation';
+import { useMarketStatus } from '@/hooks/useMarketStatus';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -15,6 +16,27 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
   const location = useLocation();
+  const marketStatus = useMarketStatus();
+  const [showDetailedTime, setShowDetailedTime] = React.useState(false);
+  const [localTime, setLocalTime] = React.useState('');
+
+  // Update local time every second
+  React.useEffect(() => {
+    const updateLocalTime = () => {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+      setLocalTime(timeString);
+    };
+
+    updateLocalTime();
+    const interval = setInterval(updateLocalTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <aside className={cn(
@@ -97,12 +119,31 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
       
       <div className="p-4 border-t border-sidebar-border">
         <div className={cn(
-          "transition-opacity duration-200 rounded-md bg-sidebar-accent/50 p-2 text-xs text-sidebar-accent-foreground",
-          isCollapsed ? "opacity-0" : "opacity-100"
+          "transition-opacity duration-200 rounded-md p-2 text-xs",
+          isCollapsed ? "opacity-0" : "opacity-100",
+          marketStatus.isOpen 
+            ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20" 
+            : "bg-sidebar-accent/50 text-sidebar-accent-foreground"
         )}>
-          <p className="font-medium">Market Status</p>
-          <p>Markets are open</p>
-          <p className="text-[10px]">Closes in 3h 45m</p>
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              marketStatus.isOpen ? "bg-green-500 animate-pulse" : "bg-gray-400"
+            )} />
+            <p className="font-medium">Market Status</p>
+          </div>
+          <p className="mt-1">{marketStatus.statusText}</p>
+          <button
+            onClick={() => setShowDetailedTime(!showDetailedTime)}
+            className="text-[10px] mt-0.5 opacity-80 hover:opacity-100 transition-opacity cursor-pointer text-left w-full underline decoration-dotted"
+            title="Click to toggle between detailed and estimated time"
+          >
+            {showDetailedTime ? marketStatus.timeUntilChangeDetailed : marketStatus.timeUntilChange}
+          </button>
+          <div className="mt-2 pt-2 border-t border-current/10">
+            <p className="text-[10px] opacity-60">Your local time</p>
+            <p className="text-[11px] font-mono mt-0.5">{localTime}</p>
+          </div>
         </div>
       </div>
     </aside>
