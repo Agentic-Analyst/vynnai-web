@@ -1,30 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const WATCHLIST_STORAGE_KEY = 'vynn_stock_watchlist';
 
 export function useStockWatchlist() {
-  const [watchedSymbols, setWatchedSymbols] = useState<string[]>([]);
-
-  // Load watchlist from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(WATCHLIST_STORAGE_KEY);
-    if (saved) {
-      try {
+  // FIXED: Initialize state from localStorage directly to avoid empty array issue in Strict Mode
+  const [watchedSymbols, setWatchedSymbols] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(WATCHLIST_STORAGE_KEY);
+      if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          setWatchedSymbols(parsed);
-        } else {
-          setWatchedSymbols([]);
+          console.log('📊 Watchlist: Loaded from localStorage:', parsed);
+          return parsed;
         }
-      } catch (error) {
-        console.error('Error loading stock watchlist:', error);
-        setWatchedSymbols([]);
       }
+    } catch (error) {
+      console.error('Error loading stock watchlist:', error);
     }
-  }, []);
+    return [];
+  });
+  
+  // FIXED: Track if this is the initial mount to prevent overwriting on first render
+  const isInitialMount = useRef(true);
 
-  // Save watchlist to localStorage whenever it changes
+  // FIXED: Save watchlist to localStorage whenever it changes (but skip initial mount)
   useEffect(() => {
+    // Skip saving on initial mount in Strict Mode (prevents clearing data on double-render)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    console.log('📊 Watchlist: Saving to localStorage:', watchedSymbols);
     localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchedSymbols));
   }, [watchedSymbols]);
 

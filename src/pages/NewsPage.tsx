@@ -147,165 +147,204 @@ export function NewsPage() {
   };
 
   return (
-    <div className="animate-fade-in">
-      {/* Header with Connection Status */}
-      <div className="text-center mb-6">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <NewspaperIcon className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold">Value Your Next News</h1>
-        </div>
-        <div className="flex items-center justify-center gap-4 text-sm">
-          <div className={`flex items-center gap-2 ${
-            connectionState.isConnected ? 'text-green-600' : 'text-red-600'
-          }`}>
-            <div className={`w-3 h-3 rounded-full ${
-              connectionState.isConnected ? 'bg-green-500' : 'bg-red-500'
-            }`} />
+    <div className="animate-fade-in max-w-7xl mx-auto">
+      {/* Modern Compact Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <NewspaperIcon className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Value Your Next News</h1>
+              <p className="text-sm text-muted-foreground">Real-time market insights</p>
+            </div>
+          </div>
+          
+          {/* Connection Badge */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+            connectionState.isConnected 
+              ? "bg-green-50 text-green-700 border border-green-200" 
+              : "bg-red-50 text-red-700 border border-red-200"
+          )}>
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              connectionState.isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+            )} />
             {connectionState.isConnected ? 'Connected' : 'Disconnected'}
           </div>
-          <span className="text-muted-foreground">•</span>
-          <span className="text-muted-foreground">
-            {Array.from(connectionState.subscribedTickers).length} subscription{Array.from(connectionState.subscribedTickers).length !== 1 ? 's' : ''}
-          </span>
-          <span className="text-muted-foreground">•</span>
-          <span className="text-muted-foreground">{allArticles.length} articles</span>
+        </div>
+        
+        {/* Stats Bar */}
+        <div className="flex items-center gap-6 text-sm text-muted-foreground bg-muted/30 rounded-lg px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            <span className="font-medium">{Array.from(connectionState.subscribedTickers).length}</span>
+            <span>subscription{Array.from(connectionState.subscribedTickers).length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="w-px h-4 bg-border" />
+          <div className="flex items-center gap-2">
+            <NewspaperIcon className="h-4 w-4" />
+            <span className="font-medium">{allArticles.length}</span>
+            <span>article{allArticles.length !== 1 ? 's' : ''}</span>
+          </div>
         </div>
       </div>
 
-      {/* Error Display */}
+      {/* Modern Error Display */}
       {lastError && (
-        <Card className="border-red-200 bg-red-50 mb-6">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-red-500" />
-                <span className="text-sm font-medium text-red-700">{lastError.message}</span>
+        <div className="mb-6 animate-slide-up">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <div className="p-1 bg-red-100 rounded-full">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-red-900 mb-1">Connection Error</h4>
+                  <p className="text-sm text-red-700">{lastError.message}</p>
+                </div>
               </div>
-              <Button onClick={clearError} variant="ghost" size="sm">
-                <X className="h-3 w-3" />
+              <Button onClick={clearError} variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-red-100">
+                <X className="h-4 w-4 text-red-600" />
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* No Stocks Warning */}
+      {/* No Stocks Info Banner */}
       {!hasStocks && (
-        <Card className="border-blue-200 bg-blue-50 mb-6">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-500" />
-              <span className="text-sm text-blue-700">
-                Add stocks to your watchlist in the <strong>Stocks</strong> page to see relevant news here.
-              </span>
+        <div className="mb-6 animate-slide-up">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-blue-900 mb-1">Get Started</h4>
+                <p className="text-sm text-blue-700 mb-3">
+                  Add stocks to your watchlist to receive personalized, real-time news updates.
+                </p>
+                <Button size="sm" onClick={() => navigate('/dashboard/stocks')} className="bg-blue-600 hover:bg-blue-700">
+                  Browse Stocks
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Search and Filters */}
+      {/* Modern Search and Filters */}
       <div className="space-y-4 mb-6">
-        {/* Search Bar */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        {/* Search Bar - Full Width, Modern Design */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
           <Input
             placeholder="Search news titles..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-10"
+            className="pl-12 pr-12 h-12 text-base border-2 focus:border-primary rounded-xl shadow-sm"
           />
           {searchQuery && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setSearchQuery('')}
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted rounded-lg"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </Button>
           )}
         </div>
 
-        {/* Filter Controls */}
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Ticker Filter */}
+        {/* Filter Pills - Modern Chip Design */}
+        <div className="space-y-3">
+          {/* Ticker Filter Pills */}
           {availableTickers.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Tickers:</span>
-              <div className="flex flex-wrap gap-1">
-                {availableTickers.slice(0, showAllTickers ? availableTickers.length : 10).map((ticker) => (
-                  <Button
-                    key={ticker}
-                    variant={selectedTickers.includes(ticker) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleTickerToggle(ticker)}
-                    className="h-7 px-2 text-xs"
-                  >
-                    {ticker}
-                  </Button>
-                ))}
-                {availableTickers.length > 10 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAllTickers(!showAllTickers)}
-                    className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
-                  >
-                    {showAllTickers ? 'Show less' : `+${availableTickers.length - 10} more`}
-                  </Button>
-                )}
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">
+                Tickers
+              </span>
+              {availableTickers.slice(0, showAllTickers ? availableTickers.length : 10).map((ticker) => (
+                <button
+                  key={ticker}
+                  onClick={() => handleTickerToggle(ticker)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
+                    "border-2 hover:scale-105 active:scale-95",
+                    selectedTickers.includes(ticker)
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-background border-border hover:border-primary/50 hover:bg-muted"
+                  )}
+                >
+                  {ticker}
+                </button>
+              ))}
+              {availableTickers.length > 10 && (
+                <button
+                  onClick={() => setShowAllTickers(!showAllTickers)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border-2 border-dashed border-muted-foreground/30"
+                >
+                  {showAllTickers ? 'Show less' : `+${availableTickers.length - 10} more`}
+                </button>
+              )}
             </div>
           )}
 
-          {/* Source Filter */}
+          {/* Source Filter Pills */}
           {availableSources.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Sources:</span>
-              <div className="flex flex-wrap gap-1">
-                {availableSources.slice(0, showAllSources ? availableSources.length : 5).map((source) => (
-                  <Button
-                    key={source}
-                    variant={selectedSources.includes(source) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleSourceToggle(source)}
-                    className="h-7 px-2 text-xs"
-                  >
-                    {source}
-                  </Button>
-                ))}
-                {availableSources.length > 5 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAllSources(!showAllSources)}
-                    className="text-xs text-muted-foreground hover:text-foreground h-7 px-2"
-                  >
-                    {showAllSources ? 'Show less' : `+${availableSources.length - 5} more`}
-                  </Button>
-                )}
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mr-1">
+                Sources
+              </span>
+              {availableSources.slice(0, showAllSources ? availableSources.length : 5).map((source) => (
+                <button
+                  key={source}
+                  onClick={() => handleSourceToggle(source)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200",
+                    "border-2 hover:scale-105 active:scale-95",
+                    selectedSources.includes(source)
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-background border-border hover:border-primary/50 hover:bg-muted"
+                  )}
+                >
+                  {source}
+                </button>
+              ))}
+              {availableSources.length > 5 && (
+                <button
+                  onClick={() => setShowAllSources(!showAllSources)}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border-2 border-dashed border-muted-foreground/30"
+                >
+                  {showAllSources ? 'Show less' : `+${availableSources.length - 5} more`}
+                </button>
+              )}
             </div>
           )}
 
-          {/* Clear Filters */}
+          {/* Clear Filters Button */}
           {(selectedTickers.length > 0 || selectedSources.length > 0 || searchQuery) && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={clearAllFilters}
-              className="flex items-center gap-2 h-7"
-            >
-              <X className="h-3 w-3" />
-              Clear All
-            </Button>
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearAllFilters}
+                className="flex items-center gap-2 rounded-full border-2 hover:border-destructive hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+                Clear All Filters
+              </Button>
+            </div>
           )}
         </div>
 
-        {/* Results Count and Pagination Controls */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            {filteredArticles.length} article{filteredArticles.length !== 1 ? 's' : ''} found
+        {/* Results Count and Pagination - Modern Design */}
+        <div className="flex items-center justify-between pt-2 border-t">
+          <span className="text-sm font-medium text-muted-foreground">
+            <span className="text-foreground font-semibold">{filteredArticles.length}</span> {filteredArticles.length === 1 ? 'article' : 'articles'}
           </span>
           
           {totalPages > 1 && (
@@ -315,70 +354,76 @@ export function NewsPage() {
                 size="sm"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
-                className="h-7 px-2"
+                className="h-8 w-8 p-0 rounded-lg"
               >
-                <ChevronLeft className="h-3 w-3" />
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
+              <span className="text-sm font-medium px-2">
+                <span className="text-primary">{currentPage}</span>
+                <span className="text-muted-foreground"> / {totalPages}</span>
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
-                className="h-7 px-2"
+                className="h-8 w-8 p-0 rounded-lg"
               >
-                <ChevronRight className="h-3 w-3" />
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
         </div>
       </div>
 
-      {/* News Feed */}
-      <div className="space-y-4 animate-slide-up" style={{ '--delay': '300ms' } as React.CSSProperties}>
+      {/* Modern News Feed */}
+      <div className="space-y-4" style={{ '--delay': '300ms' } as React.CSSProperties}>
         {!connectionState.isConnected ? (
-          <Card className="p-12 text-center">
-            <div className="text-muted-foreground">
-              <WifiOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">Connecting to news feed...</p>
-              <p>Establishing real-time connection to news service.</p>
+          <Card className="p-16 text-center border-2 border-dashed">
+            <div className="text-muted-foreground max-w-md mx-auto">
+              <div className="inline-flex p-4 bg-muted rounded-full mb-4">
+                <WifiOff className="h-8 w-8 opacity-50" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">Connecting to News Feed</h3>
+              <p className="text-sm">Establishing real-time connection to news service...</p>
             </div>
           </Card>
         ) : !hasStocks ? (
-          <Card className="p-12 text-center">
-            <div className="text-muted-foreground">
-              <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">No stocks in watchlist</p>
-              <p>Add stocks to your watchlist to receive personalized news updates.</p>
-              <Button className="mt-4" onClick={() => navigate('/dashboard/stocks')}>
-                Go to Stocks Page
+          <Card className="p-16 text-center border-2 border-dashed">
+            <div className="text-muted-foreground max-w-md mx-auto">
+              <div className="inline-flex p-4 bg-primary/10 rounded-full mb-4">
+                <TrendingUp className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">No Stocks in Watchlist</h3>
+              <p className="text-sm mb-4">Add stocks to your watchlist to receive personalized news updates</p>
+              <Button onClick={() => navigate('/dashboard/stocks')} className="mt-2">
+                Browse Stocks
               </Button>
             </div>
           </Card>
         ) : paginatedArticles.length === 0 ? (
-          <Card className="p-12 text-center">
-            <div className="text-muted-foreground">
-              <NewspaperIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium mb-2">
-                {allArticles.length === 0 ? 'Loading news...' : 'No news found'}
-              </p>
-              <p>
+          <Card className="p-16 text-center border-2 border-dashed">
+            <div className="text-muted-foreground max-w-md mx-auto">
+              <div className="inline-flex p-4 bg-muted rounded-full mb-4">
+                {allArticles.length === 0 ? (
+                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                ) : (
+                  <NewspaperIcon className="h-8 w-8 opacity-50" />
+                )}
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-foreground">
+                {allArticles.length === 0 ? 'Loading News' : 'No News Found'}
+              </h3>
+              <p className="text-sm">
                 {allArticles.length === 0 
-                  ? 'Fetching the latest news for your watchlist stocks.'
+                  ? 'Fetching the latest news for your watchlist stocks...'
                   : 'Try adjusting your search terms or filters.'
                 }
               </p>
               {allArticles.length === 0 && connectionState.subscribedTickers.size > 0 && (
-                <div className="mt-4">
-                  <div className="flex justify-center">
-                    <RefreshCw className="h-4 w-4 animate-spin text-primary" />
-                  </div>
-                  <p className="text-sm mt-2">
-                    Subscribed to: {Array.from(connectionState.subscribedTickers).join(', ')}
-                  </p>
-                </div>
+                <p className="text-xs mt-3 text-muted-foreground">
+                  Subscribed to: <span className="font-medium">{Array.from(connectionState.subscribedTickers).join(', ')}</span>
+                </p>
               )}
             </div>
           </Card>
@@ -387,78 +432,110 @@ export function NewsPage() {
             <Card 
               key={article.id} 
               className={cn(
-                "overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer group border-l-4 border-l-transparent hover:border-l-primary",
+                "overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer group",
+                "border-l-4 border-l-transparent hover:border-l-primary",
+                "bg-gradient-to-r from-background to-background hover:from-muted/20",
                 "animate-slide-up"
               )}
               style={{ '--delay': `${400 + index * 50}ms` } as React.CSSProperties}
               onClick={() => handleNewsClick(article)}
             >
               <CardContent className="p-0">
-                <div className="flex flex-col lg:flex-row">
-                  {/* Thumbnail Image from serpapi_thumbnail */}
-                  {article.imageUrl && (
-                    <div className="lg:w-64 lg:flex-shrink-0">
-                      <div className="h-48 lg:h-full relative overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  {/* Enhanced Thumbnail with Fallback */}
+                  {article.imageUrl ? (
+                    <div className="md:w-72 md:flex-shrink-0 relative overflow-hidden bg-muted">
+                      <div className="aspect-video md:aspect-auto md:h-full relative">
                         <img 
                           src={article.imageUrl} 
                           alt={article.title}
-                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                           onError={(e) => {
-                            // Hide image if it fails to load
-                            e.currentTarget.style.display = 'none';
+                            const target = e.currentTarget;
+                            target.onerror = null;
+                            // Replace with gradient fallback
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('.fallback-gradient')) {
+                              const fallback = document.createElement('div');
+                              fallback.className = 'fallback-gradient absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center';
+                              fallback.innerHTML = '<svg class="h-12 w-12 text-primary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg>';
+                              parent.appendChild(fallback);
+                            }
                           }}
                         />
+                        {/* Overlay gradient for better text readability */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </div>
+                    </div>
+                  ) : (
+                    <div className="md:w-72 md:flex-shrink-0 bg-gradient-to-br from-primary/10 to-primary/5 hidden md:flex items-center justify-center">
+                      <NewspaperIcon className="h-16 w-16 text-primary/30" />
                     </div>
                   )}
                   
-                  {/* Content */}
-                  <div className="flex-1 p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h2 className="text-xl font-semibold mb-2 group-hover:text-primary transition-colors line-clamp-2">
+                  {/* Enhanced Content */}
+                  <div className="flex-1 p-6 flex flex-col justify-between min-h-[200px]">
+                    {/* Title and Summary */}
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <h2 className="text-xl font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">
                           {article.title}
                         </h2>
-                        <p className="text-muted-foreground mb-4 line-clamp-3">
-                          {article.serpapi_snippet || article.summary}
-                        </p>
-                      </div>
-                      <ExternalLink className="h-4 w-4 text-muted-foreground ml-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    
-                    {/* Enhanced Metadata */}
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {article.publish_date || formatDate(article.publishedAt)}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {/* Source icon if available */}
-                          {article.source && (
-                            <span className="text-sm font-medium text-primary">
-                              {article.source}
-                            </span>
-                          )}
-                          {article.search_category && (
-                            <span className="text-sm text-muted-foreground">• {article.search_category}</span>
-                          )}
-                          {article.word_count && (
-                            <span className="text-sm text-muted-foreground">• {article.word_count} words</span>
-                          )}
+                        <div className="flex-shrink-0 p-2 rounded-full bg-muted/50 group-hover:bg-primary/10 transition-colors">
+                          <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
                       </div>
                       
-                      {/* Related Symbols */}
+                      <p className="text-muted-foreground text-sm leading-relaxed line-clamp-2 mb-4">
+                        {article.serpapi_snippet || article.summary}
+                      </p>
+                    </div>
+                    
+                    {/* Enhanced Metadata Section */}
+                    <div className="space-y-3 pt-3 border-t">
+                      {/* Top Row: Time and Source */}
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
+                          <span className="font-medium">{article.publish_date || formatDate(article.publishedAt)}</span>
+                        </div>
+                        
+                        {article.source && (
+                          <>
+                            <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                            <span className="font-semibold text-primary text-sm">{article.source}</span>
+                          </>
+                        )}
+                        
+                        {article.search_category && (
+                          <>
+                            <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                            <span className="text-muted-foreground text-xs capitalize">{article.search_category}</span>
+                          </>
+                        )}
+                        
+                        {article.word_count && (
+                          <>
+                            <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                            <span className="text-muted-foreground text-xs">{article.word_count} words</span>
+                          </>
+                        )}
+                      </div>
+                      
+                      {/* Bottom Row: Related Symbols */}
                       {article.relatedSymbols && article.relatedSymbols.length > 0 && (
                         <div className="flex items-center gap-2">
-                          <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                          <div className="flex gap-1">
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            <span className="text-xs font-medium">Related:</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
                             {article.relatedSymbols.map((symbol) => (
                               <Badge 
                                 key={symbol} 
-                                variant="outline" 
-                                className="text-xs hover:bg-primary hover:text-primary-foreground transition-colors"
+                                variant="secondary"
+                                className="text-xs font-semibold px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
                               >
                                 {symbol}
                               </Badge>
@@ -475,23 +552,75 @@ export function NewsPage() {
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Enhanced Bottom Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mt-8">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 p-4 bg-muted/30 rounded-lg border">
           <Button
             variant="outline"
             onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 rounded-lg"
           >
             <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
           
           <div className="flex items-center gap-2">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-              if (pageNum > totalPages) return null;
+            {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+              let pageNum;
+              
+              if (totalPages <= 7) {
+                // Show all pages if 7 or fewer
+                pageNum = i + 1;
+              } else if (currentPage <= 4) {
+                // Near the start
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 3) {
+                // Near the end
+                pageNum = totalPages - 6 + i;
+              } else {
+                // In the middle
+                pageNum = currentPage - 3 + i;
+              }
+              
+              if (pageNum > totalPages || pageNum < 1) return null;
+              
+              // Add ellipsis
+              if (totalPages > 7) {
+                if (i === 0 && currentPage > 4) {
+                  return (
+                    <React.Fragment key="start-ellipsis">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        className="w-9 h-9 p-0 rounded-lg"
+                      >
+                        1
+                      </Button>
+                      <span className="text-muted-foreground px-1">...</span>
+                    </React.Fragment>
+                  );
+                }
+                if (i === 6 && currentPage < totalPages - 3) {
+                  return (
+                    <React.Fragment key="end-ellipsis">
+                      <span className="text-muted-foreground px-1">...</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        className="w-9 h-9 p-0 rounded-lg"
+                      >
+                        {totalPages}
+                      </Button>
+                    </React.Fragment>
+                  );
+                }
+                if ((i === 0 && currentPage > 4) || (i === 6 && currentPage < totalPages - 3)) {
+                  return null;
+                }
+              }
               
               return (
                 <Button
@@ -499,7 +628,10 @@ export function NewsPage() {
                   variant={currentPage === pageNum ? "default" : "outline"}
                   size="sm"
                   onClick={() => setCurrentPage(pageNum)}
-                  className="w-8 h-8 p-0"
+                  className={cn(
+                    "w-9 h-9 p-0 rounded-lg transition-all",
+                    currentPage === pageNum && "shadow-md"
+                  )}
                 >
                   {pageNum}
                 </Button>
@@ -511,7 +643,7 @@ export function NewsPage() {
             variant="outline"
             onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 rounded-lg"
           >
             Next
             <ChevronRight className="h-4 w-4" />
@@ -519,17 +651,21 @@ export function NewsPage() {
         </div>
       )}
 
-      {/* Connection Status Footer */}
+      {/* Modern Connection Status Footer */}
       {paginatedArticles.length > 0 && (
-        <div className="text-center mt-8">
-          <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+        <div className="text-center mt-8 pb-4">
+          <div className="inline-flex items-center gap-6 px-6 py-3 bg-gradient-to-r from-muted/50 to-muted/30 rounded-full border text-sm">
             <div className="flex items-center gap-2">
-              <Wifi className="h-4 w-4 text-green-500" />
-              <span>Live updates enabled</span>
+              <div className="relative">
+                <Wifi className="h-4 w-4 text-green-600" />
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              </div>
+              <span className="font-medium text-muted-foreground">Live Updates Active</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="w-px h-4 bg-border" />
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Activity className="h-4 w-4" />
-              <span>Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredArticles.length)} of {filteredArticles.length}</span>
+              <span>Showing <span className="font-semibold text-foreground">{startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredArticles.length)}</span> of <span className="font-semibold text-foreground">{filteredArticles.length}</span></span>
             </div>
           </div>
         </div>

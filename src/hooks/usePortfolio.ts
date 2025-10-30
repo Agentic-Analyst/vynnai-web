@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export interface PortfolioHolding {
   id: string;
@@ -56,32 +56,36 @@ const defaultHoldings: PortfolioHolding[] = [
 ];
 
 export function usePortfolio() {
-  const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Load portfolio from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
-    if (saved) {
-      try {
+  // FIXED: Initialize state from localStorage directly to avoid empty array issue in Strict Mode
+  const [holdings, setHoldings] = useState<PortfolioHolding[]>(() => {
+    try {
+      const saved = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
+      if (saved) {
         const parsedHoldings = JSON.parse(saved);
-        setHoldings(parsedHoldings);
-      } catch (error) {
-        console.error('Error loading portfolio:', error);
-        setHoldings(defaultHoldings);
+        console.log('📊 Portfolio: Loaded from localStorage:', parsedHoldings);
+        return parsedHoldings;
       }
-    } else {
-      setHoldings(defaultHoldings);
+    } catch (error) {
+      console.error('Error loading portfolio:', error);
     }
-    setIsInitialized(true);
-  }, []);
+    console.log('📊 Portfolio: Using default holdings');
+    return defaultHoldings;
+  });
+  
+  // FIXED: Track if this is the initial mount to prevent overwriting on first render
+  const isInitialMount = useRef(true);
 
-  // Save to localStorage whenever holdings change (after initialization)
+  // FIXED: Save to localStorage whenever holdings change (but skip initial mount)
   useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(holdings));
+    // Skip saving on initial mount in Strict Mode (prevents clearing data on double-render)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
     }
-  }, [holdings, isInitialized]);
+    
+    console.log('📊 Portfolio: Saving to localStorage:', holdings);
+    localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(holdings));
+  }, [holdings]);
 
   const addHolding = (holding: Omit<PortfolioHolding, 'id' | 'dateAdded'>) => {
     const newHolding: PortfolioHolding = {

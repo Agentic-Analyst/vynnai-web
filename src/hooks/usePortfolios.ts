@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PortfolioHolding } from './usePortfolio';
 
 export interface Portfolio {
@@ -26,24 +26,33 @@ export interface PortfolioSummary {
 const PORTFOLIOS_STORAGE_KEY = 'vynn_portfolios';
 
 export function usePortfolios() {
-  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-
-  // Load portfolios from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(PORTFOLIOS_STORAGE_KEY);
-    if (saved) {
-      try {
+  // FIXED: Initialize state from localStorage directly to avoid empty array issue in Strict Mode
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(() => {
+    try {
+      const saved = localStorage.getItem(PORTFOLIOS_STORAGE_KEY);
+      if (saved) {
         const parsed = JSON.parse(saved);
-        setPortfolios(parsed);
-      } catch (error) {
-        console.error('Error loading portfolios:', error);
-        setPortfolios([]);
+        console.log('📊 Portfolios: Loaded from localStorage:', parsed);
+        return parsed;
       }
+    } catch (error) {
+      console.error('Error loading portfolios:', error);
     }
-  }, []);
+    return [];
+  });
+  
+  // FIXED: Track if this is the initial mount to prevent overwriting on first render
+  const isInitialMount = useRef(true);
 
-  // Save portfolios to localStorage whenever they change
+  // FIXED: Save portfolios to localStorage whenever they change (but skip initial mount)
   useEffect(() => {
+    // Skip saving on initial mount in Strict Mode (prevents clearing data on double-render)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    
+    console.log('📊 Portfolios: Saving to localStorage:', portfolios);
     localStorage.setItem(PORTFOLIOS_STORAGE_KEY, JSON.stringify(portfolios));
   }, [portfolios]);
 
