@@ -521,6 +521,53 @@ export function formatDate(date: Date): string {
   }
 }
 
+/**
+ * Converts ISO timestamp string to user-friendly relative time
+ * @param timestamp - ISO 8601 timestamp string (e.g., "2025-10-29T17:06:30.839155")
+ * @returns User-friendly time string (e.g., "2h ago", "3 days ago", "Oct 15")
+ */
+export function formatTimestamp(timestamp: string): string {
+  try {
+    const date = new Date(timestamp);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return timestamp; // Return original if invalid
+    }
+    
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInSec = Math.floor(diffInMs / 1000);
+    const diffInMin = Math.floor(diffInSec / 60);
+    const diffInHour = Math.floor(diffInMin / 60);
+    const diffInDay = Math.floor(diffInHour / 24);
+    
+    if (diffInSec < 60) {
+      return 'Just now';
+    } else if (diffInMin < 60) {
+      return `${diffInMin}m ago`;
+    } else if (diffInHour < 24) {
+      return `${diffInHour}h ago`;
+    } else if (diffInDay === 1) {
+      return '1 day ago';
+    } else if (diffInDay < 7) {
+      return `${diffInDay} days ago`;
+    } else if (diffInDay < 30) {
+      const weeks = Math.floor(diffInDay / 7);
+      return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+    } else if (diffInDay < 365) {
+      // Show month and day for older articles in current year
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else {
+      // Show year for articles older than a year
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  } catch (error) {
+    console.error('Error formatting timestamp:', error);
+    return timestamp; // Return original if parsing fails
+  }
+}
+
 export function useStockData(initialData: Stock[], updateInterval = 5000) {
   const [stocks, setStocks] = useState<Stock[]>(initialData);
   

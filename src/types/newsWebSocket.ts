@@ -13,7 +13,7 @@ export interface NewsArticle {
   company: string; // Company name
   content: string; // Article content/summary
   createdAt: string; // When article was created in database (ISO string)
-  publish_date: string; // Publication date as string (e.g. '5 days ago')
+  publish_date: string; // Publication date as ISO timestamp (e.g. '2025-10-29T17:06:30.839155')
   scraped_at: string; // When article was scraped (datetime string)
   search_category: string; // Search category used
   serpapi_authors: string[]; // Authors from SerpAPI (can be empty)

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useNewsWebSocket } from '@/contexts/NewsWebSocketContext';
 import { useStockWatchlist } from '@/hooks/useStockWatchlist';
-import { formatDate } from '@/utils/stocksApi';
+import { formatDate, formatTimestamp } from '@/utils/stocksApi';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -89,7 +89,7 @@ export function NewsPage() {
   }, [allArticles]);
   
   const filteredArticles = useMemo(() => {
-    return allArticles.filter(article => {
+    const filtered = allArticles.filter(article => {
       // Search filter - focus on titles primarily
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = searchQuery === '' || 
@@ -105,6 +105,17 @@ export function NewsPage() {
                            (article.source && selectedSources.includes(article.source));
       
       return matchesSearch && matchesTicker && matchesSource;
+    });
+
+    // Sort by publish_date timestamp (newest first)
+    return filtered.sort((a, b) => {
+      try {
+        const dateA = new Date(a.publish_date || a.publishedAt || 0);
+        const dateB = new Date(b.publish_date || b.publishedAt || 0);
+        return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
+      } catch (error) {
+        return 0; // Keep original order if parsing fails
+      }
     });
   }, [allArticles, searchQuery, selectedTickers, selectedSources]);
 
@@ -498,7 +509,11 @@ export function NewsPage() {
                       <div className="flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-1.5 text-muted-foreground">
                           <Clock className="h-3.5 w-3.5" />
-                          <span className="font-medium">{article.publish_date || formatDate(article.publishedAt)}</span>
+                          <span className="font-medium">
+                            {article.publish_date 
+                              ? formatTimestamp(article.publish_date)
+                              : formatDate(article.publishedAt)}
+                          </span>
                         </div>
                         
                         {article.source && (
