@@ -1,5 +1,5 @@
 // ChatPage.jsx (refined UI)
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from "react-markdown";
@@ -11,9 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  ChevronDown,
-  ChevronUp,
-  ArrowDown,
   StopCircle,
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -36,11 +33,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import AnalysisLogMessage from "@/components/chat/AnalysisLogMessage";
+import ScrollToBottomButton from "@/components/chat/ScrollToBottomButton";
 
 const ChatPage = () => {
   // ---------- Helper functions ----------
@@ -86,7 +80,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   });
   const [currentConversationIndex, setCurrentConversationIndex] = useState(0);
   const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -562,6 +555,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const addAssistantLogBatch = (lines) => {
     if (!Array.isArray(lines) || lines.length === 0) return;
     const nowIso = new Date().toISOString();
+
     setConversations((prev) => {
       const updated = [...prev];
       const convo = updated[currentConversationIndex];
@@ -580,6 +574,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
           role: "assistant",
           kind: "logbatch",
           lines: [...lines],
+          nlSummary: "Summary 1", // TODO: remove this, this is for testing purposes
           content: lines.join("\n"),
           timestamp: nowIso,
         });
@@ -1542,497 +1537,505 @@ ${JSON.stringify(analysisRequest, null, 2)}
     }
   };
 
+  // Auto-collapse new log messages
+  useEffect(() => {
+    const currentMessages =
+      conversations[currentConversationIndex]?.messages || [];
+    const lastMessage = currentMessages[currentMessages.length - 1];
+
+    // Only act if the last message is a log and hasn't been collapsed yet
+    if (
+      lastMessage &&
+      (lastMessage.kind === "logbatch" || lastMessage.kind === "analysisLog") &&
+      !collapsedLogs.has(currentMessages.length - 1)
+    ) {
+      // Add the new log message index to collapsed set
+      setCollapsedLogs((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(currentMessages.length - 1);
+        return newSet;
+      });
+    }
+  }, [conversations[currentConversationIndex]?.messages.length]);
+
   // ---------- Row renderer (UI refresh) ----------
-  const Row = ({ index, style, data }) => {
-    const message = data[index];
-    const isUser = message.role === "user";
-    const isLogBatch = message.kind === "logbatch";
-    const isDownloads = message.kind === "downloads";
-    const isReport = message.kind === "report";
-    const measureRef = useRef(null);
+  const Row = useCallback(
+    ({ index, style, data }) => {
+      const message = data.messages[index];
+      const isUser = message.role === "user";
+      const isLogBatch = message.kind === "logbatch";
+      const isDownloads = message.kind === "downloads";
+      const isReport = message.kind === "report";
+      const measureRef = useRef(null);
 
-    useEffect(() => {
-      if (!measureRef.current) return;
+      // TODO: Will be removed, this is just for for testing mock data purposes
+      let displayMessage = message;
+      if (message.kind === "logbatch") {
+        displayMessage = {
+          ...message,
+          nlSummary: "Analysis in progress...", // mock NL summary
+          logLines: Array.isArray(message.lines)
+            ? message.lines
+            : message.content?.split("\n") || [],
+        };
+      }
 
-      const measureHeight = () => {
-        const rect = measureRef.current.getBoundingClientRect();
-        const h = Math.ceil(rect.height) + 16;
+      useEffect(() => {
+        if (!measureRef.current) return;
 
-        if (rowHeightsRef.current[index] !== h && h > 0) {
-          rowHeightsRef.current[index] = h;
-          // Use requestAnimationFrame for smooth updates
-          requestAnimationFrame(() => {
-            listRef.current?.resetAfterIndex(index);
-          });
-        }
-      };
+        const measureHeight = () => {
+          const rect = measureRef.current.getBoundingClientRect();
+          const h = Math.ceil(rect.height) + 16;
 
-      // Measure immediately
-      measureHeight();
+          if (rowHeightsRef.current[index] !== h && h > 0) {
+            rowHeightsRef.current[index] = h;
+            // Use requestAnimationFrame for smooth updates
+            requestAnimationFrame(() => {
+              listRef.current?.resetAfterIndex(index);
+            });
+          }
+        };
 
-      // Also measure after a small delay to catch any async rendering
-      const timer = setTimeout(measureHeight, 50);
+        // Measure immediately
+        measureHeight();
 
-      return () => clearTimeout(timer);
-    }, [index, message, collapsedLogs.has(index)]);
+        // Also measure after a small delay to catch any async rendering
+        const timer = setTimeout(measureHeight, 50);
 
-    const Bubble = ({ children }) => (
-      <div
-        ref={measureRef}
-        className={[
-          "inline-block max-w-[920px] break-words",
-          "rounded-2xl shadow-sm ring-1",
-          isUser
-            ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-blue-700/30"
-            : "bg-white text-slate-800 ring-slate-200",
-        ].join(" ")}
-      >
-        <div className={isUser ? "p-3 sm:p-4" : "p-4 sm:p-5"}>{children}</div>
-      </div>
-    );
+        return () => clearTimeout(timer);
+      }, [index, message, collapsedLogs.has(index)]);
 
-    return (
-      <div style={style} className="px-4 py-2">
-        <div className={isUser ? "flex justify-end" : "flex justify-start"}>
-          {isDownloads ? (
-            <Bubble>
-              <div className="m-0">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                  Available Downloads
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {Array.isArray(message.entries) &&
-                    message.entries.map((entry) => (
-                      <button
-                        key={entry.key}
-                        onClick={() => handleDownload(entry)}
-                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
-                      >
-                        <span className="flex items-center gap-2">
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" />
-                          </svg>
-                          {entry.label}
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-slate-400" />
-                      </button>
-                    ))}
+      const Bubble = ({ children }) => (
+        <div
+          ref={measureRef}
+          className={[
+            "inline-block max-w-[920px] break-words",
+            "rounded-2xl shadow-sm ring-1",
+            isUser
+              ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-blue-700/30"
+              : "bg-white text-slate-800 ring-slate-200",
+          ].join(" ")}
+        >
+          <div className={isUser ? "p-3 sm:p-4" : "p-4 sm:p-5"}>{children}</div>
+        </div>
+      );
+
+      return (
+        <div style={style} className="px-4 py-2">
+          <div className={isUser ? "flex justify-end" : "flex justify-start"}>
+            {isDownloads ? (
+              <Bubble>
+                <div className="m-0">
+                  <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                    Available Downloads
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {Array.isArray(message.entries) &&
+                      message.entries.map((entry) => (
+                        <button
+                          key={entry.key}
+                          onClick={() => handleDownload(entry)}
+                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+                        >
+                          <span className="flex items-center gap-2">
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-4 w-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" />
+                            </svg>
+                            {entry.label}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-400" />
+                        </button>
+                      ))}
+                  </div>
                 </div>
-              </div>
-            </Bubble>
-          ) : isLogBatch ? (
-            <div
-              ref={measureRef}
-              className="inline-block max-w-[1000px] rounded-2xl overflow-hidden bg-white ring-1 ring-slate-200 shadow-sm"
-            >
-              <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[11px] tracking-wide font-semibold text-slate-700 uppercase">
-                    Live Analysis Log
-                  </span>
-                </div>
-                <button
-                  onClick={() => toggleLogCollapse(index)}
-                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
-                  aria-label={
-                    collapsedLogs.has(index) ? "Expand log" : "Collapse log"
+              </Bubble>
+            ) : isLogBatch ? (
+              <div ref={measureRef} className="max-w-[1000px]">
+                <AnalysisLogMessage
+                  message={displayMessage}
+                  index={index}
+                  isCollapsed={collapsedLogs.has(index)}
+                  toggleCollapse={toggleLogCollapse}
+                  isStreaming={
+                    data.isStreaming && index === data.messages.length - 1
                   }
-                >
-                  <span className="text-[10px] font-medium text-slate-600">
-                    {collapsedLogs.has(index) ? "Show" : "Hide"}
-                  </span>
-                  {collapsedLogs.has(index) ? (
-                    <ChevronDown className="h-3 w-3 text-slate-500" />
-                  ) : (
-                    <ChevronUp className="h-3 w-3 text-slate-500" />
-                  )}
-                </button>
+                  jobProgress={
+                    data.isStreaming && index === data.messages.length - 1
+                      ? getCurrentConversationProgress()
+                      : null
+                  }
+                />
               </div>
-              {!collapsedLogs.has(index) && (
-                <>
-                  <pre className="whitespace-pre-wrap break-words font-mono text-[12.75px] leading-5 text-slate-700 p-4 bg-slate-50/50">
-                    {message.lines ? message.lines.join("\n") : message.content}
-                  </pre>
-                  {isStreaming && index === data.length - 1 && (
-                    <div className="border-t border-slate-200 px-4 py-2 bg-slate-50/60 flex items-center gap-2 text-slate-600">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-xs">Analyzing…</span>
-                    </div>
-                  )}
-                </>
-              )}
-              {collapsedLogs.has(index) && (
-                <div className="px-4 py-3 bg-slate-50/50">
-                  <span className="text-xs text-slate-500 italic">
-                    Log collapsed ({message.lines ? message.lines.length : "1"}{" "}
-                    lines)
-                  </span>
-                </div>
-              )}
-            </div>
-          ) : isReport ? (
-            <div
-              ref={measureRef}
-              className={`inline-block max-w-[1000px] rounded-2xl overflow-hidden shadow-lg ring-1 ${
-                message.reportType === "llm"
-                  ? "bg-gradient-to-br from-purple-50 to-pink-50 ring-purple-200"
-                  : "bg-gradient-to-br from-indigo-50 to-blue-50 ring-indigo-200"
-              }`}
-            >
+            ) : isReport ? (
               <div
-                className={`flex items-center gap-3 px-5 py-3 border-b ${
+                ref={measureRef}
+                className={`inline-block max-w-[1000px] rounded-2xl overflow-hidden shadow-lg ring-1 ${
                   message.reportType === "llm"
-                    ? "border-purple-200 bg-gradient-to-r from-purple-100 to-pink-100"
-                    : "border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100"
+                    ? "bg-gradient-to-br from-purple-50 to-pink-50 ring-purple-200"
+                    : "bg-gradient-to-br from-indigo-50 to-blue-50 ring-indigo-200"
                 }`}
               >
-                <div className="flex items-center gap-2">
+                <div
+                  className={`flex items-center gap-3 px-5 py-3 border-b ${
+                    message.reportType === "llm"
+                      ? "border-purple-200 bg-gradient-to-r from-purple-100 to-pink-100"
+                      : "border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-3 w-3 rounded-full shadow-sm ${
+                        message.reportType === "llm"
+                          ? "bg-purple-500"
+                          : "bg-indigo-500"
+                      }`}
+                    />
+                    <span
+                      className={`text-sm font-bold tracking-wide ${
+                        message.reportType === "llm"
+                          ? "text-purple-900"
+                          : "text-indigo-900"
+                      }`}
+                    >
+                      {message.reportType === "llm"
+                        ? "📑 LLM ANALYSIS REPORT"
+                        : "📊 DETERMINISTIC ANALYSIS REPORT"}
+                    </span>
+                  </div>
                   <span
-                    className={`h-3 w-3 rounded-full shadow-sm ${
+                    className={`ml-auto text-xs font-medium bg-white/60 px-2 py-1 rounded-full ${
                       message.reportType === "llm"
-                        ? "bg-purple-500"
-                        : "bg-indigo-500"
-                    }`}
-                  />
-                  <span
-                    className={`text-sm font-bold tracking-wide ${
-                      message.reportType === "llm"
-                        ? "text-purple-900"
-                        : "text-indigo-900"
+                        ? "text-purple-600"
+                        : "text-indigo-600"
                     }`}
                   >
                     {message.reportType === "llm"
-                      ? "📑 LLM ANALYSIS REPORT"
-                      : "📊 DETERMINISTIC ANALYSIS REPORT"}
+                      ? "AI-Generated Output"
+                      : "Deterministic Model Output"}
                   </span>
                 </div>
-                <span
-                  className={`ml-auto text-xs font-medium bg-white/60 px-2 py-1 rounded-full ${
+                <div className="p-5 bg-white/80">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    className={`prose prose-sm max-w-none break-words prose-headings:font-bold prose-p:leading-relaxed prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 ${
+                      message.reportType === "llm"
+                        ? "prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-purple-700 prose-code:bg-purple-50 prose-code:text-purple-800"
+                        : "prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-indigo-700 prose-code:bg-indigo-50 prose-code:text-indigo-800"
+                    }`}
+                    components={{
+                      h1: ({ children }) => (
+                        <h1
+                          className={`text-xl font-bold mb-3 pb-2 border-b ${
+                            message.reportType === "llm"
+                              ? "text-purple-900 border-purple-200"
+                              : "text-indigo-900 border-indigo-200"
+                          }`}
+                        >
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2
+                          className={`text-lg font-semibold mb-2 mt-4 ${
+                            message.reportType === "llm"
+                              ? "text-purple-800"
+                              : "text-indigo-800"
+                          }`}
+                        >
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-base font-medium text-slate-700 mb-2 mt-3">
+                          {children}
+                        </h3>
+                      ),
+                      p: ({ children }) => (
+                        <p className="text-slate-600 leading-relaxed mb-3">
+                          {children}
+                        </p>
+                      ),
+                      ul: ({ children }) => (
+                        <ul className="list-disc list-inside space-y-1 text-slate-600 mb-3">
+                          {children}
+                        </ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol className="list-decimal list-inside space-y-1 text-slate-600 mb-3">
+                          {children}
+                        </ol>
+                      ),
+                      li: ({ children }) => (
+                        <li className="text-slate-600">{children}</li>
+                      ),
+                      table: ({ children }) => (
+                        <div className="overflow-x-auto my-4">
+                          <table className="min-w-full border-collapse border border-slate-300">
+                            {children}
+                          </table>
+                        </div>
+                      ),
+                      thead: ({ children }) => (
+                        <thead className="bg-slate-100">{children}</thead>
+                      ),
+                      tbody: ({ children }) => <tbody>{children}</tbody>,
+                      tr: ({ children }) => (
+                        <tr className="border-b border-slate-200">
+                          {children}
+                        </tr>
+                      ),
+                      th: ({ children }) => (
+                        <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td className="border border-slate-300 px-3 py-2 text-slate-600">
+                          {children}
+                        </td>
+                      ),
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-slate-300 pl-4 italic text-slate-600 my-3">
+                          {children}
+                        </blockquote>
+                      ),
+                      br: () => <br className="my-1" />,
+                      code: ({ node, inline, children, ...props }) =>
+                        inline ? (
+                          <code
+                            className={`px-1.5 py-0.5 rounded text-sm font-mono ${
+                              message.reportType === "llm"
+                                ? "bg-purple-50 text-purple-800"
+                                : "bg-indigo-50 text-indigo-800"
+                            }`}
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        ) : (
+                          <pre
+                            className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm font-mono text-slate-700 overflow-x-auto"
+                            {...props}
+                          >
+                            <code>{children}</code>
+                          </pre>
+                        ),
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+                <div
+                  className={`px-5 py-3 border-t ${
                     message.reportType === "llm"
-                      ? "text-purple-600"
-                      : "text-indigo-600"
+                      ? "bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200"
+                      : "bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200"
                   }`}
                 >
-                  {message.reportType === "llm"
-                    ? "AI-Generated Output"
-                    : "Deterministic Model Output"}
-                </span>
+                  <div
+                    className={`flex items-center justify-between text-xs ${
+                      message.reportType === "llm"
+                        ? "text-purple-600"
+                        : "text-indigo-600"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          message.reportType === "llm"
+                            ? "bg-purple-400"
+                            : "bg-indigo-400"
+                        }`}
+                      />
+                      Generated by VYNN AI Agent
+                    </span>
+                    <span>
+                      {new Date(
+                        message.timestamp || Date.now()
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="p-5 bg-white/80">
+            ) : (
+              <Bubble>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkBreaks]}
-                  className={`prose prose-sm max-w-none break-words prose-headings:font-bold prose-p:leading-relaxed prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 ${
-                    message.reportType === "llm"
-                      ? "prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-purple-700 prose-code:bg-purple-50 prose-code:text-purple-800"
-                      : "prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-indigo-700 prose-code:bg-indigo-50 prose-code:text-indigo-800"
-                  }`}
+                  className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
+                      ${isUser ? "prose-invert" : "prose-slate"}`}
                   components={{
-                    h1: ({ children }) => (
-                      <h1
-                        className={`text-xl font-bold mb-3 pb-2 border-b ${
-                          message.reportType === "llm"
-                            ? "text-purple-900 border-purple-200"
-                            : "text-indigo-900 border-indigo-200"
-                        }`}
-                      >
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2
-                        className={`text-lg font-semibold mb-2 mt-4 ${
-                          message.reportType === "llm"
-                            ? "text-purple-800"
-                            : "text-indigo-800"
-                        }`}
-                      >
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-base font-medium text-slate-700 mb-2 mt-3">
-                        {children}
-                      </h3>
-                    ),
-                    p: ({ children }) => (
-                      <p className="text-slate-600 leading-relaxed mb-3">
-                        {children}
-                      </p>
-                    ),
-                    ul: ({ children }) => (
-                      <ul className="list-disc list-inside space-y-1 text-slate-600 mb-3">
-                        {children}
-                      </ul>
-                    ),
-                    ol: ({ children }) => (
-                      <ol className="list-decimal list-inside space-y-1 text-slate-600 mb-3">
-                        {children}
-                      </ol>
-                    ),
-                    li: ({ children }) => (
-                      <li className="text-slate-600">{children}</li>
-                    ),
-                    table: ({ children }) => (
-                      <div className="overflow-x-auto my-4">
-                        <table className="min-w-full border-collapse border border-slate-300">
-                          {children}
-                        </table>
-                      </div>
-                    ),
-                    thead: ({ children }) => (
-                      <thead className="bg-slate-100">{children}</thead>
-                    ),
-                    tbody: ({ children }) => <tbody>{children}</tbody>,
-                    tr: ({ children }) => (
-                      <tr className="border-b border-slate-200">{children}</tr>
-                    ),
-                    th: ({ children }) => (
-                      <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
-                        {children}
-                      </th>
-                    ),
-                    td: ({ children }) => (
-                      <td className="border border-slate-300 px-3 py-2 text-slate-600">
-                        {children}
-                      </td>
-                    ),
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-slate-300 pl-4 italic text-slate-600 my-3">
-                        {children}
-                      </blockquote>
-                    ),
-                    br: () => <br className="my-1" />,
-                    code: ({ node, inline, children, ...props }) =>
-                      inline ? (
+                    code({ node, inline, className, children, ...props }) {
+                      const match = /language-(\w+)/.exec(className || "");
+                      return !inline && match ? (
+                        <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
+                          <SyntaxHighlighter
+                            {...props}
+                            style={vscDarkPlus}
+                            language={match[1]}
+                            PreTag="div"
+                            customStyle={{ margin: 0, maxWidth: "100%" }}
+                          >
+                            {String(children).replace(/\n$/, "")}
+                          </SyntaxHighlighter>
+                        </div>
+                      ) : (
                         <code
-                          className={`px-1.5 py-0.5 rounded text-sm font-mono ${
-                            message.reportType === "llm"
-                              ? "bg-purple-50 text-purple-800"
-                              : "bg-indigo-50 text-indigo-800"
-                          }`}
                           {...props}
+                          className={`${className} break-all px-1.5 py-0.5 rounded ${
+                            isUser ? "bg-white/20 text-white" : "bg-slate-100"
+                          }`}
                         >
                           {children}
                         </code>
-                      ) : (
+                      );
+                    },
+                    pre({ node, children, ...props }) {
+                      return (
                         <pre
-                          className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm font-mono text-slate-700 overflow-x-auto"
                           {...props}
+                          className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3"
                         >
-                          <code>{children}</code>
+                          {children}
                         </pre>
-                      ),
+                      );
+                    },
+                    p({ node, children, ...props }) {
+                      return (
+                        <p {...props} className="break-words">
+                          {children}
+                        </p>
+                      );
+                    },
+                    ul({ node, children, ...props }) {
+                      return (
+                        <ul
+                          {...props}
+                          className="list-disc list-inside space-y-1 mb-3"
+                        >
+                          {children}
+                        </ul>
+                      );
+                    },
+                    ol({ node, children, ...props }) {
+                      return (
+                        <ol
+                          {...props}
+                          className="list-decimal list-inside space-y-1 mb-3"
+                        >
+                          {children}
+                        </ol>
+                      );
+                    },
+                    li({ node, children, ...props }) {
+                      return (
+                        <li {...props} className="break-words">
+                          {children}
+                        </li>
+                      );
+                    },
+                    table({ node, children, ...props }) {
+                      return (
+                        <div className="overflow-x-auto my-4">
+                          <table
+                            {...props}
+                            className="min-w-full border-collapse border border-slate-300"
+                          >
+                            {children}
+                          </table>
+                        </div>
+                      );
+                    },
+                    thead({ node, children, ...props }) {
+                      return (
+                        <thead
+                          {...props}
+                          className={`${
+                            isUser ? "bg-white/20" : "bg-slate-100"
+                          }`}
+                        >
+                          {children}
+                        </thead>
+                      );
+                    },
+                    tbody({ node, children, ...props }) {
+                      return <tbody {...props}>{children}</tbody>;
+                    },
+                    tr({ node, children, ...props }) {
+                      return (
+                        <tr
+                          {...props}
+                          className={`border-b ${
+                            isUser ? "border-white/20" : "border-slate-200"
+                          }`}
+                        >
+                          {children}
+                        </tr>
+                      );
+                    },
+                    th({ node, children, ...props }) {
+                      return (
+                        <th
+                          {...props}
+                          className={`border px-3 py-2 text-left font-semibold ${
+                            isUser
+                              ? "border-white/20 text-white"
+                              : "border-slate-300 text-slate-700"
+                          }`}
+                        >
+                          {children}
+                        </th>
+                      );
+                    },
+                    td({ node, children, ...props }) {
+                      return (
+                        <td
+                          {...props}
+                          className={`border px-3 py-2 ${
+                            isUser
+                              ? "border-white/20 text-white"
+                              : "border-slate-300 text-slate-600"
+                          }`}
+                        >
+                          {children}
+                        </td>
+                      );
+                    },
+                    blockquote({ node, children, ...props }) {
+                      return (
+                        <blockquote
+                          {...props}
+                          className={`border-l-4 pl-4 italic my-3 ${
+                            isUser
+                              ? "border-white/40 text-white/90"
+                              : "border-slate-300 text-slate-600"
+                          }`}
+                        >
+                          {children}
+                        </blockquote>
+                      );
+                    },
+                    br() {
+                      return <br className="my-1" />;
+                    },
                   }}
                 >
                   {message.content}
                 </ReactMarkdown>
-              </div>
-              <div
-                className={`px-5 py-3 border-t ${
-                  message.reportType === "llm"
-                    ? "bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200"
-                    : "bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200"
-                }`}
-              >
-                <div
-                  className={`flex items-center justify-between text-xs ${
-                    message.reportType === "llm"
-                      ? "text-purple-600"
-                      : "text-indigo-600"
-                  }`}
-                >
-                  <span className="flex items-center gap-1">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        message.reportType === "llm"
-                          ? "bg-purple-400"
-                          : "bg-indigo-400"
-                      }`}
-                    />
-                    Generated by VYNN AI Agent
-                  </span>
-                  <span>
-                    {new Date(message.timestamp || Date.now()).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Bubble>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkBreaks]}
-                className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
-                      ${isUser ? "prose-invert" : "prose-slate"}`}
-                components={{
-                  code({ node, inline, className, children, ...props }) {
-                    const match = /language-(\w+)/.exec(className || "");
-                    return !inline && match ? (
-                      <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
-                        <SyntaxHighlighter
-                          {...props}
-                          style={vscDarkPlus}
-                          language={match[1]}
-                          PreTag="div"
-                          customStyle={{ margin: 0, maxWidth: "100%" }}
-                        >
-                          {String(children).replace(/\n$/, "")}
-                        </SyntaxHighlighter>
-                      </div>
-                    ) : (
-                      <code
-                        {...props}
-                        className={`${className} break-all px-1.5 py-0.5 rounded ${
-                          isUser ? "bg-white/20 text-white" : "bg-slate-100"
-                        }`}
-                      >
-                        {children}
-                      </code>
-                    );
-                  },
-                  pre({ node, children, ...props }) {
-                    return (
-                      <pre
-                        {...props}
-                        className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3"
-                      >
-                        {children}
-                      </pre>
-                    );
-                  },
-                  p({ node, children, ...props }) {
-                    return (
-                      <p {...props} className="break-words">
-                        {children}
-                      </p>
-                    );
-                  },
-                  ul({ node, children, ...props }) {
-                    return (
-                      <ul
-                        {...props}
-                        className="list-disc list-inside space-y-1 mb-3"
-                      >
-                        {children}
-                      </ul>
-                    );
-                  },
-                  ol({ node, children, ...props }) {
-                    return (
-                      <ol
-                        {...props}
-                        className="list-decimal list-inside space-y-1 mb-3"
-                      >
-                        {children}
-                      </ol>
-                    );
-                  },
-                  li({ node, children, ...props }) {
-                    return (
-                      <li {...props} className="break-words">
-                        {children}
-                      </li>
-                    );
-                  },
-                  table({ node, children, ...props }) {
-                    return (
-                      <div className="overflow-x-auto my-4">
-                        <table
-                          {...props}
-                          className="min-w-full border-collapse border border-slate-300"
-                        >
-                          {children}
-                        </table>
-                      </div>
-                    );
-                  },
-                  thead({ node, children, ...props }) {
-                    return (
-                      <thead
-                        {...props}
-                        className={`${isUser ? "bg-white/20" : "bg-slate-100"}`}
-                      >
-                        {children}
-                      </thead>
-                    );
-                  },
-                  tbody({ node, children, ...props }) {
-                    return <tbody {...props}>{children}</tbody>;
-                  },
-                  tr({ node, children, ...props }) {
-                    return (
-                      <tr
-                        {...props}
-                        className={`border-b ${
-                          isUser ? "border-white/20" : "border-slate-200"
-                        }`}
-                      >
-                        {children}
-                      </tr>
-                    );
-                  },
-                  th({ node, children, ...props }) {
-                    return (
-                      <th
-                        {...props}
-                        className={`border px-3 py-2 text-left font-semibold ${
-                          isUser
-                            ? "border-white/20 text-white"
-                            : "border-slate-300 text-slate-700"
-                        }`}
-                      >
-                        {children}
-                      </th>
-                    );
-                  },
-                  td({ node, children, ...props }) {
-                    return (
-                      <td
-                        {...props}
-                        className={`border px-3 py-2 ${
-                          isUser
-                            ? "border-white/20 text-white"
-                            : "border-slate-300 text-slate-600"
-                        }`}
-                      >
-                        {children}
-                      </td>
-                    );
-                  },
-                  blockquote({ node, children, ...props }) {
-                    return (
-                      <blockquote
-                        {...props}
-                        className={`border-l-4 pl-4 italic my-3 ${
-                          isUser
-                            ? "border-white/40 text-white/90"
-                            : "border-slate-300 text-slate-600"
-                        }`}
-                      >
-                        {children}
-                      </blockquote>
-                    );
-                  },
-                  br() {
-                    return <br className="my-1" />;
-                  },
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </Bubble>
-          )}
+              </Bubble>
+            )}
+          </div>
         </div>
-      </div>
-    );
-  };
+      );
+    },
+    [collapsedLogs]
+  );
 
   // OpenAI-style Progress Text Animation Component
   const ProgressText = ({ text, className = "" }) => {
@@ -2257,7 +2260,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
                 conversations[currentConversationIndex].messages.length
               }
               itemSize={getItemSize}
-              itemData={conversations[currentConversationIndex].messages}
+              itemData={conversations[currentConversationIndex]}
               overscanCount={6}
             >
               {Row}
@@ -2265,34 +2268,10 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
             {/* Scroll to Bottom Button */}
             {showScrollToBottom && (
-              <div className="absolute bottom-4 right-4 z-50 opacity-100 transform transition-all duration-300 ease-in-out">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={scrollToBottom}
-                      variant="default"
-                      size="default"
-                      className="h-12 w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white border-2 border-white transition-all duration-200 hover:scale-105 relative group"
-                    >
-                      <ArrowDown className="h-5 w-5 transition-transform group-hover:translate-y-0.5" />
-                      {unreadMessages > 0 && (
-                        <span className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                          {unreadMessages > 9 ? "9+" : unreadMessages}
-                        </span>
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">
-                    <p>
-                      {unreadMessages > 0
-                        ? `${unreadMessages} new message${
-                            unreadMessages > 1 ? "s" : ""
-                          }`
-                        : "Scroll to bottom"}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
+              <ScrollToBottomButton
+                scrollToBottom={scrollToBottom}
+                unreadMessages={unreadMessages}
+              />
             )}
 
             {/* Debug info - only show when there are unread messages */}
