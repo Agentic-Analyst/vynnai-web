@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, X, TrendingUp, Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { Search, Plus, X, TrendingUp, Wifi, WifiOff, Loader2, BarChart3 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { mockStocks } from '@/utils/stocksApi';
@@ -376,19 +376,32 @@ const Stocks = () => {
   return (
     <ErrorBoundary>
       <div className="h-[calc(100vh-4rem)] flex flex-col">
-        {/* Header */}
-        <div className="flex-shrink-0">
-          <PageHeader 
-            description="Monitor and track your favorite stocks in real-time"
-          >
-            {/* Connection Status and Add Stock Button */}
+        {/* Compact Header - Single Row */}
+        <div className="flex-shrink-0 pb-3 border-b">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
-              {/* Connection Status Indicator */}
-              <div className="flex items-center gap-2 text-sm">
+              {/* Icon and Title - More Compact */}
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border">
+                <BarChart3 className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-foreground">
+                  Stocks
+                </h1>
+                <p className="text-xs text-muted-foreground">
+                  Real-time monitoring
+                </p>
+              </div>
+            </div>
+            
+            {/* Right Side: Status and Count */}
+            <div className="flex items-center gap-3">
+              {/* Connection Status - Compact */}
+              <div className="flex items-center gap-1.5 text-xs">
                 {isUsingRealTime ? (
                   <>
                     <Wifi className={cn(
-                      "h-4 w-4",
+                      "h-3.5 w-3.5",
                       isConnected ? "text-green-500" : "text-orange-500"
                     )} />
                     <span className="text-muted-foreground">
@@ -397,84 +410,82 @@ const Stocks = () => {
                   </>
                 ) : (
                   <>
-                    <WifiOff className="h-4 w-4 text-muted-foreground" />
+                    <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
                     <span className="text-muted-foreground">Disconnected</span>
                   </>
                 )}
                 {lastUpdated && (
-                  <span className="text-xs text-muted-foreground">
-                    Updated {lastUpdated.toLocaleTimeString()}
+                  <span className="text-xs text-muted-foreground ml-1">
+                    {lastUpdated.toLocaleTimeString()}
                   </span>
                 )}
               </div>
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="secondary" className="text-xs h-6">
                 {filteredStocksForDisplay.length} stocks tracked
               </Badge>
             </div>
-          </PageHeader>
-        
-        {/* Search Bar */}
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search your stocks or add new ones..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          </div>
+          
+          {/* Integrated Search Bar - More Compact */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search your stocks or add new ones..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 text-sm bg-muted/30"
+            />
             
-            {/* Show results info */}
+            {/* Compact Search Results Info */}
             {searchQuery && (
-              <div className="mt-2 text-sm text-muted-foreground">
-                {filteredStocks.length > 0 && (
-                  <span>Found {filteredStocks.length} stock{filteredStocks.length !== 1 ? 's' : ''} in your watchlist</span>
-                )}
-                {filteredStocks.length === 0 && addSuggestions.length === 0 && (
-                  <span>No stocks found matching "{searchQuery}"</span>
-                )}
-              </div>
-            )}
-            
-            {/* Add Suggestions - only show when no current stocks match or when we have results */}
-            {searchQuery && addSuggestions.length > 0 && (
-              <div className="mt-3 p-3 bg-muted/50 rounded-lg border">
-                <div className="text-sm text-muted-foreground mb-2">Add to watchlist:</div>
-                <div className="flex flex-wrap gap-2">
-                  {addSuggestions.map((stock) => (
-                    <Button
-                      key={stock.symbol}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addStock(stock.symbol)}
-                      className="h-8 text-xs"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      {stock.symbol} - {stock.name}
-                    </Button>
-                  ))}
+              <div className="absolute top-full mt-1 left-0 right-0 bg-background border rounded-md shadow-md z-10 p-2">
+                <div className="text-xs text-muted-foreground mb-1">
+                  {filteredStocks.length > 0 && (
+                    <span>Found {filteredStocks.length} stock{filteredStocks.length !== 1 ? 's' : ''} in watchlist</span>
+                  )}
+                  {filteredStocks.length === 0 && addSuggestions.length === 0 && (
+                    <span>No stocks found matching "{searchQuery}"</span>
+                  )}
                 </div>
+                
+                {/* Add Suggestions - Compact */}
+                {addSuggestions.length > 0 && (
+                  <div className="mt-1">
+                    <div className="text-xs text-muted-foreground mb-1">Add to watchlist:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {addSuggestions.map((stock) => (
+                        <Button
+                          key={stock.symbol}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addStock(stock.symbol)}
+                          className="h-7 text-xs px-2"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          {stock.symbol}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Market Overview Stats - Always show */}
+        {/* Market Overview Stats - Compact */}
         <MarketStats 
           stocks={marketStatsData} 
-          className="mb-6"
+          className="py-3"
         />
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
+        {/* Main Content */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
         {/* Stock List - Scrollable */}
         <div className="lg:col-span-4 flex flex-col min-h-0">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
               Watchlist
             </h2>
             
@@ -547,7 +558,7 @@ const Stocks = () => {
             </Card>
           ) : (
             <ScrollArea className="flex-1">
-              <div className="space-y-3 pr-4">
+              <div className="space-y-2 pr-4">
                 {filteredStocksForDisplay
                   .filter(stock => stock && stock.symbol) // Safety filter
                   .map((stock) => {
@@ -765,7 +776,7 @@ const Stocks = () => {
           )}
         </div>
       </div>
-    </div>
+      </div>
     </ErrorBoundary>
   );
 };

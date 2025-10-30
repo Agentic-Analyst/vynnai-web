@@ -26,8 +26,8 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
       )}
       onClick={onClick}
     >
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div className="space-y-1">
+      <CardHeader className="flex flex-row items-center justify-between pb-1.5 pt-3">
+        <div className="space-y-0.5">
           <CardTitle className="text-base font-semibold leading-none">{stock.symbol}</CardTitle>
           <p className="text-xs text-muted-foreground truncate max-w-[180px]">{stock.name}</p>
         </div>
@@ -37,10 +37,10 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
           <BarChart3Icon className="h-4 w-4 text-muted-foreground" />
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="pb-3 pt-2">
         {/* Price and Change */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="space-y-1">
+        <div className="flex items-start justify-between mb-2">
+          <div className="space-y-0.5">
             <div className="text-2xl font-bold">
               {isLoading ? (
                 <div className="flex items-center gap-2">
@@ -70,7 +70,7 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
           </div>
           
           {/* Chart in top right */}
-          <div className="h-16 w-24 flex-shrink-0">
+          <div className="h-14 w-24 flex-shrink-0">
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -83,25 +83,9 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
             ) : null}
           </div>
         </div>
-
-        {/* Main Info Grid - Better distributed layout */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3">
-          <div className="text-muted-foreground">Volume:</div>
-          <div className="text-right">
-            {isLoading || stock.volume === null ? "N/A" : formatNumber(stock.volume)}
-          </div>
-          <div className="text-muted-foreground">Mkt Cap:</div>
-          <div className="text-right">
-            {isLoading || stock.marketCap === null ? "N/A" : formatNumber(stock.marketCap)}
-          </div>
-          <div className="text-muted-foreground">Updated:</div>
-          <div className="text-right">
-            {isLoading || !stock.lastUpdated ? "N/A" : formatDate(stock.lastUpdated)}
-          </div>
-        </div>
         
-        {/* Analysis Section */}
-        <div className="space-y-2 pt-2 border-t border-border/50">
+        {/* Analysis Section - more compact */}
+        <div className="space-y-1.5 pt-2 border-t border-border/50">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Short-term:</span>
             <div>
