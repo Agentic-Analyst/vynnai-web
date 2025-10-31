@@ -28,6 +28,7 @@ import PortfolioList from "./pages/PortfolioList.tsx";
 import Performance from "./pages/Performance.tsx";
 import Analysis from "./pages/Analysis.tsx";
 import Settings from "./pages/Settings.tsx";
+import Reports from "./pages/Reports.tsx";
 import Navigation from "./components/Navigation.jsx";
 import { NewsWebSocketTest } from "./components/test/NewsWebSocketTest.tsx";
 import { API_BASE_URL } from "@/lib/apiBase";
@@ -140,6 +141,7 @@ const App = () => {
                             <Route path="markets" element={<Markets />} />
                             <Route path="currencies" element={<Currencies />} />
                             <Route path="global" element={<Global />} />
+                            <Route path="reports" element={<Reports />} />
                             <Route
                               path="portfolio"
                               element={<PortfolioList />}
