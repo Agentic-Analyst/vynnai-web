@@ -143,7 +143,7 @@ const Reports: React.FC = () => {
     },
   ];
 
-  // Filtering and sorting logic
+  // Filtering and sorting logic for Company Reports
   const filteredCompanyReports = useMemo(() => {
     let filtered = companyReports;
 
@@ -175,6 +175,34 @@ const Reports: React.FC = () => {
 
     return filtered;
   }, [companyReports, searchQuery, selectedSector, sortBy]);
+
+  // Filtering for Sector Reports
+  const filteredSectorReports = useMemo(() => {
+    let filtered = sectorReports;
+
+    if (searchQuery) {
+      filtered = filtered.filter(r =>
+        r.sector.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return filtered;
+  }, [sectorReports, searchQuery]);
+
+  // Filtering for Global Reports
+  const filteredGlobalReports = useMemo(() => {
+    let filtered = globalReports;
+
+    if (searchQuery) {
+      filtered = filtered.filter(r =>
+        r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.topics.some(topic => topic.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+
+    return filtered;
+  }, [searchQuery]);
 
   const sectors = useMemo(() => {
     return Array.from(new Set(companyReports.map(r => r.sector)));
@@ -382,7 +410,7 @@ const Reports: React.FC = () => {
           {/* Sector Reports Tab */}
           <TabsContent value="sector" className="space-y-4 mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {sectorReports.map(report => (
+              {filteredSectorReports.map(report => (
                 <Card key={report.id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -443,13 +471,15 @@ const Reports: React.FC = () => {
               ))}
             </div>
 
-            {sectorReports.length === 0 && (
+            {filteredSectorReports.length === 0 && (
               <Card className="p-12">
                 <div className="text-center text-muted-foreground">
                   <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg font-medium">No sector reports available</p>
+                  <p className="text-lg font-medium">No sector reports found</p>
                   <p className="text-sm mt-2">
-                    Add companies to your watchlist to generate sector reports
+                    {searchQuery
+                      ? 'Try adjusting your search query'
+                      : 'Add companies to your watchlist to generate sector reports'}
                   </p>
                 </div>
               </Card>
@@ -459,7 +489,7 @@ const Reports: React.FC = () => {
           {/* Global Reports Tab */}
           <TabsContent value="global" className="space-y-4 mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {globalReports.map(report => (
+              {filteredGlobalReports.map(report => (
                 <Card key={report.id} className="hover:shadow-lg transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between mb-2">
@@ -523,6 +553,20 @@ const Reports: React.FC = () => {
                 </Card>
               ))}
             </div>
+
+            {filteredGlobalReports.length === 0 && (
+              <Card className="p-12">
+                <div className="text-center text-muted-foreground">
+                  <Globe2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-lg font-medium">No global reports found</p>
+                  <p className="text-sm mt-2">
+                    {searchQuery
+                      ? 'Try adjusting your search query'
+                      : 'Global market reports will appear here'}
+                  </p>
+                </div>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
 
