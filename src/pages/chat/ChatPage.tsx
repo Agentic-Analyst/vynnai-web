@@ -35,21 +35,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AnalysisLogMessage from "@/components/chat/AnalysisLogMessage";
 import ScrollToBottomButton from "@/components/chat/ScrollToBottomButton";
+import { createWelcomeMessage } from "./utils";
 
 const ChatPage = () => {
-  // ---------- Helper functions ----------
-  const createWelcomeMessage = () => ({
-    role: "assistant",
-    content: `**Welcome to VYNN AI. Your AI Financial Analyst!** 📊
-
-**Getting Started:**
-- Tell me which company or stock you’d like to analyze (e.g., "I want to analyze Google").
-- Configure your analysis parameters using ⚙️ above.
-
-Need financial statements, models, news, or insights? I’ve got you covered — just ask!`,
-    timestamp: new Date().toISOString(),
-  });
-
   // ---------- Local state ----------
   const [analysisParams, setAnalysisParams] = useState(() => {
     return userStorage.getJSON("analysis_params", {});
