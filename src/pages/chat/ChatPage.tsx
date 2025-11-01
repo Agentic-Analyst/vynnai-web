@@ -647,16 +647,6 @@ const ChatPage = () => {
     });
   };
 
-  const generateTitle = (userMessage) => {
-    const text = userMessage.toLowerCase();
-    if (text.includes("analyze") || text.includes("analysis")) {
-      const tickerMatch = userMessage.match(/\b([A-Z]{1,5})\b/);
-      return tickerMatch ? `${tickerMatch[1]} Analysis` : "Stock Analysis";
-    }
-    const words = userMessage.split(" ").slice(0, 3).join(" ");
-    return words.length > 20 ? words.substring(0, 20) + "..." : words;
-  };
-
   const startNewConversation = () => {
     const newConversation = {
       id: Date.now(),
