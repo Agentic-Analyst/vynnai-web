@@ -27,11 +27,13 @@ const ChatPage = () => {
     conversations,
     currentConversationIndex,
     setCurrentConversationIndex,
-    addMessage,
-    updateConversation,
     startNewConversation,
     deleteConversation,
     setConversations,
+    addAssistantMessage,
+    addAssistantLogBatch,
+    addDownloadsMessage,
+    addReportMessage,
   } = useConversations();
   const [analysisParams, setAnalysisParams] = useState(() => {
     return userStorage.getJSON("analysis_params", {});
@@ -50,7 +52,6 @@ const ChatPage = () => {
   const eventSourceRef = useRef(null);
   const progressPollRef = useRef(null);
   const [availableFiles, setAvailableFiles] = useState({});
-  const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
   const [isStoppingJob, setIsStoppingJob] = useState(false);
 
   // NEW — rename state
@@ -490,114 +491,6 @@ const ChatPage = () => {
         setAutoScrollEnabled(true); // Re-enable auto-scroll when user manually goes to bottom
         console.log("Manual scroll to bottom - auto-scroll re-enabled");
       }
-    });
-  };
-
-  // log batch bubble
-  const addAssistantLogBatch = (lines) => {
-    if (!Array.isArray(lines) || lines.length === 0) return;
-    const nowIso = new Date().toISOString();
-
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      const msgs = [...(convo.messages || [])];
-      const last = msgs[msgs.length - 1];
-
-      if (last && last.role === "assistant" && last.kind === "logbatch") {
-        msgs[msgs.length - 1] = {
-          ...last,
-          lines: (last.lines || []).concat(lines),
-          content: (last.lines || []).concat(lines).join("\n"),
-          timestamp: nowIso,
-        };
-      } else {
-        msgs.push({
-          role: "assistant",
-          kind: "logbatch",
-          lines: [...lines],
-          nlSummary: "Summary 1", // TODO: remove this, this is for testing purposes
-          content: lines.join("\n"),
-          timestamp: nowIso,
-        });
-      }
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
-    });
-  };
-
-  const addAssistantMessage = (content) => {
-    const COALESCE_MS = 3000;
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex] ?? {
-        id: Date.now(),
-        title: "New Analysis",
-        messages: [],
-      };
-      const msgs = [...(convo.messages || [])];
-
-      const nowIso = new Date().toISOString();
-      const last = msgs[msgs.length - 1];
-      const canCoalesce =
-        last &&
-        last.role === "assistant" &&
-        !last.kind &&
-        last.timestamp &&
-        Date.now() - new Date(last.timestamp).getTime() <= COALESCE_MS;
-
-      if (canCoalesce) {
-        msgs[msgs.length - 1] = {
-          ...last,
-          content: `${last.content}\n${content}`,
-          timestamp: nowIso,
-        };
-      } else {
-        msgs.push({ role: "assistant", content, timestamp: nowIso });
-      }
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
-    });
-  };
-
-  const addDownloadsMessage = (jobId, entriesObject) => {
-    if (downloadsPostedRef.current.has(jobId)) return;
-    downloadsPostedRef.current.add(jobId);
-
-    const nowIso = new Date().toISOString();
-    const entries = Object.values(entriesObject);
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      const msgs = [...(convo.messages || [])];
-      msgs.push({
-        role: "assistant",
-        kind: "downloads",
-        jobId,
-        entries,
-        content: `Downloads available (${entries.length})`,
-        timestamp: nowIso,
-      });
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
-    });
-  };
-
-  const addReportMessage = (reportContent, reportType = "deterministic") => {
-    const nowIso = new Date().toISOString();
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      const msgs = [...(convo.messages || [])];
-      msgs.push({
-        role: "assistant",
-        kind: "report",
-        reportType: reportType,
-        content: reportContent,
-        timestamp: nowIso,
-      });
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
     });
   };
 
