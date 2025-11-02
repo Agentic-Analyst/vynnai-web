@@ -4,6 +4,8 @@ import { API_BASE_URL } from '@/lib/apiBase';
 export interface Stock {
   symbol: string;
   name: string;
+  sector?: string;
+  industry?: string;
   price: number | null;
   change: number | null;
   changePercent: number | null;

@@ -16,6 +16,7 @@ import OAuthCallback from "./pages/OAuthCallback.jsx";
 import { NewsWebSocketProvider } from "./contexts/NewsWebSocketContext.tsx";
 import { StockPricesWebSocketProvider } from "./contexts/StockPricesWebSocketContext.tsx";
 import { HistoricalDataProvider } from "./contexts/HistoricalDataContext.tsx";
+import { DailyReportsProvider } from "./contexts/DailyReportsContext.tsx";
 
 // Stock Dashboard Pages
 import Stocks from "./pages/Stocks.tsx";
@@ -114,10 +115,11 @@ const App = () => {
             <Shell>
               {(isAuthed) =>
                 isAuthed ? (
-                  <NewsWebSocketProvider>
-                    <StockPricesWebSocketProvider>
-                      <HistoricalDataProvider>
-                        <Routes>
+                  <DailyReportsProvider>
+                    <NewsWebSocketProvider>
+                      <StockPricesWebSocketProvider>
+                        <HistoricalDataProvider>
+                          <Routes>
                           <Route
                             path="/"
                             element={<Navigate to="/chat" replace />}
@@ -177,6 +179,7 @@ const App = () => {
                       </HistoricalDataProvider>
                     </StockPricesWebSocketProvider>
                   </NewsWebSocketProvider>
+                </DailyReportsProvider>
                 ) : (
                   <Routes>
                     <Route path="/" element={<LandingPage />} />

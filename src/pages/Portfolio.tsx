@@ -89,7 +89,7 @@ const Portfolio = () => {
   const symbols = useMemo(() => {
     if (!holdings || !Array.isArray(holdings)) return [];
     return holdings.map(h => h.symbol).filter(Boolean);
-  }, [holdings?.length, holdings?.map(h => h.symbol).join(',')]);
+  }, [JSON.stringify(holdings?.map(h => h.symbol).sort())]);
   
   const { prices: realTimePrices, isConnected, connectionStatus } = useStockPricesSubscription(symbols, `portfolio-${portfolioId}`);
   

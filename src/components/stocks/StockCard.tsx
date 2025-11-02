@@ -29,7 +29,12 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
       <CardHeader className="flex flex-row items-center justify-between pb-1.5 pt-3">
         <div className="space-y-0.5">
           <CardTitle className="text-base font-semibold leading-none">{stock.symbol}</CardTitle>
-          <p className="text-xs text-muted-foreground truncate max-w-[180px]">{stock.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-muted-foreground truncate max-w-[180px]">{stock.name}</p>
+            {stock.sector && (
+              <span className="text-xs text-muted-foreground/80">• {stock.sector}</span>
+            )}
+          </div>
         </div>
         {isLoading ? (
           <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />

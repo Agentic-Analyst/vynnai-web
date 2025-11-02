@@ -108,6 +108,8 @@ const Stocks = () => {
           return {
             symbol,
             name: realTimePrice.name || symbol,
+            sector: realTimePrice.sector || undefined,
+            industry: realTimePrice.industry || undefined,
             price: realTimePrice.current_price ? parseFloat(realTimePrice.current_price.toFixed(2)) : null,
             change: realTimePrice.change_amount ? parseFloat(realTimePrice.change_amount.toFixed(2)) : null,
             changePercent: realTimePrice.change_percent ? parseFloat(realTimePrice.change_percent.toFixed(2)) : null,

@@ -4,6 +4,8 @@ import { API_BASE_URL } from '@/lib/apiBase';
 interface StockPrice {
   symbol: string;
   name?: string;
+  sector?: string;
+  industry?: string;
   current_price: number;
   change_amount: number;
   change_percent: number;
@@ -150,6 +152,8 @@ export function useRealTimeStockPrices(symbols: string[]) {
                   const priceData = {
                     symbol: message.data.symbol,
                     name: message.data.name,
+                    sector: message.data.sector,
+                    industry: message.data.industry,
                     current_price: message.data.current_price,
                     change_amount: message.data.change_amount,
                     change_percent: message.data.change_percent,
@@ -188,6 +192,8 @@ export function useRealTimeStockPrices(symbols: string[]) {
                   const priceData = {
                     symbol: priceInfo.symbol,
                     name: priceInfo.name,
+                    sector: priceInfo.sector,
+                    industry: priceInfo.industry,
                     current_price: priceInfo.current_price,
                     change_amount: priceInfo.change_amount || 0,
                     change_percent: priceInfo.change_percent || 0,
