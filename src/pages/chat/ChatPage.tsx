@@ -37,6 +37,7 @@ import AnalysisLogMessage from "@/components/chat/AnalysisLogMessage";
 import ScrollToBottomButton from "@/components/chat/ScrollToBottomButton";
 import { createWelcomeMessage } from "./utils";
 import AnalysisReportMessage from "@/components/chat/AnalysisReportMessage";
+import Bubble from "@/components/chat/Bubble";
 
 const ChatPage = () => {
   // ---------- Local state ----------
@@ -1584,26 +1585,11 @@ ${JSON.stringify(analysisRequest, null, 2)}
         return () => clearTimeout(timer);
       }, [index, message, collapsedLogs.has(index)]);
 
-      const Bubble = ({ children }) => (
-        <div
-          ref={measureRef}
-          className={[
-            "inline-block max-w-[920px] break-words",
-            "rounded-2xl shadow-sm ring-1",
-            isUser
-              ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-blue-700/30"
-              : "bg-white text-slate-800 ring-slate-200",
-          ].join(" ")}
-        >
-          <div className={isUser ? "p-3 sm:p-4" : "p-4 sm:p-5"}>{children}</div>
-        </div>
-      );
-
       return (
         <div style={style} className="px-4 py-2">
           <div className={isUser ? "flex justify-end" : "flex justify-start"}>
             {isDownloads ? (
-              <Bubble>
+              <Bubble measureRef={measureRef} isUser={isUser}>
                 <div className="m-0">
                   <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
@@ -1658,7 +1644,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
                 message={message}
               />
             ) : (
-              <Bubble>
+              <Bubble measureRef={measureRef} isUser={isUser}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkBreaks]}
                   className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
