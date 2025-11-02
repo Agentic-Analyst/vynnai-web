@@ -1,5 +1,5 @@
 // ChatPage.jsx (refined UI)
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from "react-markdown";
@@ -39,6 +39,7 @@ import { createWelcomeMessage } from "./utils";
 import AnalysisReportMessage from "@/components/chat/AnalysisReportMessage";
 import Bubble from "@/components/chat/Bubble";
 import DownloadMessage from "@/components/chat/DownloadMessage";
+import ChatInput from "@/components/chat/ChatInput";
 
 const ChatPage = () => {
   // ---------- Local state ----------
@@ -830,7 +831,7 @@ const ChatPage = () => {
   };
 
   // ---------- Submits ----------
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Get current conversation's job state
@@ -2038,48 +2039,17 @@ ${JSON.stringify(analysisRequest, null, 2)}
         </div>
 
         <div className="p-4 bg-white border-t shadow-sm">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me to analyze any stock or company."
-              className="flex-grow rounded-xl"
-              disabled={
-                getCurrentConversationJobId() ||
-                getCurrentConversationStreamingState()
-              }
-            />
-            <Button
-              type="submit"
-              disabled={
-                isStoppingJob ||
-                (!getCurrentConversationJobId() &&
-                  (!input.trim() || getCurrentConversationStreamingState()))
-              }
-              className={`rounded-xl ${
-                getCurrentConversationJobId()
-                  ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800"
-                  : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-              }`}
-            >
-              {getCurrentConversationJobId() ? (
-                isStoppingJob ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Stopping...
-                  </>
-                ) : (
-                  <>
-                    <StopCircle className="h-4 w-4 mr-2" />
-                    Stop Analysis
-                  </>
-                )
-              ) : (
-                "Analyze"
-              )}
-            </Button>
-          </form>
+          <ChatInput
+            onSubmit={handleSubmit}
+            value={input}
+            onChange={(newValue) => setInput(newValue)}
+            isDisabled={
+              getCurrentConversationJobId() ||
+              getCurrentConversationStreamingState()
+            }
+            isChatActive={getCurrentConversationJobId()}
+            isChatStopping={isStoppingJob}
+          />
         </div>
       </div>
     </div>
