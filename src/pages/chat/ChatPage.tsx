@@ -49,7 +49,6 @@ const ChatPage = () => {
   const [currentConversationIndex, setCurrentConversationIndex] = useState(0);
   const [input, setInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
 
   // virtualization
   const listRef = useRef(null);
@@ -85,13 +84,6 @@ const ChatPage = () => {
     reportType: "",
     reports: { deterministic: "", llm: "" }, // Store both reports
   });
-
-  // REPLACE your filteredConversations with index mapping (so search works without breaking selection)
-  const filteredConversations = conversations
-    .map((c, idx) => ({ ...c, _index: idx }))
-    .filter((c) =>
-      (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
-    );
 
   // NEW — select by id (safe when filtering)
   const switchConversationById = (id) => {
@@ -1777,9 +1769,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
       <ChatSidebar
         isSidebarOpen={isSidebarOpen}
         onSidebarOpenChange={setIsSidebarOpen}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        conversations={filteredConversations}
+        conversations={conversations}
         activeConversationId={conversations[currentConversationIndex]?.id}
         renamingId={renamingId}
         renameValue={renameValue}

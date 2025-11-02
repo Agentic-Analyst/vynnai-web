@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { KeyboardEvent } from "react";
+import { KeyboardEvent, useState } from "react";
 
 type Conversation = {
   id: string | number;
@@ -31,8 +31,6 @@ type Conversation = {
 type ChatSidebarProps = {
   isSidebarOpen: boolean;
   onSidebarOpenChange: (open: boolean) => void;
-  searchQuery: string;
-  onSearchQueryChange: (newValue: string) => void;
   conversations: Conversation[];
   activeConversationId: string | number | null;
   renamingId: string | number | null;
@@ -49,8 +47,6 @@ type ChatSidebarProps = {
 const ChatSidebar = ({
   isSidebarOpen,
   onSidebarOpenChange,
-  searchQuery,
-  onSearchQueryChange,
   conversations,
   activeConversationId,
   renamingId,
@@ -63,6 +59,13 @@ const ChatSidebar = ({
   onCancelRename,
   onDeleteConversation,
 }: ChatSidebarProps) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredConversations = conversations
+    .map((c, idx) => ({ ...c, _index: idx }))
+    .filter((c) =>
+      (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
   // Helper to handle renaming form submission
   const handleRenameSubmit = (
     e: React.FormEvent<HTMLFormElement>,
@@ -108,7 +111,7 @@ const ChatSidebar = ({
             type="text"
             placeholder="Search conversations..."
             value={searchQuery}
-            onChange={(e) => onSearchQueryChange(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
