@@ -67,7 +67,7 @@ const ChatSidebar = ({
           (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
         )
     );
-  }, [searchQuery]);
+  }, [searchQuery, conversations]);
 
   // Helper to handle renaming form submission
   const handleRenameSubmit = (
