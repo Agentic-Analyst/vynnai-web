@@ -16,39 +16,26 @@ import {
   ChatSidebar,
   DownloadMessage,
   ProgressText,
+  Message,
 } from "@/features/chat";
 import { createWelcomeMessage } from "./utils";
+import { useConversations } from "@/hooks/chat/useConversations";
 
 const ChatPage = () => {
   // ---------- Local state ----------
+  const {
+    conversations,
+    currentConversationIndex,
+    setCurrentConversationIndex,
+    addMessage,
+    updateConversation,
+    startNewConversation,
+    deleteConversation,
+    setConversations,
+  } = useConversations();
   const [analysisParams, setAnalysisParams] = useState(() => {
     return userStorage.getJSON("analysis_params", {});
   });
-  const [conversations, setConversations] = useState(() => {
-    const savedConversations = userStorage.getJSON("conversations");
-    if (savedConversations) {
-      // Migrate existing conversations to include job state fields if missing
-      return savedConversations.map((conv) => ({
-        ...conv,
-        activeJobId: conv.activeJobId || null,
-        isStreaming: conv.isStreaming || false,
-        jobProgress: conv.jobProgress || null,
-      }));
-    } else {
-      // First time user - create conversation with welcome message
-      return [
-        {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [createWelcomeMessage()],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-        },
-      ];
-    }
-  });
-  const [currentConversationIndex, setCurrentConversationIndex] = useState(0);
   const [input, setInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -116,60 +103,53 @@ const ChatPage = () => {
   };
 
   // NEW — delete chat
-  const deleteConversation = (id) => {
-    setConversations((prev) => {
-      const idx = prev.findIndex((c) => c.id === id);
-      if (idx === -1) return prev;
+  const handleDeleteConversation = (id: number) => {
+    const idx = conversations.findIndex((c) => c.id === id);
+    if (idx === -1) return;
 
-      // if deleting the active convo, check if it has a running job and clean up
-      if (idx === currentConversationIndex) {
-        const conversation = prev[idx];
-        if (conversation?.activeJobId) {
-          // Clean up job state for this conversation
-          userStorage.removeItem("activeJob");
-          if (eventSourceRef.current) {
-            try {
-              eventSourceRef.current.close();
-            } catch {}
-            eventSourceRef.current = null;
-          }
-          if (progressPollRef.current) {
-            clearInterval(progressPollRef.current);
-            progressPollRef.current = null;
-          }
+    // If deleting the active convo, perform cleanup of running job state
+    if (idx === currentConversationIndex) {
+      const conversation = conversations[idx];
+      if (conversation?.activeJobId) {
+        userStorage.removeItem("activeJob");
+
+        if (eventSourceRef.current) {
+          try {
+            eventSourceRef.current.close();
+          } catch {}
+          eventSourceRef.current = null;
+        }
+
+        if (progressPollRef.current) {
+          clearInterval(progressPollRef.current);
+          progressPollRef.current = null;
         }
       }
+    }
 
-      const next = prev.filter((c) => c.id !== id);
-      // choose a sane next index
-      let nextIndex = currentConversationIndex;
-      if (idx < currentConversationIndex)
-        nextIndex = Math.max(0, currentConversationIndex - 1);
-      if (idx === currentConversationIndex) nextIndex = Math.max(0, idx - 1);
+    // Ask hook to delete the conversation but preserve the index so we can compute/set it ourselves
+    deleteConversation(id, { preserveIndex: true });
 
-      // fallback: always keep at least one chat
-      const finalList = next.length
-        ? next
-        : [
-            {
-              id: Date.now(),
-              title: "New Analysis",
-              messages: [createWelcomeMessage()],
-              activeJobId: null,
-              isStreaming: false,
-              jobProgress: null,
-            },
-          ];
-      setCurrentConversationIndex(Math.min(nextIndex, finalList.length - 1));
-      return finalList;
-    });
-    // if we were renaming this one, reset rename state
+    // Compute the next index exactly like your original logic
+    let nextIndex = currentConversationIndex;
+    if (idx < currentConversationIndex) {
+      nextIndex = Math.max(0, currentConversationIndex - 1);
+    }
+    if (idx === currentConversationIndex) {
+      nextIndex = Math.max(0, idx - 1);
+    }
+
+    // Compute final list length after delete (we removed one item)
+    const finalLength = Math.max(1, conversations.length - 1);
+    setCurrentConversationIndex(Math.min(nextIndex, finalLength - 1));
+
+    // If we were renaming this one, reset rename state
     if (renamingId === id) cancelRename();
   };
 
   const confirmDelete = (id) => {
     if (window.confirm("Delete this chat? This cannot be undone.")) {
-      deleteConversation(id);
+      handleDeleteConversation(id);
     }
   };
 
@@ -621,17 +601,8 @@ const ChatPage = () => {
     });
   };
 
-  const startNewConversation = () => {
-    const newConversation = {
-      id: Date.now(),
-      title: "New Analysis",
-      messages: [createWelcomeMessage()],
-      activeJobId: null, // Each conversation tracks its own job
-      isStreaming: false,
-      jobProgress: null,
-    };
-    setConversations([...conversations, newConversation]);
-    setCurrentConversationIndex(conversations.length);
+  const onStartNewConversation = () => {
+    startNewConversation();
     rowHeightsRef.current = {};
     setShowScrollToBottom(false);
     setUnreadMessages(0);
@@ -816,7 +787,7 @@ const ChatPage = () => {
 
     if (!input.trim() || currentStreaming) return;
 
-    const userMessage = { role: "user", content: input };
+    const userMessage: Message = { role: "user", content: input };
     setConversations((prev) => {
       const updated = [...prev];
       const convo = updated[currentConversationIndex] ?? {
@@ -1771,7 +1742,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
         renamingId={renamingId}
         renameValue={renameValue}
         onRenameValueChange={setRenameValue}
-        onStartNewConversation={startNewConversation}
+        onStartNewConversation={onStartNewConversation}
         onSwitchConversation={switchConversationById}
         onStartRename={startRename}
         onCommitRename={commitRename}
@@ -1835,7 +1806,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
             value={input}
             onChange={(newValue) => setInput(newValue)}
             isInputDisabled={
-              getCurrentConversationJobId() ||
+              !!getCurrentConversationJobId() ||
               getCurrentConversationStreamingState()
             }
             isButtonDisabled={
@@ -1843,7 +1814,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
               (!getCurrentConversationJobId() &&
                 (!input.trim() || getCurrentConversationStreamingState()))
             }
-            isChatActive={getCurrentConversationJobId()}
+            isChatActive={!!getCurrentConversationJobId()}
             isChatStopping={isStoppingJob}
           />
         </div>
