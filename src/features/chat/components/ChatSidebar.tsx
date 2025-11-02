@@ -22,11 +22,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { KeyboardEvent, useEffect, useState } from "react";
-
-type Conversation = {
-  id: string | number;
-  title: string;
-};
+import { Conversation } from "..";
 
 type ChatSidebarProps = {
   isSidebarOpen: boolean;

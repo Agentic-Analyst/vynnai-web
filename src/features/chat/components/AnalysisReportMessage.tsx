@@ -4,10 +4,11 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { DETERMINISTIC_REPORT, LLM_REPORT } from "@/pages/chat/constants";
+import { Message } from "..";
 
 type AnalysisReportMessageProps = {
   measureRef: LegacyRef<HTMLDivElement>;
-  message: { reportType: string; content: string; timestamp: string };
+  message: Message;
 };
 
 const AnalysisReportMessage = ({

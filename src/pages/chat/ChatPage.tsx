@@ -1577,11 +1577,6 @@ ${JSON.stringify(analysisRequest, null, 2)}
                   isStreaming={
                     data.isStreaming && index === data.messages.length - 1
                   }
-                  jobProgress={
-                    data.isStreaming && index === data.messages.length - 1
-                      ? getCurrentConversationProgress()
-                      : null
-                  }
                 />
               </div>
             ) : isReport ? (

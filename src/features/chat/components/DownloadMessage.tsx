@@ -1,7 +1,8 @@
 import { ChevronRight } from "lucide-react";
+import { Message } from "..";
 
 type DownloadMessageProps = {
-  message: any;
+  message: Message;
   onDownload: (entry: any) => void;
 };
 
