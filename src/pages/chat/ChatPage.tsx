@@ -1,38 +1,12 @@
-// ChatPage.jsx (refined UI)
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import {
-  Loader2,
-  PlusCircle,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  StopCircle,
-} from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { VariableSizeList as List } from "react-window";
 import { api, buildDownloadEntries, downloadByEntry } from "@/lib/api";
 import { userStorage } from "@/lib/userStorage.js";
-
-// NEW
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import AnalysisLogMessage from "@/components/chat/AnalysisLogMessage";
 import ScrollToBottomButton from "@/components/chat/ScrollToBottomButton";
 import { createWelcomeMessage } from "./utils";
@@ -40,6 +14,7 @@ import AnalysisReportMessage from "@/components/chat/AnalysisReportMessage";
 import Bubble from "@/components/chat/Bubble";
 import DownloadMessage from "@/components/chat/DownloadMessage";
 import ChatInput from "@/components/chat/ChatInput";
+import ChatSidebar from "@/components/chat/ChatSidebar";
 
 const ChatPage = () => {
   // ---------- Local state ----------
@@ -1878,115 +1853,23 @@ ${JSON.stringify(analysisRequest, null, 2)}
   // ---------- UI ----------
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-50 to-slate-100 overflow-x-hidden">
-      <div className="relative">
-        <Collapsible
-          open={isSidebarOpen}
-          onOpenChange={setIsSidebarOpen}
-          className="bg-white border-r h-full"
-        >
-          <CollapsibleContent className="w-64 p-4 h-full flex flex-col">
-            <Button onClick={startNewConversation} className="w-full mb-4">
-              <PlusCircle className="mr-2 h-4 w-4" /> New Analysis
-            </Button>
-            <div className="relative mb-4">
-              <Input
-                type="text"
-                placeholder="Search conversations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            </div>
-            <div className="flex-1 overflow-auto space-y-1">
-              {filteredConversations.map((c) => {
-                const idx = c._index;
-                const isActive = currentConversationIndex === idx;
-                const isEditing = renamingId === c.id;
-
-                return (
-                  <div key={c.id} className="group relative">
-                    {isEditing ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          commitRename();
-                        }}
-                        className="flex items-center gap-2 mb-1"
-                      >
-                        <Input
-                          autoFocus
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onBlur={commitRename}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") cancelRename();
-                          }}
-                          className="h-9"
-                        />
-                        <Button type="submit" size="sm">
-                          Save
-                        </Button>
-                      </form>
-                    ) : (
-                      <>
-                        <Button
-                          onClick={() => switchConversationById(c.id)}
-                          variant={isActive ? "secondary" : "ghost"}
-                          className="w-full justify-start pr-9 truncate"
-                        >
-                          <span className="truncate">{c.title}</span>
-                        </Button>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100"
-                              aria-label="Chat actions"
-                            >
-                              <MoreVertical className="h-4 w-4 text-slate-500" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="start"
-                            side="right"
-                            className="w-44"
-                          >
-                            <DropdownMenuItem
-                              onClick={() => startRename(c.id, c.title)}
-                              className="flex items-center gap-2"
-                            >
-                              <Pencil className="h-4 w-4" /> Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => confirmDelete(c.id)}
-                              className="flex items-center gap-2 text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CollapsibleContent>
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`absolute top-4 ${
-                isSidebarOpen ? "left-64" : "left-0"
-              } transition-all duration-300`}
-            >
-              {isSidebarOpen ? <ChevronLeft /> : <ChevronRight />}
-            </Button>
-          </CollapsibleTrigger>
-        </Collapsible>
-      </div>
+      <ChatSidebar
+        isSidebarOpen={isSidebarOpen}
+        onSidebarOpenChange={setIsSidebarOpen}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        conversations={filteredConversations}
+        activeConversationId={conversations[currentConversationIndex]?.id}
+        renamingId={renamingId}
+        renameValue={renameValue}
+        onRenameValueChange={setRenameValue}
+        onStartNewConversation={startNewConversation}
+        onSwitchConversation={switchConversationById}
+        onStartRename={startRename}
+        onCommitRename={commitRename}
+        onCancelRename={cancelRename}
+        onDeleteConversation={confirmDelete}
+      />
 
       <div className="flex flex-col flex-grow h-full">
         <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
