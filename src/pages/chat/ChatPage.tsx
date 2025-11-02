@@ -7,15 +7,17 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { VariableSizeList as List } from "react-window";
 import { api, buildDownloadEntries, downloadByEntry } from "@/lib/api";
 import { userStorage } from "@/lib/userStorage.js";
-import AnalysisLogMessage from "@/components/chat/AnalysisLogMessage";
-import ScrollToBottomButton from "@/components/chat/ScrollToBottomButton";
+import {
+  AnalysisLogMessage,
+  AnalysisReportMessage,
+  ScrollToBottomButton,
+  Bubble,
+  ChatInput,
+  ChatSidebar,
+  DownloadMessage,
+  ProgressText,
+} from "@/features/chat";
 import { createWelcomeMessage } from "./utils";
-import AnalysisReportMessage from "@/components/chat/AnalysisReportMessage";
-import Bubble from "@/components/chat/Bubble";
-import DownloadMessage from "@/components/chat/DownloadMessage";
-import ChatInput from "@/components/chat/ChatInput";
-import ChatSidebar from "@/components/chat/ChatSidebar";
-import ProgressText from "@/components/chat/ProgressText";
 
 const ChatPage = () => {
   // ---------- Local state ----------
@@ -1837,9 +1839,14 @@ ${JSON.stringify(analysisRequest, null, 2)}
             onSubmit={handleSubmit}
             value={input}
             onChange={(newValue) => setInput(newValue)}
-            isDisabled={
+            isInputDisabled={
               getCurrentConversationJobId() ||
               getCurrentConversationStreamingState()
+            }
+            isButtonDisabled={
+              isStoppingJob ||
+              (!getCurrentConversationJobId() &&
+                (!input.trim() || getCurrentConversationStreamingState()))
             }
             isChatActive={getCurrentConversationJobId()}
             isChatStopping={isStoppingJob}

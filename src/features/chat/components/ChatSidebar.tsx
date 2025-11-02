@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { KeyboardEvent, useState } from "react";
+import { KeyboardEvent, useEffect, useState } from "react";
 
 type Conversation = {
   id: string | number;
@@ -60,11 +60,18 @@ const ChatSidebar = ({
   onDeleteConversation,
 }: ChatSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const filteredConversations = conversations
-    .map((c, idx) => ({ ...c, _index: idx }))
-    .filter((c) =>
-      (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+  const [filteredConversations, setFilteredConversations] =
+    useState(conversations);
+
+  useEffect(() => {
+    setFilteredConversations(
+      conversations
+        .map((c, idx) => ({ ...c, _index: idx }))
+        .filter((c) =>
+          (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+        )
     );
+  }, [searchQuery]);
 
   // Helper to handle renaming form submission
   const handleRenameSubmit = (
@@ -119,7 +126,7 @@ const ChatSidebar = ({
 
         {/* Conversation List */}
         <div className="flex-1 overflow-auto space-y-1">
-          {conversations.map((c) => {
+          {filteredConversations.map((c) => {
             const isActive = activeConversationId === c.id;
             const isEditing = renamingId === c.id;
 

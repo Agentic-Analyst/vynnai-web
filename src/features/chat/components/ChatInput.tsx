@@ -7,7 +7,8 @@ type ChatInputProps = {
   onSubmit: (e: FormEvent<HTMLFormElement>) => Promise<void>;
   value: string;
   onChange: (newValue: string) => void;
-  isDisabled: boolean;
+  isInputDisabled: boolean;
+  isButtonDisabled: boolean;
   isChatActive: boolean;
   isChatStopping: boolean;
 };
@@ -16,7 +17,8 @@ const ChatInput = ({
   onSubmit,
   value,
   onChange,
-  isDisabled = false,
+  isInputDisabled = false,
+  isButtonDisabled = false,
   isChatActive = false,
   isChatStopping = false,
 }: ChatInputProps) => {
@@ -30,11 +32,11 @@ const ChatInput = ({
         }
         placeholder="Ask me to analyze any stock or company."
         className="flex-grow rounded-xl"
-        disabled={isDisabled}
+        disabled={isInputDisabled}
       />
       <Button
         type="submit"
-        disabled={isDisabled}
+        disabled={isButtonDisabled}
         className={`rounded-xl ${
           isChatActive
             ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800"
