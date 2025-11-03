@@ -727,15 +727,18 @@ ${JSON.stringify(analysisRequest, null, 2)}
         true,
         "Initializing analysis..."
       ); // Set new job ID, streaming, and initial progress
+
+      // Start both SSE monitoring and periodic status checking
+      const convId = conversations[currentConversationIndex].id;
+
       userStorage.setJSON("activeJob", {
         id: result.job_id,
         started: Date.now(),
         status: "running",
-        conversationId: conversations[currentConversationIndex].id,
+        conversationId: convId,
       });
 
-      // Start both SSE monitoring and periodic status checking
-      startJobMonitoring(result.job_id);
+      startJobMonitoring(result.job_id, { convId });
       startPeriodicStatusCheck(result.job_id);
 
       if (conversations[currentConversationIndex].title === "New Analysis") {
@@ -754,6 +757,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
   // ---------- SSE monitoring ----------
   const startJobMonitoring = (jobId, opts = {}) => {
+    const { convId } = opts;
     if (eventSourceRef.current) {
       try {
         eventSourceRef.current.close();
@@ -955,7 +959,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
         clearTimeout(flushTimer);
         flushTimer = null;
       }
-      addAssistantLogBatch(lines);
+      addAssistantLogBatch(lines, convId);
       const count =
         conversations[currentConversationIndex]?.messages?.length || 0;
       if (count > 0) listRef.current?.resetAfterIndex(count - 1);
@@ -990,7 +994,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
         );
         addReportMessage(
           reportCaptureRef.current.reports.deterministic,
-          "deterministic"
+          "deterministic",
+          convId
         );
       }
 
@@ -999,7 +1004,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
           "🤖 Displaying LLM report with length:",
           reportCaptureRef.current.reports.llm.length
         );
-        addReportMessage(reportCaptureRef.current.reports.llm, "llm");
+        addReportMessage(reportCaptureRef.current.reports.llm, "llm", convId);
       }
 
       if (
@@ -1013,7 +1018,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
       reportCaptureRef.current.reports = { deterministic: "", llm: "" };
 
       addAssistantMessage(
-        `🏁 **Analysis Complete**${note ? `: ${note}` : ""}.`
+        `🏁 **Analysis Complete**${note ? `: ${note}` : ""}.`,
+        convId
       );
       console.log("🏁 Analysis completed, clearing job state for job:", jobId);
 
@@ -1033,7 +1039,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
             const mapped = buildDownloadEntries(api.base, jobId, ticker, files);
             if (Object.keys(mapped).length > 0) {
               setAvailableFiles(mapped);
-              addDownloadsMessage(jobId, mapped);
+              addDownloadsMessage(jobId, mapped, convId);
             }
           }
         } catch {
@@ -1057,7 +1063,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
       addAssistantMessage(
         `❌ **Analysis Failed** (status: ${status})${
           detail ? `\n\n${detail}` : ""
-        }`
+        }`,
+        convId
       );
       console.log("❌ Analysis failed, clearing job state for job:", jobId);
 
@@ -1085,7 +1092,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
         addAssistantMessage(
           opts.fromReconnect
             ? `🔄 **Reconnected to analysis job ${jobId}**`
-            : `🔗 **Connected to analysis job ${jobId}**`
+            : `🔗 **Connected to analysis job ${jobId}**`,
+          convId
         );
       },
       onStatus: (payload) => {
@@ -1168,13 +1176,15 @@ ${JSON.stringify(analysisRequest, null, 2)}
                 (status.status === "completed" || status.status === "failed")
               ) {
                 addAssistantMessage(
-                  "ℹ️ **Analysis completed. Connection closed.**"
+                  "ℹ️ **Analysis completed. Connection closed.**",
+                  convId
                 );
                 updateCurrentConversationJobState(null, false, null);
                 userStorage.removeItem("activeJob");
               } else {
                 addAssistantMessage(
-                  "⚠️ **Connection lost. Monitoring may resume automatically.**"
+                  "⚠️ **Connection lost. Monitoring may resume automatically.**",
+                  convId
                 );
                 // Keep job state but mark as not streaming
                 updateCurrentConversationJobState(
@@ -1185,7 +1195,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
               }
             } catch (error) {
               console.log("Failed to check job status after SSE close:", error);
-              addAssistantMessage("ℹ️ **Connection closed.**");
+              addAssistantMessage("ℹ️ **Connection closed.**", convId);
             }
           }, 500);
 
@@ -1196,7 +1206,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
         } else {
           flush();
           addAssistantMessage(
-            "⚠️ **Connection issue:** Monitoring may resume automatically."
+            "⚠️ **Connection issue:** Monitoring may resume automatically.",
+            convId
           );
         }
       },

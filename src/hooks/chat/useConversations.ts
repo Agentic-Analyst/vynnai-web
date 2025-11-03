@@ -1,3 +1,4 @@
+// useConversations.ts
 import { Conversation, Message } from "@/features/chat";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { userStorage } from "@/lib/userStorage";
@@ -36,50 +37,47 @@ export function useConversations(initialIndex = 0) {
     }
   }, [conversations]);
 
-  // stable ref to avoid stale-closure issues in callbacks
-  const currentConversationIndexRef = useRef<number>(currentConversationIndex);
+  // stable ref to avoid stale-closure issues
+  const currentConversationIndexRef = useRef(currentConversationIndex);
   useEffect(() => {
     currentConversationIndexRef.current = currentConversationIndex;
   }, [currentConversationIndex]);
 
-  /**
-   * addMessage - append a message to a conversation
-   * msg: Message to append (timestamp will be attached)
-   * convIndex: optional explicit conversation index; defaults to currentConversationIndexRef
-   */
-  const addMessage = useCallback((msg: Message, convIndex?: number) => {
-    setConversations((prev) => {
-      const next = [...prev];
-      const idx =
-        typeof convIndex === "number"
-          ? convIndex
-          : currentConversationIndexRef.current ?? 0;
+  // --- small helper to find a conversation index by id ---
+  const findIndexById = useCallback((arr: Conversation[], convId?: number) => {
+    if (typeof convId === "number") {
+      const found = arr.findIndex((c) => c.id === convId);
+      if (found !== -1) return found;
+    }
+    return currentConversationIndexRef.current ?? 0;
+  }, []);
 
-      const convo =
-        next[idx] ??
-        ({
+  // --- add message (shared primitive) ---
+  const addMessage = useCallback(
+    (msg: Message, convId?: number) => {
+      setConversations((prev) => {
+        const next = [...prev];
+        const idx = findIndexById(next, convId);
+        const convo = next[idx] ?? {
           id: Date.now(),
           title: "New Analysis",
           messages: [],
           activeJobId: null,
           isStreaming: false,
           jobProgress: null,
-        } as Conversation);
+        };
+        convo.messages = [
+          ...(convo.messages || []),
+          { ...msg, timestamp: new Date().toISOString() },
+        ];
+        next[idx] = convo;
+        return next;
+      });
+    },
+    [findIndexById]
+  );
 
-      convo.messages = [
-        ...(convo.messages || []),
-        { ...msg, timestamp: new Date().toISOString() },
-      ];
-      next[idx] = convo;
-      return next;
-    });
-  }, []);
-
-  /**
-   * updateConversation - patch or compute new conversation safely
-   * idx: index of conversation to update
-   * patchOrUpdater: either a Partial<Conversation> patch or a function (cur => patchOrNew)
-   */
+  // --- update conversation ---
   type Updater = (cur: Conversation) => Partial<Conversation> | Conversation;
   const updateConversation = useCallback(
     (idx: number, patchOrUpdater: Partial<Conversation> | Updater) => {
@@ -90,7 +88,7 @@ export function useConversations(initialIndex = 0) {
         const patch =
           typeof patchOrUpdater === "function"
             ? (patchOrUpdater as Updater)(cur)
-            : (patchOrUpdater as Partial<Conversation>);
+            : patchOrUpdater;
         next[idx] = { ...cur, ...patch };
         return next;
       });
@@ -98,6 +96,7 @@ export function useConversations(initialIndex = 0) {
     []
   );
 
+  // --- start new conversation ---
   const startNewConversation = useCallback(() => {
     const newConversation: Conversation = {
       id: Date.now(),
@@ -107,30 +106,20 @@ export function useConversations(initialIndex = 0) {
       isStreaming: false,
       jobProgress: null,
     };
-
     setConversations((prev) => {
       const next = [...prev, newConversation];
-      // set index to the last item of the new array
       setCurrentConversationIndex(next.length - 1);
       return next;
     });
   }, []);
 
-  /**
-   * deleteConversation
-   * - id: conversation id to delete
-   * - opts.preserveIndex: when true the hook will NOT set currentConversationIndex;
-   *   caller is expected to set index appropriately (useful when caller must run cleanup first).
-   */
+  // --- delete conversation ---
   const deleteConversation = useCallback(
     (id: number, opts?: { preserveIndex?: boolean }) => {
       setConversations((prev) => {
         const idx = prev.findIndex((c) => c.id === id);
         if (idx === -1) return prev;
-
         const next = prev.filter((c) => c.id !== id);
-
-        // fallback: always keep at least one chat
         const finalList = next.length
           ? next
           : [
@@ -143,46 +132,30 @@ export function useConversations(initialIndex = 0) {
                 jobProgress: null,
               },
             ];
-
-        // Only update the currentConversationIndex here if caller has not asked to preserve it.
-        if (!opts?.preserveIndex) {
-          setCurrentConversationIndex(0);
-        }
-
+        if (!opts?.preserveIndex) setCurrentConversationIndex(0);
         return finalList;
       });
     },
     []
   );
 
-  /**
-   * addAssistantMessage - append + coalesce assistant text segments (preserves behavior you had)
-   * - content: string to append/coalesce
-   * - convIndex: optional index (defaults to active conversation)
-   */
+  // --- assistant text message (coalescing) ---
   const addAssistantMessage = useCallback(
-    (content: string, convIndex?: number) => {
-      const idx =
-        typeof convIndex === "number"
-          ? convIndex
-          : currentConversationIndexRef.current ?? 0;
-
+    (content: string, convId?: number) => {
+      const nowIso = new Date().toISOString();
       const COALESCE_MS = 3000;
       setConversations((prev) => {
         const next = [...prev];
-        const convo =
-          next[idx] ??
-          ({
-            id: Date.now(),
-            title: "New Analysis",
-            messages: [],
-            activeJobId: null,
-            isStreaming: false,
-            jobProgress: null,
-          } as Conversation);
-
+        const idx = findIndexById(next, convId);
+        const convo = next[idx] ?? {
+          id: Date.now(),
+          title: "New Analysis",
+          messages: [],
+          activeJobId: null,
+          isStreaming: false,
+          jobProgress: null,
+        };
         const msgs = [...(convo.messages || [])];
-        const nowIso = new Date().toISOString();
         const last = msgs[msgs.length - 1];
         const canCoalesce =
           last &&
@@ -190,7 +163,6 @@ export function useConversations(initialIndex = 0) {
           !last.kind &&
           last.timestamp &&
           Date.now() - new Date(last.timestamp).getTime() <= COALESCE_MS;
-
         if (canCoalesce) {
           msgs[msgs.length - 1] = {
             ...last,
@@ -200,44 +172,31 @@ export function useConversations(initialIndex = 0) {
         } else {
           msgs.push({ role: "assistant", content, timestamp: nowIso });
         }
-
         next[idx] = { ...convo, messages: msgs };
         return next;
       });
     },
-    []
+    [findIndexById]
   );
 
-  /**
-   * addAssistantLogBatch - append or merge a 'logbatch' assistant message
-   * - lines: string[] of new lines to append into a logbatch bubble
-   * - convIndex: optional index (defaults to active conversation)
-   */
+  // --- assistant log batch ---
   const addAssistantLogBatch = useCallback(
-    (lines: string[], convIndex?: number) => {
-      if (!Array.isArray(lines) || lines.length === 0) return;
-      const idx =
-        typeof convIndex === "number"
-          ? convIndex
-          : currentConversationIndexRef.current ?? 0;
+    (lines: string[], convId?: number) => {
+      if (!Array.isArray(lines) || !lines.length) return;
       const nowIso = new Date().toISOString();
-
       setConversations((prev) => {
         const next = [...prev];
-        const convo =
-          next[idx] ??
-          ({
-            id: Date.now(),
-            title: "New Analysis",
-            messages: [],
-            activeJobId: null,
-            isStreaming: false,
-            jobProgress: null,
-          } as Conversation);
-
+        const idx = findIndexById(next, convId);
+        const convo = next[idx] ?? {
+          id: Date.now(),
+          title: "New Analysis",
+          messages: [],
+          activeJobId: null,
+          isStreaming: false,
+          jobProgress: null,
+        };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
-
         if (last && last.role === "assistant" && last.kind === "logbatch") {
           const newLines = (last.lines || []).concat(lines);
           msgs[msgs.length - 1] = {
@@ -251,55 +210,36 @@ export function useConversations(initialIndex = 0) {
             role: "assistant",
             kind: "logbatch",
             lines: [...lines],
-            nlSummary: "Summary 1", // keep or remove as you prefer
             content: lines.join("\n"),
             timestamp: nowIso,
           });
         }
-
         next[idx] = { ...convo, messages: msgs };
         return next;
       });
     },
-    []
+    [findIndexById]
   );
 
-  // small dedupe cache for downloads posted per jobId
+  // --- downloads & reports ---
   const downloadsPostedRef = useRef<Set<string>>(new Set());
 
   const addDownloadsMessage = useCallback(
     (
       jobId: string,
       entriesObject: Record<string, any> | any[],
-      convIndex?: number
+      convId?: number
     ) => {
-      const idx =
-        typeof convIndex === "number"
-          ? convIndex
-          : currentConversationIndexRef.current ?? 0;
-
-      // dedupe: do not post the same job twice
       if (downloadsPostedRef.current.has(jobId)) return;
       downloadsPostedRef.current.add(jobId);
-
       const nowIso = new Date().toISOString();
       const entries = Array.isArray(entriesObject)
         ? entriesObject
         : Object.values(entriesObject);
-
       setConversations((prev) => {
         const next = [...prev];
-        const convo =
-          next[idx] ??
-          ({
-            id: Date.now(),
-            title: "New Analysis",
-            messages: [],
-            activeJobId: null,
-            isStreaming: false,
-            jobProgress: null,
-          } as Conversation);
-
+        const idx = findIndexById(next, convId);
+        const convo = next[idx];
         const msgs = [...(convo.messages || [])];
         msgs.push({
           role: "assistant",
@@ -309,58 +249,39 @@ export function useConversations(initialIndex = 0) {
           content: `Downloads available (${entries.length})`,
           timestamp: nowIso,
         });
-
         next[idx] = { ...convo, messages: msgs };
         return next;
       });
     },
-    []
+    [findIndexById]
   );
 
   const addReportMessage = useCallback(
     (
-      reportContent: string,
+      content: string,
       reportType: "deterministic" | "llm" = "deterministic",
-      convIndex?: number
+      convId?: number
     ) => {
-      const idx =
-        typeof convIndex === "number"
-          ? convIndex
-          : currentConversationIndexRef.current ?? 0;
-
       const nowIso = new Date().toISOString();
       setConversations((prev) => {
         const next = [...prev];
-        const convo =
-          next[idx] ??
-          ({
-            id: Date.now(),
-            title: "New Analysis",
-            messages: [],
-            activeJobId: null,
-            isStreaming: false,
-            jobProgress: null,
-          } as Conversation);
-
+        const idx = findIndexById(next, convId);
+        const convo = next[idx];
         const msgs = [...(convo.messages || [])];
         msgs.push({
           role: "assistant",
           kind: "report",
           reportType,
-          content: reportContent,
+          content,
           timestamp: nowIso,
         });
-
         next[idx] = { ...convo, messages: msgs };
         return next;
       });
     },
-    []
+    [findIndexById]
   );
 
-  /**
-   * utility to reset download dedupe set (e.g. on logout or import)
-   */
   const resetDownloadsPosted = useCallback(() => {
     downloadsPostedRef.current.clear();
   }, []);
