@@ -12,6 +12,15 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import ScrollToBottomButton from "./ScrollToBottomButton";
+import { Message } from "..";
+
+type AnalysisLogMessageProps = {
+  message: Message;
+  index: number;
+  isCollapsed: boolean;
+  toggleCollapse: (index: number) => void;
+  isStreaming: boolean;
+};
 
 const AnalysisLogMessage = memo(
   ({
@@ -20,8 +29,7 @@ const AnalysisLogMessage = memo(
     isCollapsed,
     toggleCollapse,
     isStreaming,
-    jobProgress,
-  }: any) => {
+  }: AnalysisLogMessageProps) => {
     const scrollRef = useRef(null);
     const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
 

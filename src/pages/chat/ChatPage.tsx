@@ -1,87 +1,45 @@
-// ChatPage.jsx (refined UI)
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import {
-  Loader2,
-  PlusCircle,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  StopCircle,
-} from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { VariableSizeList as List } from "react-window";
 import { api, buildDownloadEntries, downloadByEntry } from "@/lib/api";
 import { userStorage } from "@/lib/userStorage.js";
-
-// NEW
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import AnalysisLogMessage from "@/components/chat/AnalysisLogMessage";
-import ScrollToBottomButton from "@/components/chat/ScrollToBottomButton";
+  AnalysisLogMessage,
+  AnalysisReportMessage,
+  ScrollToBottomButton,
+  Bubble,
+  ChatInput,
+  ChatSidebar,
+  DownloadMessage,
+  ProgressText,
+  Message,
+} from "@/features/chat";
+import { createWelcomeMessage } from "./utils";
+import { useConversations } from "@/hooks/chat/useConversations";
 
 const ChatPage = () => {
-  // ---------- Helper functions ----------
-  const createWelcomeMessage = () => ({
-    role: "assistant",
-    content: `**Welcome to VYNN AI. Your AI Financial Analyst!** 📊
-
-**Getting Started:**
-- Tell me which company or stock you’d like to analyze (e.g., "I want to analyze Google").
-- Configure your analysis parameters using ⚙️ above.
-
-Need financial statements, models, news, or insights? I’ve got you covered — just ask!`,
-    timestamp: new Date().toISOString(),
-  });
-
   // ---------- Local state ----------
+  const {
+    conversations,
+    currentConversationIndex,
+    setCurrentConversationIndex,
+    startNewConversation,
+    deleteConversation,
+    setConversations,
+    addAssistantMessage,
+    addAssistantLogBatch,
+    addDownloadsMessage,
+    addReportMessage,
+  } = useConversations();
   const [analysisParams, setAnalysisParams] = useState(() => {
     return userStorage.getJSON("analysis_params", {});
   });
-  const [conversations, setConversations] = useState(() => {
-    const savedConversations = userStorage.getJSON("conversations");
-    if (savedConversations) {
-      // Migrate existing conversations to include job state fields if missing
-      return savedConversations.map((conv) => ({
-        ...conv,
-        activeJobId: conv.activeJobId || null,
-        isStreaming: conv.isStreaming || false,
-        jobProgress: conv.jobProgress || null,
-      }));
-    } else {
-      // First time user - create conversation with welcome message
-      return [
-        {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [createWelcomeMessage()],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-        },
-      ];
-    }
-  });
-  const [currentConversationIndex, setCurrentConversationIndex] = useState(0);
   const [input, setInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
 
   // virtualization
   const listRef = useRef(null);
@@ -94,7 +52,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   const eventSourceRef = useRef(null);
   const progressPollRef = useRef(null);
   const [availableFiles, setAvailableFiles] = useState({});
-  const downloadsPostedRef = useRef(new Set()); // jobIds we've already posted
   const [isStoppingJob, setIsStoppingJob] = useState(false);
 
   // NEW — rename state
@@ -117,13 +74,6 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     reportType: "",
     reports: { deterministic: "", llm: "" }, // Store both reports
   });
-
-  // REPLACE your filteredConversations with index mapping (so search works without breaking selection)
-  const filteredConversations = conversations
-    .map((c, idx) => ({ ...c, _index: idx }))
-    .filter((c) =>
-      (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())
-    );
 
   // NEW — select by id (safe when filtering)
   const switchConversationById = (id) => {
@@ -154,60 +104,53 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   };
 
   // NEW — delete chat
-  const deleteConversation = (id) => {
-    setConversations((prev) => {
-      const idx = prev.findIndex((c) => c.id === id);
-      if (idx === -1) return prev;
+  const handleDeleteConversation = (id: number) => {
+    const idx = conversations.findIndex((c) => c.id === id);
+    if (idx === -1) return;
 
-      // if deleting the active convo, check if it has a running job and clean up
-      if (idx === currentConversationIndex) {
-        const conversation = prev[idx];
-        if (conversation?.activeJobId) {
-          // Clean up job state for this conversation
-          userStorage.removeItem("activeJob");
-          if (eventSourceRef.current) {
-            try {
-              eventSourceRef.current.close();
-            } catch {}
-            eventSourceRef.current = null;
-          }
-          if (progressPollRef.current) {
-            clearInterval(progressPollRef.current);
-            progressPollRef.current = null;
-          }
+    // If deleting the active convo, perform cleanup of running job state
+    if (idx === currentConversationIndex) {
+      const conversation = conversations[idx];
+      if (conversation?.activeJobId) {
+        userStorage.removeItem("activeJob");
+
+        if (eventSourceRef.current) {
+          try {
+            eventSourceRef.current.close();
+          } catch {}
+          eventSourceRef.current = null;
+        }
+
+        if (progressPollRef.current) {
+          clearInterval(progressPollRef.current);
+          progressPollRef.current = null;
         }
       }
+    }
 
-      const next = prev.filter((c) => c.id !== id);
-      // choose a sane next index
-      let nextIndex = currentConversationIndex;
-      if (idx < currentConversationIndex)
-        nextIndex = Math.max(0, currentConversationIndex - 1);
-      if (idx === currentConversationIndex) nextIndex = Math.max(0, idx - 1);
+    // Ask hook to delete the conversation but preserve the index so we can compute/set it ourselves
+    deleteConversation(id, { preserveIndex: true });
 
-      // fallback: always keep at least one chat
-      const finalList = next.length
-        ? next
-        : [
-            {
-              id: Date.now(),
-              title: "New Analysis",
-              messages: [createWelcomeMessage()],
-              activeJobId: null,
-              isStreaming: false,
-              jobProgress: null,
-            },
-          ];
-      setCurrentConversationIndex(Math.min(nextIndex, finalList.length - 1));
-      return finalList;
-    });
-    // if we were renaming this one, reset rename state
+    // Compute the next index exactly like your original logic
+    let nextIndex = currentConversationIndex;
+    if (idx < currentConversationIndex) {
+      nextIndex = Math.max(0, currentConversationIndex - 1);
+    }
+    if (idx === currentConversationIndex) {
+      nextIndex = Math.max(0, idx - 1);
+    }
+
+    // Compute final list length after delete (we removed one item)
+    const finalLength = Math.max(1, conversations.length - 1);
+    setCurrentConversationIndex(Math.min(nextIndex, finalLength - 1));
+
+    // If we were renaming this one, reset rename state
     if (renamingId === id) cancelRename();
   };
 
   const confirmDelete = (id) => {
     if (window.confirm("Delete this chat? This cannot be undone.")) {
-      deleteConversation(id);
+      handleDeleteConversation(id);
     }
   };
 
@@ -551,135 +494,8 @@ Need financial statements, models, news, or insights? I’ve got you covered —
     });
   };
 
-  // log batch bubble
-  const addAssistantLogBatch = (lines) => {
-    if (!Array.isArray(lines) || lines.length === 0) return;
-    const nowIso = new Date().toISOString();
-
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      const msgs = [...(convo.messages || [])];
-      const last = msgs[msgs.length - 1];
-
-      if (last && last.role === "assistant" && last.kind === "logbatch") {
-        msgs[msgs.length - 1] = {
-          ...last,
-          lines: (last.lines || []).concat(lines),
-          content: (last.lines || []).concat(lines).join("\n"),
-          timestamp: nowIso,
-        };
-      } else {
-        msgs.push({
-          role: "assistant",
-          kind: "logbatch",
-          lines: [...lines],
-          nlSummary: "Summary 1", // TODO: remove this, this is for testing purposes
-          content: lines.join("\n"),
-          timestamp: nowIso,
-        });
-      }
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
-    });
-  };
-
-  const addAssistantMessage = (content) => {
-    const COALESCE_MS = 3000;
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex] ?? {
-        id: Date.now(),
-        title: "New Analysis",
-        messages: [],
-      };
-      const msgs = [...(convo.messages || [])];
-
-      const nowIso = new Date().toISOString();
-      const last = msgs[msgs.length - 1];
-      const canCoalesce =
-        last &&
-        last.role === "assistant" &&
-        !last.kind &&
-        last.timestamp &&
-        Date.now() - new Date(last.timestamp).getTime() <= COALESCE_MS;
-
-      if (canCoalesce) {
-        msgs[msgs.length - 1] = {
-          ...last,
-          content: `${last.content}\n${content}`,
-          timestamp: nowIso,
-        };
-      } else {
-        msgs.push({ role: "assistant", content, timestamp: nowIso });
-      }
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
-    });
-  };
-
-  const addDownloadsMessage = (jobId, entriesObject) => {
-    if (downloadsPostedRef.current.has(jobId)) return;
-    downloadsPostedRef.current.add(jobId);
-
-    const nowIso = new Date().toISOString();
-    const entries = Object.values(entriesObject);
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      const msgs = [...(convo.messages || [])];
-      msgs.push({
-        role: "assistant",
-        kind: "downloads",
-        jobId,
-        entries,
-        content: `Downloads available (${entries.length})`,
-        timestamp: nowIso,
-      });
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
-    });
-  };
-
-  const addReportMessage = (reportContent, reportType = "deterministic") => {
-    const nowIso = new Date().toISOString();
-    setConversations((prev) => {
-      const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      const msgs = [...(convo.messages || [])];
-      msgs.push({
-        role: "assistant",
-        kind: "report",
-        reportType: reportType,
-        content: reportContent,
-        timestamp: nowIso,
-      });
-      updated[currentConversationIndex] = { ...convo, messages: msgs };
-      return updated;
-    });
-  };
-
-  const generateTitle = (userMessage) => {
-    const text = userMessage.toLowerCase();
-    if (text.includes("analyze") || text.includes("analysis")) {
-      const tickerMatch = userMessage.match(/\b([A-Z]{1,5})\b/);
-      return tickerMatch ? `${tickerMatch[1]} Analysis` : "Stock Analysis";
-    }
-    const words = userMessage.split(" ").slice(0, 3).join(" ");
-    return words.length > 20 ? words.substring(0, 20) + "..." : words;
-  };
-
-  const startNewConversation = () => {
-    const newConversation = {
-      id: Date.now(),
-      title: "New Analysis",
-      messages: [createWelcomeMessage()],
-      activeJobId: null, // Each conversation tracks its own job
-      isStreaming: false,
-      jobProgress: null,
-    };
-    setConversations([...conversations, newConversation]);
-    setCurrentConversationIndex(conversations.length);
+  const onStartNewConversation = () => {
+    startNewConversation();
     rowHeightsRef.current = {};
     setShowScrollToBottom(false);
     setUnreadMessages(0);
@@ -849,7 +665,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
   };
 
   // ---------- Submits ----------
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Get current conversation's job state
@@ -864,7 +680,7 @@ Need financial statements, models, news, or insights? I’ve got you covered —
 
     if (!input.trim() || currentStreaming) return;
 
-    const userMessage = { role: "user", content: input };
+    const userMessage: Message = { role: "user", content: input };
     setConversations((prev) => {
       const updated = [...prev];
       const convo = updated[currentConversationIndex] ?? {
@@ -911,15 +727,18 @@ ${JSON.stringify(analysisRequest, null, 2)}
         true,
         "Initializing analysis..."
       ); // Set new job ID, streaming, and initial progress
+
+      // Start both SSE monitoring and periodic status checking
+      const convId = conversations[currentConversationIndex].id;
+
       userStorage.setJSON("activeJob", {
         id: result.job_id,
         started: Date.now(),
         status: "running",
-        conversationId: conversations[currentConversationIndex].id,
+        conversationId: convId,
       });
 
-      // Start both SSE monitoring and periodic status checking
-      startJobMonitoring(result.job_id);
+      startJobMonitoring(result.job_id, { convId });
       startPeriodicStatusCheck(result.job_id);
 
       if (conversations[currentConversationIndex].title === "New Analysis") {
@@ -938,6 +757,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
 
   // ---------- SSE monitoring ----------
   const startJobMonitoring = (jobId, opts = {}) => {
+    const { convId } = opts;
     if (eventSourceRef.current) {
       try {
         eventSourceRef.current.close();
@@ -1139,7 +959,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
         clearTimeout(flushTimer);
         flushTimer = null;
       }
-      addAssistantLogBatch(lines);
+      addAssistantLogBatch(lines, convId);
       const count =
         conversations[currentConversationIndex]?.messages?.length || 0;
       if (count > 0) listRef.current?.resetAfterIndex(count - 1);
@@ -1174,7 +994,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
         );
         addReportMessage(
           reportCaptureRef.current.reports.deterministic,
-          "deterministic"
+          "deterministic",
+          convId
         );
       }
 
@@ -1183,7 +1004,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
           "🤖 Displaying LLM report with length:",
           reportCaptureRef.current.reports.llm.length
         );
-        addReportMessage(reportCaptureRef.current.reports.llm, "llm");
+        addReportMessage(reportCaptureRef.current.reports.llm, "llm", convId);
       }
 
       if (
@@ -1197,7 +1018,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
       reportCaptureRef.current.reports = { deterministic: "", llm: "" };
 
       addAssistantMessage(
-        `🏁 **Analysis Complete**${note ? `: ${note}` : ""}.`
+        `🏁 **Analysis Complete**${note ? `: ${note}` : ""}.`,
+        convId
       );
       console.log("🏁 Analysis completed, clearing job state for job:", jobId);
 
@@ -1217,7 +1039,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
             const mapped = buildDownloadEntries(api.base, jobId, ticker, files);
             if (Object.keys(mapped).length > 0) {
               setAvailableFiles(mapped);
-              addDownloadsMessage(jobId, mapped);
+              addDownloadsMessage(jobId, mapped, convId);
             }
           }
         } catch {
@@ -1241,7 +1063,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
       addAssistantMessage(
         `❌ **Analysis Failed** (status: ${status})${
           detail ? `\n\n${detail}` : ""
-        }`
+        }`,
+        convId
       );
       console.log("❌ Analysis failed, clearing job state for job:", jobId);
 
@@ -1269,7 +1092,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
         addAssistantMessage(
           opts.fromReconnect
             ? `🔄 **Reconnected to analysis job ${jobId}**`
-            : `🔗 **Connected to analysis job ${jobId}**`
+            : `🔗 **Connected to analysis job ${jobId}**`,
+          convId
         );
       },
       onStatus: (payload) => {
@@ -1352,13 +1176,15 @@ ${JSON.stringify(analysisRequest, null, 2)}
                 (status.status === "completed" || status.status === "failed")
               ) {
                 addAssistantMessage(
-                  "ℹ️ **Analysis completed. Connection closed.**"
+                  "ℹ️ **Analysis completed. Connection closed.**",
+                  convId
                 );
                 updateCurrentConversationJobState(null, false, null);
                 userStorage.removeItem("activeJob");
               } else {
                 addAssistantMessage(
-                  "⚠️ **Connection lost. Monitoring may resume automatically.**"
+                  "⚠️ **Connection lost. Monitoring may resume automatically.**",
+                  convId
                 );
                 // Keep job state but mark as not streaming
                 updateCurrentConversationJobState(
@@ -1369,7 +1195,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
               }
             } catch (error) {
               console.log("Failed to check job status after SSE close:", error);
-              addAssistantMessage("ℹ️ **Connection closed.**");
+              addAssistantMessage("ℹ️ **Connection closed.**", convId);
             }
           }, 500);
 
@@ -1380,7 +1206,8 @@ ${JSON.stringify(analysisRequest, null, 2)}
         } else {
           flush();
           addAssistantMessage(
-            "⚠️ **Connection issue:** Monitoring may resume automatically."
+            "⚠️ **Connection issue:** Monitoring may resume automatically.",
+            convId
           );
         }
       },
@@ -1605,56 +1432,15 @@ ${JSON.stringify(analysisRequest, null, 2)}
         return () => clearTimeout(timer);
       }, [index, message, collapsedLogs.has(index)]);
 
-      const Bubble = ({ children }) => (
-        <div
-          ref={measureRef}
-          className={[
-            "inline-block max-w-[920px] break-words",
-            "rounded-2xl shadow-sm ring-1",
-            isUser
-              ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-blue-700/30"
-              : "bg-white text-slate-800 ring-slate-200",
-          ].join(" ")}
-        >
-          <div className={isUser ? "p-3 sm:p-4" : "p-4 sm:p-5"}>{children}</div>
-        </div>
-      );
-
       return (
         <div style={style} className="px-4 py-2">
           <div className={isUser ? "flex justify-end" : "flex justify-start"}>
             {isDownloads ? (
-              <Bubble>
-                <div className="m-0">
-                  <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                    Available Downloads
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {Array.isArray(message.entries) &&
-                      message.entries.map((entry) => (
-                        <button
-                          key={entry.key}
-                          onClick={() => handleDownload(entry)}
-                          className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
-                        >
-                          <span className="flex items-center gap-2">
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="h-4 w-4"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            >
-                              <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" />
-                            </svg>
-                            {entry.label}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-slate-400" />
-                        </button>
-                      ))}
-                  </div>
-                </div>
+              <Bubble measureRef={measureRef} isUser={isUser}>
+                <DownloadMessage
+                  message={message}
+                  onDownload={handleDownload}
+                />
               </Bubble>
             ) : isLogBatch ? (
               <div ref={measureRef} className="max-w-[1000px]">
@@ -1666,206 +1452,15 @@ ${JSON.stringify(analysisRequest, null, 2)}
                   isStreaming={
                     data.isStreaming && index === data.messages.length - 1
                   }
-                  jobProgress={
-                    data.isStreaming && index === data.messages.length - 1
-                      ? getCurrentConversationProgress()
-                      : null
-                  }
                 />
               </div>
             ) : isReport ? (
-              <div
-                ref={measureRef}
-                className={`inline-block max-w-[1000px] rounded-2xl overflow-hidden shadow-lg ring-1 ${
-                  message.reportType === "llm"
-                    ? "bg-gradient-to-br from-purple-50 to-pink-50 ring-purple-200"
-                    : "bg-gradient-to-br from-indigo-50 to-blue-50 ring-indigo-200"
-                }`}
-              >
-                <div
-                  className={`flex items-center gap-3 px-5 py-3 border-b ${
-                    message.reportType === "llm"
-                      ? "border-purple-200 bg-gradient-to-r from-purple-100 to-pink-100"
-                      : "border-indigo-200 bg-gradient-to-r from-indigo-100 to-blue-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-3 w-3 rounded-full shadow-sm ${
-                        message.reportType === "llm"
-                          ? "bg-purple-500"
-                          : "bg-indigo-500"
-                      }`}
-                    />
-                    <span
-                      className={`text-sm font-bold tracking-wide ${
-                        message.reportType === "llm"
-                          ? "text-purple-900"
-                          : "text-indigo-900"
-                      }`}
-                    >
-                      {message.reportType === "llm"
-                        ? "📑 LLM ANALYSIS REPORT"
-                        : "📊 DETERMINISTIC ANALYSIS REPORT"}
-                    </span>
-                  </div>
-                  <span
-                    className={`ml-auto text-xs font-medium bg-white/60 px-2 py-1 rounded-full ${
-                      message.reportType === "llm"
-                        ? "text-purple-600"
-                        : "text-indigo-600"
-                    }`}
-                  >
-                    {message.reportType === "llm"
-                      ? "AI-Generated Output"
-                      : "Deterministic Model Output"}
-                  </span>
-                </div>
-                <div className="p-5 bg-white/80">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                    className={`prose prose-sm max-w-none break-words prose-headings:font-bold prose-p:leading-relaxed prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-slate-50 prose-pre:border prose-pre:border-slate-200 ${
-                      message.reportType === "llm"
-                        ? "prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-purple-700 prose-code:bg-purple-50 prose-code:text-purple-800"
-                        : "prose-headings:text-slate-800 prose-p:text-slate-700 prose-strong:text-indigo-700 prose-code:bg-indigo-50 prose-code:text-indigo-800"
-                    }`}
-                    components={{
-                      h1: ({ children }) => (
-                        <h1
-                          className={`text-xl font-bold mb-3 pb-2 border-b ${
-                            message.reportType === "llm"
-                              ? "text-purple-900 border-purple-200"
-                              : "text-indigo-900 border-indigo-200"
-                          }`}
-                        >
-                          {children}
-                        </h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2
-                          className={`text-lg font-semibold mb-2 mt-4 ${
-                            message.reportType === "llm"
-                              ? "text-purple-800"
-                              : "text-indigo-800"
-                          }`}
-                        >
-                          {children}
-                        </h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3 className="text-base font-medium text-slate-700 mb-2 mt-3">
-                          {children}
-                        </h3>
-                      ),
-                      p: ({ children }) => (
-                        <p className="text-slate-600 leading-relaxed mb-3">
-                          {children}
-                        </p>
-                      ),
-                      ul: ({ children }) => (
-                        <ul className="list-disc list-inside space-y-1 text-slate-600 mb-3">
-                          {children}
-                        </ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol className="list-decimal list-inside space-y-1 text-slate-600 mb-3">
-                          {children}
-                        </ol>
-                      ),
-                      li: ({ children }) => (
-                        <li className="text-slate-600">{children}</li>
-                      ),
-                      table: ({ children }) => (
-                        <div className="overflow-x-auto my-4">
-                          <table className="min-w-full border-collapse border border-slate-300">
-                            {children}
-                          </table>
-                        </div>
-                      ),
-                      thead: ({ children }) => (
-                        <thead className="bg-slate-100">{children}</thead>
-                      ),
-                      tbody: ({ children }) => <tbody>{children}</tbody>,
-                      tr: ({ children }) => (
-                        <tr className="border-b border-slate-200">
-                          {children}
-                        </tr>
-                      ),
-                      th: ({ children }) => (
-                        <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
-                          {children}
-                        </th>
-                      ),
-                      td: ({ children }) => (
-                        <td className="border border-slate-300 px-3 py-2 text-slate-600">
-                          {children}
-                        </td>
-                      ),
-                      blockquote: ({ children }) => (
-                        <blockquote className="border-l-4 border-slate-300 pl-4 italic text-slate-600 my-3">
-                          {children}
-                        </blockquote>
-                      ),
-                      br: () => <br className="my-1" />,
-                      code: ({ node, inline, children, ...props }) =>
-                        inline ? (
-                          <code
-                            className={`px-1.5 py-0.5 rounded text-sm font-mono ${
-                              message.reportType === "llm"
-                                ? "bg-purple-50 text-purple-800"
-                                : "bg-indigo-50 text-indigo-800"
-                            }`}
-                            {...props}
-                          >
-                            {children}
-                          </code>
-                        ) : (
-                          <pre
-                            className="bg-slate-50 border border-slate-200 rounded-md p-3 text-sm font-mono text-slate-700 overflow-x-auto"
-                            {...props}
-                          >
-                            <code>{children}</code>
-                          </pre>
-                        ),
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                </div>
-                <div
-                  className={`px-5 py-3 border-t ${
-                    message.reportType === "llm"
-                      ? "bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200"
-                      : "bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200"
-                  }`}
-                >
-                  <div
-                    className={`flex items-center justify-between text-xs ${
-                      message.reportType === "llm"
-                        ? "text-purple-600"
-                        : "text-indigo-600"
-                    }`}
-                  >
-                    <span className="flex items-center gap-1">
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          message.reportType === "llm"
-                            ? "bg-purple-400"
-                            : "bg-indigo-400"
-                        }`}
-                      />
-                      Generated by VYNN AI Agent
-                    </span>
-                    <span>
-                      {new Date(
-                        message.timestamp || Date.now()
-                      ).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <AnalysisReportMessage
+                measureRef={measureRef}
+                message={message}
+              />
             ) : (
-              <Bubble>
+              <Bubble measureRef={measureRef} isUser={isUser}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkBreaks]}
                   className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
@@ -2037,201 +1632,27 @@ ${JSON.stringify(analysisRequest, null, 2)}
     [collapsedLogs]
   );
 
-  // OpenAI-style Progress Text Animation Component
-  const ProgressText = ({ text, className = "" }) => {
-    if (!text || typeof text !== "string") return null;
-
-    return (
-      <>
-        <style>
-          {`
-            @keyframes gradient-flow {
-              0% {
-                background-position: -300% 0;
-              }
-              100% {
-                background-position: 300% 0;
-              }
-            }
-            .progress-text {
-              background: linear-gradient(
-                110deg,
-                #9ca3af 0%,
-                #6b7280 25%,
-                #4b5563 35%,
-                #374151 45%,
-                #1f2937 55%,
-                #374151 65%,
-                #4b5563 75%,
-                #6b7280 85%,
-                #9ca3af 100%
-              );
-              background-size: 300% 100%;
-              background-clip: text;
-              -webkit-background-clip: text;
-              -webkit-text-fill-color: transparent;
-              animation: gradient-flow 6s linear infinite;
-              font-weight: 500;
-              letter-spacing: 0.01em;
-            }
-            .progress-container {
-              position: relative;
-              overflow: hidden;
-            }
-            .progress-dots::before,
-            .progress-dots::after {
-              content: '';
-              position: absolute;
-              top: 50%;
-              width: 4px;
-              height: 4px;
-              border-radius: 50%;
-              background: #9ca3af;
-              animation: dot-pulse 1.5s ease-in-out infinite;
-              transform: translateY(-50%);
-            }
-            .progress-dots::before {
-              left: -12px;
-              animation-delay: 0s;
-            }
-            .progress-dots::after {
-              right: -12px;
-              animation-delay: 0.75s;
-            }
-            @keyframes dot-pulse {
-              0%, 100% {
-                opacity: 0.3;
-                transform: translateY(-50%) scale(0.8);
-              }
-              50% {
-                opacity: 1;
-                transform: translateY(-50%) scale(1.2);
-              }
-            }
-          `}
-        </style>
-        <div className={`progress-container progress-dots ${className}`}>
-          <span className="progress-text">{text}</span>
-        </div>
-      </>
-    );
-  };
-
   const getItemSize = (index) =>
     rowHeightsRef.current[index] || DEFAULT_ROW_HEIGHT;
 
   // ---------- UI ----------
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-50 to-slate-100 overflow-x-hidden">
-      <div className="relative">
-        <Collapsible
-          open={isSidebarOpen}
-          onOpenChange={setIsSidebarOpen}
-          className="bg-white border-r h-full"
-        >
-          <CollapsibleContent className="w-64 p-4 h-full flex flex-col">
-            <Button onClick={startNewConversation} className="w-full mb-4">
-              <PlusCircle className="mr-2 h-4 w-4" /> New Analysis
-            </Button>
-            <div className="relative mb-4">
-              <Input
-                type="text"
-                placeholder="Search conversations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            </div>
-            <div className="flex-1 overflow-auto space-y-1">
-              {filteredConversations.map((c) => {
-                const idx = c._index;
-                const isActive = currentConversationIndex === idx;
-                const isEditing = renamingId === c.id;
-
-                return (
-                  <div key={c.id} className="group relative">
-                    {isEditing ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          commitRename();
-                        }}
-                        className="flex items-center gap-2 mb-1"
-                      >
-                        <Input
-                          autoFocus
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onBlur={commitRename}
-                          onKeyDown={(e) => {
-                            if (e.key === "Escape") cancelRename();
-                          }}
-                          className="h-9"
-                        />
-                        <Button type="submit" size="sm">
-                          Save
-                        </Button>
-                      </form>
-                    ) : (
-                      <>
-                        <Button
-                          onClick={() => switchConversationById(c.id)}
-                          variant={isActive ? "secondary" : "ghost"}
-                          className="w-full justify-start pr-9 truncate"
-                        >
-                          <span className="truncate">{c.title}</span>
-                        </Button>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100"
-                              aria-label="Chat actions"
-                            >
-                              <MoreVertical className="h-4 w-4 text-slate-500" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="start"
-                            side="right"
-                            className="w-44"
-                          >
-                            <DropdownMenuItem
-                              onClick={() => startRename(c.id, c.title)}
-                              className="flex items-center gap-2"
-                            >
-                              <Pencil className="h-4 w-4" /> Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => confirmDelete(c.id)}
-                              className="flex items-center gap-2 text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </CollapsibleContent>
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`absolute top-4 ${
-                isSidebarOpen ? "left-64" : "left-0"
-              } transition-all duration-300`}
-            >
-              {isSidebarOpen ? <ChevronLeft /> : <ChevronRight />}
-            </Button>
-          </CollapsibleTrigger>
-        </Collapsible>
-      </div>
+      <ChatSidebar
+        isSidebarOpen={isSidebarOpen}
+        onSidebarOpenChange={setIsSidebarOpen}
+        conversations={conversations}
+        activeConversationId={conversations[currentConversationIndex]?.id}
+        renamingId={renamingId}
+        renameValue={renameValue}
+        onRenameValueChange={setRenameValue}
+        onStartNewConversation={onStartNewConversation}
+        onSwitchConversation={switchConversationById}
+        onStartRename={startRename}
+        onCommitRename={commitRename}
+        onCancelRename={cancelRename}
+        onDeleteConversation={confirmDelete}
+      />
 
       <div className="flex flex-col flex-grow h-full">
         <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
@@ -2284,48 +1705,22 @@ ${JSON.stringify(analysisRequest, null, 2)}
         </div>
 
         <div className="p-4 bg-white border-t shadow-sm">
-          <form onSubmit={handleSubmit} className="flex gap-2">
-            <Input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me to analyze any stock or company."
-              className="flex-grow rounded-xl"
-              disabled={
-                getCurrentConversationJobId() ||
-                getCurrentConversationStreamingState()
-              }
-            />
-            <Button
-              type="submit"
-              disabled={
-                isStoppingJob ||
-                (!getCurrentConversationJobId() &&
-                  (!input.trim() || getCurrentConversationStreamingState()))
-              }
-              className={`rounded-xl ${
-                getCurrentConversationJobId()
-                  ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800"
-                  : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-              }`}
-            >
-              {getCurrentConversationJobId() ? (
-                isStoppingJob ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Stopping...
-                  </>
-                ) : (
-                  <>
-                    <StopCircle className="h-4 w-4 mr-2" />
-                    Stop Analysis
-                  </>
-                )
-              ) : (
-                "Analyze"
-              )}
-            </Button>
-          </form>
+          <ChatInput
+            onSubmit={handleSubmit}
+            value={input}
+            onChange={(newValue) => setInput(newValue)}
+            isInputDisabled={
+              !!getCurrentConversationJobId() ||
+              getCurrentConversationStreamingState()
+            }
+            isButtonDisabled={
+              isStoppingJob ||
+              (!getCurrentConversationJobId() &&
+                (!input.trim() || getCurrentConversationStreamingState()))
+            }
+            isChatActive={!!getCurrentConversationJobId()}
+            isChatStopping={isStoppingJob}
+          />
         </div>
       </div>
     </div>
