@@ -3,6 +3,9 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNewsWebSocket } from '@/contexts/NewsWebSocketContext';
 import { useStockWatchlist } from '@/hooks/useStockWatchlist';
 import { formatDate, formatTimestamp } from '@/utils/stocksApi';
@@ -22,7 +25,11 @@ import {
   RefreshCw,
   Activity,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Bell,
+  AlertTriangle,
+  TrendingDown,
+  Zap
 } from 'lucide-react';
 
 export function NewsPage() {
@@ -34,6 +41,76 @@ export function NewsPage() {
   const [showAllTickers, setShowAllTickers] = useState(false);
   const [showAllSources, setShowAllSources] = useState(false);
   const navigate = useNavigate();
+  
+  // Market Alert States - Load from localStorage on mount
+  const [alerts, setAlerts] = useState<Array<{
+    id: string;
+    type: 'critical' | 'warning' | 'info';
+    title: string;
+    message: string;
+    affectedSymbols: string[];
+    timestamp: string;
+    impact: 'high' | 'medium' | 'low';
+    category: string;
+    read: boolean;
+  }>>(() => {
+    try {
+      const savedAlerts = localStorage.getItem('marketAlerts');
+      return savedAlerts ? JSON.parse(savedAlerts) : [];
+    } catch (error) {
+      console.error('Failed to load alerts from localStorage:', error);
+      return [];
+    }
+  });
+  const [showAlertDialog, setShowAlertDialog] = useState(false);
+  const [showAlertHistory, setShowAlertHistory] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<typeof alerts[0] | null>(() => {
+    try {
+      const savedSelectedAlert = localStorage.getItem('marketAlerts_selectedAlert');
+      return savedSelectedAlert ? JSON.parse(savedSelectedAlert) : null;
+    } catch (error) {
+      return null;
+    }
+  });
+  const [showAlertBanner, setShowAlertBanner] = useState(() => {
+    try {
+      const savedBannerState = localStorage.getItem('marketAlerts_showBanner');
+      return savedBannerState === 'true';
+    } catch (error) {
+      return false;
+    }
+  });
+  
+  // Persist alerts to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('marketAlerts', JSON.stringify(alerts));
+    } catch (error) {
+      console.error('Failed to save alerts to localStorage:', error);
+    }
+  }, [alerts]);
+  
+  // Persist banner visibility
+  useEffect(() => {
+    try {
+      localStorage.setItem('marketAlerts_showBanner', String(showAlertBanner));
+    } catch (error) {
+      console.error('Failed to save banner state to localStorage:', error);
+    }
+  }, [showAlertBanner]);
+  
+  // Persist selected alert
+  useEffect(() => {
+    try {
+      if (selectedAlert) {
+        localStorage.setItem('marketAlerts_selectedAlert', JSON.stringify(selectedAlert));
+      } else {
+        localStorage.removeItem('marketAlerts_selectedAlert');
+      }
+    } catch (error) {
+      console.error('Failed to save selected alert to localStorage:', error);
+    }
+  }, [selectedAlert]);
   
   // Get stocks from watchlist to subscribe to news
   const { watchedSymbols, hasStocks } = useStockWatchlist();
@@ -157,6 +234,71 @@ export function NewsPage() {
     setSearchQuery('');
   };
 
+  // Mock Alert Trigger (for testing - will be replaced with real WebSocket/API)
+  const triggerMockAlert = () => {
+    const mockAlerts = [
+      {
+        id: `alert-${Date.now()}`,
+        type: 'critical' as const,
+        title: 'Federal Reserve Interest Rate Decision',
+        message: 'The Federal Reserve has announced an unexpected 0.75% interest rate hike, marking the largest increase in 28 years. This decision is likely to cause significant market volatility across all sectors, with particular impact on growth stocks and real estate.',
+        affectedSymbols: ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL'],
+        timestamp: new Date().toISOString(),
+        impact: 'high' as const,
+        category: 'Monetary Policy',
+        read: false
+      },
+      {
+        id: `alert-${Date.now() + 1}`,
+        type: 'warning' as const,
+        title: 'Major Tech Earnings Miss',
+        message: 'Leading technology companies reported earnings significantly below analyst expectations, citing slowing consumer demand and increased competition. Market sentiment for tech sector may turn bearish in the short term.',
+        affectedSymbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META'],
+        timestamp: new Date().toISOString(),
+        impact: 'medium' as const,
+        category: 'Earnings',
+        read: false
+      },
+      {
+        id: `alert-${Date.now() + 2}`,
+        type: 'info' as const,
+        title: 'Geopolitical Tensions Rising',
+        message: 'Escalating tensions in key oil-producing regions may impact energy sector stocks. Analysts recommend monitoring positions in energy and related sectors.',
+        affectedSymbols: ['XLE', 'XOM', 'CVX'],
+        timestamp: new Date().toISOString(),
+        impact: 'medium' as const,
+        category: 'Geopolitics',
+        read: false
+      }
+    ];
+    
+    const randomAlert = mockAlerts[Math.floor(Math.random() * mockAlerts.length)];
+    setAlerts(prev => [randomAlert, ...prev]);
+    setShowAlertBanner(true);
+    setSelectedAlert(randomAlert);
+  };
+
+  const handleAlertClick = (alert: typeof alerts[0]) => {
+    setSelectedAlert(alert);
+    setShowAlertDialog(true);
+    
+    // Mark as read
+    setAlerts(prev => prev.map(a => 
+      a.id === alert.id ? { ...a, read: true } : a
+    ));
+  };
+
+  const dismissAlert = (alertId: string) => {
+    setAlerts(prev => prev.filter(a => a.id !== alertId));
+    if (selectedAlert?.id === alertId) {
+      setShowAlertDialog(false);
+      setSelectedAlert(null);
+    }
+  };
+
+  const unreadAlertsCount = alerts.filter(a => !a.read).length;
+
+
   return (
     <div className="animate-fade-in max-w-7xl mx-auto">
       {/* Modern Compact Header */}
@@ -172,18 +314,137 @@ export function NewsPage() {
             </div>
           </div>
           
-          {/* Connection Badge */}
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-            connectionState.isConnected 
-              ? "bg-green-50 text-green-700 border border-green-200" 
-              : "bg-red-50 text-red-700 border border-red-200"
-          )}>
+          <div className="flex items-center gap-3">
+            {/* Alert Bell Icon */}
+            <div className="relative">
+              <Popover open={showAlertHistory} onOpenChange={setShowAlertHistory}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(
+                      "relative h-9 w-9 p-0 rounded-full transition-all",
+                      unreadAlertsCount > 0 && "border-orange-500 bg-orange-50 hover:bg-orange-100"
+                    )}
+                  >
+                    <Bell className={cn(
+                      "h-4 w-4",
+                      unreadAlertsCount > 0 ? "text-orange-600 animate-pulse" : "text-muted-foreground"
+                    )} />
+                    {unreadAlertsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center ring-2 ring-background">
+                        {unreadAlertsCount}
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-96 p-0" align="end">
+                  <div className="border-b p-4">
+                    <h3 className="font-semibold text-sm">Market Alerts</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {alerts.length === 0 ? 'No alerts' : `${alerts.length} total, ${unreadAlertsCount} unread`}
+                    </p>
+                  </div>
+                  <ScrollArea className="h-[400px]">
+                    {alerts.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground">
+                        <Bell className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                        <p className="text-sm">No market alerts</p>
+                      </div>
+                    ) : (
+                      <div className="p-2">
+                        {alerts.map((alert, index) => (
+                          <div
+                            key={alert.id}
+                            className={cn(
+                              "p-3 rounded-lg mb-2 cursor-pointer transition-all hover:bg-accent border",
+                              !alert.read && "bg-orange-50 border-orange-200",
+                              alert.read && "border-transparent"
+                            )}
+                            onClick={() => {
+                              handleAlertClick(alert);
+                              setShowAlertHistory(false);
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={cn(
+                                "p-1.5 rounded-full mt-0.5",
+                                alert.type === 'critical' && "bg-red-100",
+                                alert.type === 'warning' && "bg-orange-100",
+                                alert.type === 'info' && "bg-blue-100"
+                              )}>
+                                {alert.type === 'critical' && <AlertTriangle className="h-3.5 w-3.5 text-red-600" />}
+                                {alert.type === 'warning' && <AlertCircle className="h-3.5 w-3.5 text-orange-600" />}
+                                {alert.type === 'info' && <Bell className="h-3.5 w-3.5 text-blue-600" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-sm font-medium line-clamp-1">{alert.title}</p>
+                                  {!alert.read && (
+                                    <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0 mt-1" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                  {alert.message}
+                                </p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {alert.category}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(alert.timestamp).toLocaleTimeString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                  {alerts.length > 0 && (
+                    <div className="border-t p-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => {
+                          setAlerts([]);
+                          setShowAlertHistory(false);
+                        }}
+                      >
+                        Clear All Alerts
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Mock Alert Trigger Button (Dev Only) */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={triggerMockAlert}
+              className="gap-2 bg-gradient-to-r from-orange-50 to-red-50 border-orange-300 hover:from-orange-100 hover:to-red-100"
+            >
+              <Zap className="h-4 w-4 text-orange-600" />
+              <span className="text-orange-700 font-medium">Trigger Alert</span>
+            </Button>
+
+            {/* Connection Badge */}
             <div className={cn(
-              "w-2 h-2 rounded-full",
-              connectionState.isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
-            )} />
-            {connectionState.isConnected ? 'Connected' : 'Disconnected'}
+              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+              connectionState.isConnected 
+                ? "bg-green-50 text-green-700 border border-green-200" 
+                : "bg-red-50 text-red-700 border border-red-200"
+            )}>
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                connectionState.isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+              )} />
+              {connectionState.isConnected ? 'Connected' : 'Disconnected'}
+            </div>
           </div>
         </div>
         
@@ -220,6 +481,96 @@ export function NewsPage() {
               <Button onClick={clearError} variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-red-100">
                 <X className="h-4 w-4 text-red-600" />
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Market Alert Banner */}
+      {showAlertBanner && selectedAlert && (
+        <div className="mb-6 animate-slide-down">
+          <div className={cn(
+            "border-2 rounded-lg p-4 shadow-lg",
+            selectedAlert.type === 'critical' && "bg-gradient-to-r from-red-50 to-orange-50 border-red-300",
+            selectedAlert.type === 'warning' && "bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-300",
+            selectedAlert.type === 'info' && "bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-300"
+          )}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 flex-1">
+                <div className={cn(
+                  "p-2 rounded-full mt-0.5",
+                  selectedAlert.type === 'critical' && "bg-red-100",
+                  selectedAlert.type === 'warning' && "bg-orange-100",
+                  selectedAlert.type === 'info' && "bg-blue-100"
+                )}>
+                  {selectedAlert.type === 'critical' ? (
+                    <AlertTriangle className="h-5 w-5 text-red-600 animate-pulse" />
+                  ) : selectedAlert.type === 'warning' ? (
+                    <AlertCircle className="h-5 w-5 text-orange-600" />
+                  ) : (
+                    <Bell className="h-5 w-5 text-blue-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className={cn(
+                      "text-sm font-bold",
+                      selectedAlert.type === 'critical' && "text-red-900",
+                      selectedAlert.type === 'warning' && "text-orange-900",
+                      selectedAlert.type === 'info' && "text-blue-900"
+                    )}>
+                      {selectedAlert.title}
+                    </h4>
+                    <Badge variant="outline" className={cn(
+                      "text-xs",
+                      selectedAlert.impact === 'high' && "bg-red-100 text-red-700 border-red-300",
+                      selectedAlert.impact === 'medium' && "bg-orange-100 text-orange-700 border-orange-300",
+                      selectedAlert.impact === 'low' && "bg-yellow-100 text-yellow-700 border-yellow-300"
+                    )}>
+                      {selectedAlert.impact.toUpperCase()} IMPACT
+                    </Badge>
+                  </div>
+                  <p className={cn(
+                    "text-sm mb-2",
+                    selectedAlert.type === 'critical' && "text-red-800",
+                    selectedAlert.type === 'warning' && "text-orange-800",
+                    selectedAlert.type === 'info' && "text-blue-800"
+                  )}>
+                    {selectedAlert.message}
+                  </p>
+                  {selectedAlert.affectedSymbols.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-medium text-muted-foreground">Affected:</span>
+                      {selectedAlert.affectedSymbols.map(symbol => (
+                        <Badge key={symbol} variant="secondary" className="text-xs">
+                          {symbol}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAlertClick(selectedAlert)}
+                  className="h-8"
+                >
+                  View Details
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowAlertBanner(false);
+                    setSelectedAlert(null);
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -685,6 +1036,129 @@ export function NewsPage() {
           </div>
         </div>
       )}
+
+      {/* Alert Details Dialog */}
+      <Dialog open={showAlertDialog} onOpenChange={setShowAlertDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedAlert?.type === 'critical' && (
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              )}
+              {selectedAlert?.type === 'warning' && (
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+              )}
+              {selectedAlert?.type === 'info' && (
+                <Bell className="h-5 w-5 text-blue-600" />
+              )}
+              {selectedAlert?.title}
+            </DialogTitle>
+            <DialogDescription className="flex items-center gap-2">
+              <Clock className="h-3 w-3" />
+              {selectedAlert && new Date(selectedAlert.timestamp).toLocaleString()}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedAlert && (
+            <div className="space-y-4">
+              {/* Impact and Category Badges */}
+              <div className="flex gap-2">
+                <Badge variant="outline" className={cn(
+                  "text-xs font-medium",
+                  selectedAlert.impact === 'high' && "bg-red-100 text-red-700 border-red-300",
+                  selectedAlert.impact === 'medium' && "bg-orange-100 text-orange-700 border-orange-300",
+                  selectedAlert.impact === 'low' && "bg-yellow-100 text-yellow-700 border-yellow-300"
+                )}>
+                  {selectedAlert.impact.toUpperCase()} IMPACT
+                </Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {selectedAlert.category}
+                </Badge>
+              </div>
+
+              {/* Alert Message */}
+              <div className={cn(
+                "p-4 rounded-lg border-2",
+                selectedAlert.type === 'critical' && "bg-red-50 border-red-200",
+                selectedAlert.type === 'warning' && "bg-orange-50 border-orange-200",
+                selectedAlert.type === 'info' && "bg-blue-50 border-blue-200"
+              )}>
+                <p className={cn(
+                  "text-sm leading-relaxed",
+                  selectedAlert.type === 'critical' && "text-red-900",
+                  selectedAlert.type === 'warning' && "text-orange-900",
+                  selectedAlert.type === 'info' && "text-blue-900"
+                )}>
+                  {selectedAlert.message}
+                </p>
+              </div>
+
+              {/* Affected Symbols */}
+              {selectedAlert.affectedSymbols.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Affected Symbols</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedAlert.affectedSymbols.map(symbol => (
+                      <Badge 
+                        key={symbol} 
+                        variant="secondary" 
+                        className="text-sm px-3 py-1 cursor-pointer hover:bg-secondary/80"
+                        onClick={() => {
+                          setSelectedTickers([symbol]);
+                          setShowAlertDialog(false);
+                        }}
+                      >
+                        {symbol}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recommended Actions */}
+              <div className="bg-muted/50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Recommended Actions
+                </h4>
+                <ul className="text-sm space-y-1 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>Review your portfolio exposure to affected symbols</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>Monitor related news articles for further developments</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>Consider adjusting positions based on your risk tolerance</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => dismissAlert(selectedAlert.id)}
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setSelectedTickers(selectedAlert.affectedSymbols);
+                    setShowAlertDialog(false);
+                  }}
+                >
+                  Filter by Affected Symbols
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
