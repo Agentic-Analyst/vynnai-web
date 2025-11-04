@@ -124,6 +124,10 @@
     animation-delay: var(--delay, 0ms);
   }
 
+  .animate-slide-down {
+    @apply animate-in slide-in-from-top-4 duration-500;
+  }
+
   /* Stock price trends */
   .trend-up {
     color: hsl(var(--success));

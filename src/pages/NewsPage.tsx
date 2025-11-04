@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNewsWebSocket } from '@/contexts/NewsWebSocketContext';
 import { useStockWatchlist } from '@/hooks/useStockWatchlist';
+import { useGlobalAlerts } from '@/contexts/GlobalAlertsContext';
 import { formatDate, formatTimestamp } from '@/utils/stocksApi';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -114,6 +115,9 @@ export function NewsPage() {
   
   // Get stocks from watchlist to subscribe to news
   const { watchedSymbols, hasStocks } = useStockWatchlist();
+  
+  // Global alerts context for cross-page high-impact alerts
+  const { addAlert: addGlobalAlert } = useGlobalAlerts();
   
   // Real-time news WebSocket integration from context
   const {
@@ -273,9 +277,16 @@ export function NewsPage() {
     ];
     
     const randomAlert = mockAlerts[Math.floor(Math.random() * mockAlerts.length)];
+    
+    // Add to local alerts for News page history
     setAlerts(prev => [randomAlert, ...prev]);
     setShowAlertBanner(true);
     setSelectedAlert(randomAlert);
+    
+    // Add to global alerts context for cross-page display (if high impact)
+    if (randomAlert.impact === 'high') {
+      addGlobalAlert(randomAlert);
+    }
   };
 
   const handleAlertClick = (alert: typeof alerts[0]) => {
@@ -403,11 +414,23 @@ export function NewsPage() {
                     )}
                   </ScrollArea>
                   {alerts.length > 0 && (
-                    <div className="border-t p-2">
+                    <div className="border-t p-2 space-y-1">
+                      {unreadAlertsCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs"
+                          onClick={() => {
+                            setAlerts(prev => prev.map(a => ({ ...a, read: true })));
+                          }}
+                        >
+                          Mark All as Read ({unreadAlertsCount})
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="w-full text-xs"
+                        className="w-full text-xs text-destructive hover:text-destructive"
                         onClick={() => {
                           setAlerts([]);
                           setShowAlertHistory(false);

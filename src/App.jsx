@@ -17,6 +17,8 @@ import { NewsWebSocketProvider } from "./contexts/NewsWebSocketContext.tsx";
 import { StockPricesWebSocketProvider } from "./contexts/StockPricesWebSocketContext.tsx";
 import { HistoricalDataProvider } from "./contexts/HistoricalDataContext.tsx";
 import { DailyReportsProvider } from "./contexts/DailyReportsContext.tsx";
+import { GlobalAlertsProvider } from "./contexts/GlobalAlertsContext.tsx";
+import { GlobalAlertBanner } from "./components/GlobalAlertBanner.tsx";
 
 // Stock Dashboard Pages
 import Stocks from "./pages/Stocks.tsx";
@@ -115,9 +117,11 @@ const App = () => {
             <Shell>
               {(isAuthed) =>
                 isAuthed ? (
-                  <DailyReportsProvider>
-                    <NewsWebSocketProvider>
-                      <StockPricesWebSocketProvider>
+                  <GlobalAlertsProvider>
+                    <GlobalAlertBanner />
+                    <DailyReportsProvider>
+                      <NewsWebSocketProvider>
+                        <StockPricesWebSocketProvider>
                         <HistoricalDataProvider>
                           <Routes>
                           <Route
@@ -180,6 +184,7 @@ const App = () => {
                     </StockPricesWebSocketProvider>
                   </NewsWebSocketProvider>
                 </DailyReportsProvider>
+              </GlobalAlertsProvider>
                 ) : (
                   <Routes>
                     <Route path="/" element={<LandingPage />} />
