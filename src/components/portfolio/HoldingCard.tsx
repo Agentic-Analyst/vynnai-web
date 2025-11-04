@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, TrendingUp, TrendingDown, Wifi, Loader2 } from 'lucide-react';
+import { Edit2, Trash2, TrendingUp, TrendingDown, Wifi, Loader2, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,11 +7,13 @@ import { PortfolioData } from '@/hooks/usePortfolio';
 
 interface HoldingCardProps {
   holding: PortfolioData;
+  recommendation?: string;
   onEdit: (holding: PortfolioData) => void;
   onDelete: (holding: PortfolioData) => void;
+  onIndicatorClick?: () => void;
 }
 
-export function HoldingCard({ holding, onEdit, onDelete }: HoldingCardProps) {
+export function HoldingCard({ holding, recommendation, onEdit, onDelete, onIndicatorClick }: HoldingCardProps) {
   const isLoading = holding.currentPrice === null;
   const isGain = holding.gain ? holding.gain >= 0 : false;
   
@@ -105,6 +107,25 @@ export function HoldingCard({ holding, onEdit, onDelete }: HoldingCardProps) {
               </div>
             )}
           </div>
+          
+          {/* Short-term Recommendation */}
+          {recommendation && onIndicatorClick && (
+            <div className="flex justify-between items-center pt-2 border-t">
+              <span className="text-sm text-muted-foreground">Short-term</span>
+              <button
+                onClick={onIndicatorClick}
+                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                  recommendation === 'Buy' ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200' :
+                  recommendation === 'Sell' ? 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200' :
+                  'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200'
+                }`}
+                title={`Click to view ${recommendation} analysis`}
+              >
+                <Eye className="h-3 w-3" />
+                {recommendation}
+              </button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

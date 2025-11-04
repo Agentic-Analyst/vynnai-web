@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, WifiOff, ArrowLeft, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Grid3X3, List, Wifi, WifiOff, ArrowLeft, Loader2, FileText, Download, Eye } from 'lucide-react';
 
 import { usePortfolios } from '@/hooks/usePortfolios';
 import { PortfolioHolding } from '@/hooks/usePortfolio';
@@ -10,10 +10,14 @@ import { PageHeader } from '@/components/PageHeader';
 import { PieChart, Cell, Pie, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/components/ui/use-toast';
 import { HoldingModal } from '@/components/portfolio/HoldingModal';
 import { DeleteConfirmation } from '@/components/portfolio/DeleteConfirmation';
 import { HoldingCard } from '@/components/portfolio/HoldingCard';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const Portfolio = () => {
   const { portfolioId } = useParams<{ portfolioId: string }>();
@@ -114,6 +118,98 @@ const Portfolio = () => {
   const [editingHolding, setEditingHolding] = useState<PortfolioHolding | null>(null);
   const [deletingHolding, setDeletingHolding] = useState<PortfolioHolding | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  
+  // Analysis dialog states
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<{
+    symbol: string;
+    name: string;
+    recommendation: string;
+    content: string;
+    loading: boolean;
+  } | null>(null);
+
+  // Handle indicator click
+  const handleIndicatorClick = async (symbol: string, name: string, recommendation: string) => {
+    setAnalysisDialogOpen(true);
+    setSelectedAnalysis({
+      symbol,
+      name,
+      recommendation,
+      content: '',
+      loading: true
+    });
+
+    // TODO: Fetch actual analysis from API
+    // For now, show mock content
+    setTimeout(() => {
+      setSelectedAnalysis({
+        symbol,
+        name,
+        recommendation,
+        content: generateMockAnalysis(symbol, recommendation),
+        loading: false
+      });
+    }, 1000);
+  };
+
+  // Mock analysis generator (will be replaced with actual API call)
+  const generateMockAnalysis = (symbol: string, recommendation: string) => {
+    return `# ${recommendation} Recommendation for ${symbol}
+
+## Executive Summary
+Based on comprehensive technical and fundamental analysis, we recommend a **${recommendation}** position for ${symbol}.
+
+## Key Findings
+
+### Technical Analysis
+- **Support Level**: $${(Math.random() * 100 + 50).toFixed(2)}
+- **Resistance Level**: $${(Math.random() * 100 + 150).toFixed(2)}
+- **RSI (14-day)**: ${(Math.random() * 40 + 30).toFixed(1)} - ${recommendation === 'Buy' ? 'Oversold' : recommendation === 'Sell' ? 'Overbought' : 'Neutral'}
+- **MACD**: ${recommendation === 'Buy' ? 'Bullish crossover' : recommendation === 'Sell' ? 'Bearish crossover' : 'Neutral trend'}
+
+### Fundamental Analysis
+- **P/E Ratio**: ${(Math.random() * 20 + 10).toFixed(2)}
+- **PEG Ratio**: ${(Math.random() * 2 + 0.5).toFixed(2)}
+- **Debt-to-Equity**: ${(Math.random() * 1.5).toFixed(2)}
+- **ROE**: ${(Math.random() * 20 + 5).toFixed(1)}%
+
+### Recent Developments
+1. Strong earnings beat in latest quarter
+2. New product launches driving growth
+3. Expanding market share in key segments
+4. Positive analyst sentiment shift
+
+## Recommendation Rationale
+
+${recommendation === 'Buy' ? 
+  `The stock shows strong buying signals with positive momentum indicators and attractive valuation metrics. Technical indicators suggest an oversold condition with potential for upside.` :
+  recommendation === 'Sell' ?
+  `Current valuation appears stretched with overbought technical indicators. Consider taking profits at current levels.` :
+  `Maintain current position. Wait for clearer directional signals before adding or reducing exposure.`
+}
+
+## Risk Factors
+- Market volatility
+- Sector-specific headwinds
+- Regulatory changes
+- Competition intensification
+
+---
+*Analysis generated on ${new Date().toLocaleDateString()}*
+`;
+  };
+
+  // Handle download analysis
+  const handleDownloadAnalysis = () => {
+    if (!selectedAnalysis) return;
+    
+    // TODO: Implement actual PDF download from API
+    toast({
+      title: 'Download Started',
+      description: `Downloading ${selectedAnalysis.recommendation} analysis for ${selectedAnalysis.symbol}...`,
+    });
+  };
   
 
   // Debug logging for WebSocket state changes
@@ -475,17 +571,22 @@ const Portfolio = () => {
                                 
                                 const getRecommendationColor = (rec: string) => {
                                   switch(rec) {
-                                    case 'Buy': return 'bg-green-100 text-green-800 border-green-200';
-                                    case 'Sell': return 'bg-red-100 text-red-800 border-red-200';
-                                    case 'Hold': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-                                    default: return 'bg-gray-100 text-gray-800 border-gray-200';
+                                    case 'Buy': return 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200';
+                                    case 'Sell': return 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200';
+                                    case 'Hold': return 'bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200';
+                                    default: return 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200';
                                   }
                                 };
                                 
                                 return (
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getRecommendationColor(recommendation)}`}>
+                                  <button
+                                    onClick={() => handleIndicatorClick(item.symbol, item.name, recommendation)}
+                                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${getRecommendationColor(recommendation)}`}
+                                    title={`Click to view ${recommendation} analysis`}
+                                  >
+                                    <Eye className="h-3 w-3" />
                                     {recommendation}
-                                  </span>
+                                  </button>
                                 );
                               })()}
                             </td>
@@ -540,14 +641,23 @@ const Portfolio = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {portfolioItems.map((item) => (
-                      <HoldingCard
-                        key={item.id}
-                        holding={item}
-                        onEdit={handleEditHolding}
-                        onDelete={handleDeleteHolding}
-                      />
-                    ))}
+                    {portfolioItems.map((item) => {
+                      // Calculate recommendation for card view (same logic as table)
+                      const recommendations = ['Buy', 'Hold', 'Sell'];
+                      const recommendationIndex = Math.abs(item.symbol.charCodeAt(0)) % 3;
+                      const recommendation = recommendations[recommendationIndex];
+                      
+                      return (
+                        <HoldingCard
+                          key={item.id}
+                          holding={item}
+                          recommendation={recommendation}
+                          onEdit={handleEditHolding}
+                          onDelete={handleDeleteHolding}
+                          onIndicatorClick={() => handleIndicatorClick(item.symbol, item.name, recommendation)}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
@@ -583,6 +693,83 @@ const Portfolio = () => {
         onConfirm={handleConfirmDelete}
         holdingSymbol={deletingHolding?.symbol || ''}
       />
+
+      {/* Stock Analysis Dialog */}
+      <Dialog open={analysisDialogOpen} onOpenChange={setAnalysisDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {selectedAnalysis?.symbol} - {selectedAnalysis?.name}
+              {selectedAnalysis && (
+                <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                  selectedAnalysis.recommendation === 'Buy' ? 'bg-green-100 text-green-800 border-green-200' :
+                  selectedAnalysis.recommendation === 'Sell' ? 'bg-red-100 text-red-800 border-red-200' :
+                  'bg-yellow-100 text-yellow-800 border-yellow-200'
+                }`}>
+                  {selectedAnalysis.recommendation}
+                </span>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Short-term investment analysis and recommendation
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="h-[600px] w-full rounded-md border p-6">
+            {selectedAnalysis?.loading ? (
+              <div className="flex flex-col items-center justify-center h-full space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading analysis...</p>
+              </div>
+            ) : (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                className="prose prose-sm max-w-none"
+                components={{
+                  h1: ({ children }) => (
+                    <h1 className="text-2xl font-bold mb-4 pb-2 border-b">{children}</h1>
+                  ),
+                  h2: ({ children }) => (
+                    <h2 className="text-xl font-semibold mt-6 mb-3">{children}</h2>
+                  ),
+                  h3: ({ children }) => (
+                    <h3 className="text-lg font-medium mt-4 mb-2">{children}</h3>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-gray-900">{children}</strong>
+                  ),
+                  p: ({ children }) => (
+                    <p className="my-3 leading-relaxed text-gray-700">{children}</p>
+                  ),
+                }}
+              >
+                {selectedAnalysis?.content || ''}
+              </ReactMarkdown>
+            )}
+          </ScrollArea>
+          
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setAnalysisDialogOpen(false)}>
+              Close
+            </Button>
+            <Button 
+              onClick={handleDownloadAnalysis}
+              className="gap-2"
+              disabled={selectedAnalysis?.loading}
+            >
+              <Download className="h-4 w-4" />
+              Download PDF
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
