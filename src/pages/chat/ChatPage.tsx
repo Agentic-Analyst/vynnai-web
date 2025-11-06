@@ -703,29 +703,33 @@ const ChatPage = () => {
     updateCurrentConversationJobState(
       currentJobId,
       true,
-      "Starting analysis..."
+      "Starting chat..."
     ); // Keep current job ID if any, mark as streaming
 
     try {
-      const analysisRequest = parseAnalysisRequest(currentInput);
+      const email = localStorage.getItem("auth_email");
+      const currentConversation = conversations[currentConversationIndex];
+      const sessionId = currentConversation?.sessionId || null;
+      
+      const chatRequest = {
+        email: email,
+        timestamp: new Date().toISOString(),
+        user_prompt: currentInput,
+        ...(sessionId && { session_id: sessionId })
+      };
 
       addAssistantMessage(
-        `🚀 **I will help you** with **${analysisRequest.request}**
+        `🚀 **Processing your request...**
 
-📋 **Request Parameters:**
-\`\`\`json
-${JSON.stringify(analysisRequest, null, 2)}
-\`\`\`
-
-⚡ **Connecting to analysis service...**`
+⚡ **Connecting to AI assistant...**`
       );
 
-      const result = await api.startAnalysis(analysisRequest);
-      console.log("🎯 Analysis started with job ID:", result.job_id);
+      const result = await api.startChat(chatRequest);
+      console.log("🎯 Chat started with job ID:", result.job_id);
       updateCurrentConversationJobState(
         result.job_id,
         true,
-        "Initializing analysis..."
+        "Initializing chat..."
       ); // Set new job ID, streaming, and initial progress
 
       // Start both SSE monitoring and periodic status checking
@@ -741,16 +745,20 @@ ${JSON.stringify(analysisRequest, null, 2)}
       startJobMonitoring(result.job_id, { convId });
       startPeriodicStatusCheck(result.job_id);
 
+      // Update conversation title if this is the first message
       if (conversations[currentConversationIndex].title === "New Analysis") {
-        const newTitle = `${result.ticker} Stock Analysis`;
+        // Extract a short title from the user prompt
+        const shortTitle = currentInput.length > 50 
+          ? currentInput.substring(0, 47) + "..." 
+          : currentInput;
         setConversations((prev) => {
           const updated = [...prev];
-          updated[currentConversationIndex].title = newTitle;
+          updated[currentConversationIndex].title = shortTitle;
           return updated;
         });
       }
     } catch (error) {
-      addAssistantMessage(`❌ **Analysis Failed:** ${error.message}`);
+      addAssistantMessage(`❌ **Chat Failed:** ${error.message}`);
       updateCurrentConversationJobState(null, false, null); // Clear job state on error
     }
   };
@@ -773,18 +781,28 @@ ${JSON.stringify(analysisRequest, null, 2)}
     const BATCH_COUNT_CAP = 200;
     const BATCH_BYTE_CAP = 32_000;
 
-    let batch = [];
-    let batchBytes = 0;
+    let logBatch = [];
+    let nlBatch = [];
+    let logBatchBytes = 0;
+    let nlBatchBytes = 0;
     let flushTimer = null;
 
-    const queue = (text, kind = "log") => {
-      if (kind !== "log") {
-        addAssistantMessage(text);
-        return;
-      }
+    const queue = (text, type = "LOG") => {
       const s = typeof text === "string" ? text : String(text);
 
-      // Extract progress from log messages
+      // Handle NL (natural language) messages separately
+      if (type === "NL") {
+        nlBatch.push(s);
+        nlBatchBytes += s.length + 1;
+        if (nlBatch.length >= BATCH_COUNT_CAP || nlBatchBytes >= BATCH_BYTE_CAP) {
+          flush();
+          return;
+        }
+        if (!flushTimer) flushTimer = setTimeout(flush, BATCH_LATENCY_MS);
+        return;
+      }
+
+      // Handle LOG messages - Extract progress
       const progressPatterns = [
         // Common progress indicators - more flexible matching
         /(?:Starting|Initiating|Beginning)\s+(.{10,60})(?:\.|$)/i,
@@ -935,9 +953,9 @@ ${JSON.stringify(analysisRequest, null, 2)}
         }
       }
 
-      batch.push(s);
-      batchBytes += s.length + 1;
-      if (batch.length >= BATCH_COUNT_CAP || batchBytes >= BATCH_BYTE_CAP) {
+      logBatch.push(s);
+      logBatchBytes += s.length + 1;
+      if (logBatch.length >= BATCH_COUNT_CAP || logBatchBytes >= BATCH_BYTE_CAP) {
         flush();
         return;
       }
@@ -945,21 +963,38 @@ ${JSON.stringify(analysisRequest, null, 2)}
     };
 
     const flush = () => {
-      if (!batch.length) {
-        if (flushTimer) {
-          clearTimeout(flushTimer);
-          flushTimer = null;
-        }
-        return;
-      }
-      const lines = batch;
-      batch = [];
-      batchBytes = 0;
       if (flushTimer) {
         clearTimeout(flushTimer);
         flushTimer = null;
       }
-      addAssistantLogBatch(lines, convId);
+      
+      // Flush NL batch if we have any
+      if (nlBatch.length > 0) {
+        const nlSummary = nlBatch.join("\n");
+        console.log("📝 Flushing NL batch:", nlSummary.substring(0, 100) + "...");
+        
+        // If we also have log batch, add it with NL summary
+        if (logBatch.length > 0) {
+          const logLines = logBatch;
+          addAssistantLogBatch(logLines, nlSummary, convId);
+          logBatch = [];
+          logBatchBytes = 0;
+        } else {
+          // Just NL, add as assistant message
+          addAssistantMessage(nlSummary, convId);
+        }
+        
+        nlBatch = [];
+        nlBatchBytes = 0;
+      } 
+      // Flush log batch only if we have logs but no NL
+      else if (logBatch.length > 0) {
+        const logLines = logBatch;
+        addAssistantLogBatch(logLines, "", convId);
+        logBatch = [];
+        logBatchBytes = 0;
+      }
+      
       const count =
         conversations[currentConversationIndex]?.messages?.length || 0;
       if (count > 0) listRef.current?.resetAfterIndex(count - 1);
@@ -1128,26 +1163,49 @@ ${JSON.stringify(analysisRequest, null, 2)}
         );
       },
       onLog: (payload) => {
-        const { message } = payload || {};
-        if (Array.isArray(message)) message.forEach((m) => queue(m, "log"));
-        else if (message) {
+        const { message, type } = payload || {};
+        const messageType = type || "LOG"; // Default to LOG if not specified
+        
+        if (Array.isArray(message)) {
+          message.forEach((m) => queue(m, messageType));
+        } else if (message) {
           if (/ENTIRE PROGRAM.*COMPLETED/i.test(message)) {
-            finalizeDone("completed", "Analysis completed");
+            finalizeDone("completed", "Chat completed");
             return;
           }
-          queue(message, "log");
+          queue(message, messageType);
         }
       },
       onLogBatch: (payload) => {
-        const { message } = payload || {};
-        if (Array.isArray(message)) message.forEach((m) => queue(m, "log"));
+        const { message, type } = payload || {};
+        const messageType = type || "LOG"; // Default to LOG if not specified
+        
+        if (Array.isArray(message)) {
+          message.forEach((m) => queue(m, messageType));
+        }
       },
       onCompleted: (payload) => {
         try {
-          const { message, status } = payload || {};
+          const { message, status, session_id } = payload || {};
+          
+          // Extract and store session_id if provided
+          if (session_id) {
+            console.log("💾 Received session_id from completed event:", session_id);
+            setConversations((prev) => {
+              const next = [...prev];
+              const idx = convId 
+                ? next.findIndex((c) => c.id === convId)
+                : currentConversationIndex;
+              if (next[idx]) {
+                next[idx] = { ...next[idx], sessionId: session_id };
+              }
+              return next;
+            });
+          }
+          
           finalizeDone(status || "completed", message);
         } catch {
-          finalizeDone("completed");
+          finalizeDone("completed", "Chat completed");
         }
       },
       onServerError: (payload) => {
@@ -1395,18 +1453,6 @@ ${JSON.stringify(analysisRequest, null, 2)}
       const isReport = message.kind === "report";
       const measureRef = useRef(null);
 
-      // TODO: Will be removed, this is just for for testing mock data purposes
-      let displayMessage = message;
-      if (message.kind === "logbatch") {
-        displayMessage = {
-          ...message,
-          nlSummary: "Analysis in progress...", // mock NL summary
-          logLines: Array.isArray(message.lines)
-            ? message.lines
-            : message.content?.split("\n") || [],
-        };
-      }
-
       useEffect(() => {
         if (!measureRef.current) return;
 
@@ -1445,7 +1491,7 @@ ${JSON.stringify(analysisRequest, null, 2)}
             ) : isLogBatch ? (
               <div ref={measureRef} className="max-w-[1000px]">
                 <AnalysisLogMessage
-                  message={displayMessage}
+                  message={message}
                   index={index}
                   isCollapsed={collapsedLogs.has(index)}
                   toggleCollapse={toggleLogCollapse}
@@ -1704,23 +1750,25 @@ ${JSON.stringify(analysisRequest, null, 2)}
           </div>
         </div>
 
-        <div className="p-4 bg-white border-t shadow-sm">
-          <ChatInput
-            onSubmit={handleSubmit}
-            value={input}
-            onChange={(newValue) => setInput(newValue)}
-            isInputDisabled={
-              !!getCurrentConversationJobId() ||
-              getCurrentConversationStreamingState()
-            }
-            isButtonDisabled={
-              isStoppingJob ||
-              (!getCurrentConversationJobId() &&
-                (!input.trim() || getCurrentConversationStreamingState()))
-            }
-            isChatActive={!!getCurrentConversationJobId()}
-            isChatStopping={isStoppingJob}
-          />
+        <div className="p-4">
+          <div className="max-w-3xl mx-auto">
+            <ChatInput
+              onSubmit={handleSubmit}
+              value={input}
+              onChange={(newValue) => setInput(newValue)}
+              isInputDisabled={
+                !!getCurrentConversationJobId() ||
+                getCurrentConversationStreamingState()
+              }
+              isButtonDisabled={
+                isStoppingJob ||
+                (!getCurrentConversationJobId() &&
+                  (!input.trim() || getCurrentConversationStreamingState()))
+              }
+              isChatActive={!!getCurrentConversationJobId()}
+              isChatStopping={isStoppingJob}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -31,13 +31,13 @@ const ChatInput = ({
           onChange(e.target.value)
         }
         placeholder="Ask me to analyze any stock or company."
-        className="flex-grow rounded-xl"
+        className="flex-grow rounded-xl h-12 text-base px-4"
         disabled={isInputDisabled}
       />
       <Button
         type="submit"
         disabled={isButtonDisabled}
-        className={`rounded-xl ${
+        className={`rounded-xl h-12 px-6 ${
           isChatActive
             ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800"
             : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"

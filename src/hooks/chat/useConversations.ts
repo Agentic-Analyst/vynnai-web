@@ -181,8 +181,8 @@ export function useConversations(initialIndex = 0) {
 
   // --- assistant log batch ---
   const addAssistantLogBatch = useCallback(
-    (lines: string[], convId?: number) => {
-      if (!Array.isArray(lines) || !lines.length) return;
+    (logLines: string[], nlSummary?: string, convId?: number) => {
+      if (!Array.isArray(logLines) || !logLines.length) return;
       const nowIso = new Date().toISOString();
       setConversations((prev) => {
         const next = [...prev];
@@ -194,14 +194,16 @@ export function useConversations(initialIndex = 0) {
           activeJobId: null,
           isStreaming: false,
           jobProgress: null,
+          sessionId: null,
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
         if (last && last.role === "assistant" && last.kind === "logbatch") {
-          const newLines = (last.lines || []).concat(lines);
+          const newLines = (last.logLines || []).concat(logLines);
           msgs[msgs.length - 1] = {
             ...last,
-            lines: newLines,
+            logLines: newLines,
+            nlSummary: nlSummary || last.nlSummary || "",
             content: newLines.join("\n"),
             timestamp: nowIso,
           };
@@ -209,8 +211,9 @@ export function useConversations(initialIndex = 0) {
           msgs.push({
             role: "assistant",
             kind: "logbatch",
-            lines: [...lines],
-            content: lines.join("\n"),
+            logLines: [...logLines],
+            nlSummary: nlSummary || "",
+            content: logLines.join("\n"),
             timestamp: nowIso,
           });
         }

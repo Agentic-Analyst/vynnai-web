@@ -13,4 +13,5 @@ export type Conversation = {
   activeJobId?: string | null;
   isStreaming?: boolean;
   jobProgress?: string | null;
+  sessionId?: string | null;
 };
