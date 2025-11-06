@@ -188,6 +188,7 @@ const ChatPage = () => {
             activeJobId: null,
             isStreaming: false,
             jobProgress: null,
+            sessionId: null,
           },
         ]);
       }
@@ -690,6 +691,7 @@ const ChatPage = () => {
         activeJobId: null,
         isStreaming: false,
         jobProgress: null,
+        sessionId: null,
       };
       const msgs = [...(convo.messages || [])]; // clone messages
       msgs.push(userMessage); // pure append
@@ -710,6 +712,8 @@ const ChatPage = () => {
       const email = localStorage.getItem("auth_email");
       const currentConversation = conversations[currentConversationIndex];
       const sessionId = currentConversation?.sessionId || null;
+      
+      console.log("📤 Sending chat request with session_id:", sessionId);
       
       const chatRequest = {
         email: email,
