@@ -29,8 +29,7 @@ import {
   ChevronRight,
   Bell,
   AlertTriangle,
-  TrendingDown,
-  Zap
+  TrendingDown
 } from 'lucide-react';
 
 export function NewsPage() {
@@ -82,6 +81,24 @@ export function NewsPage() {
     }
   });
   
+  // Demo mode states for auto-generating alerts - persist across page navigation
+  const [isDemoMode, setIsDemoMode] = useState(() => {
+    try {
+      const savedDemoMode = localStorage.getItem('marketAlerts_demoMode');
+      return savedDemoMode === 'true';
+    } catch (error) {
+      return false;
+    }
+  });
+  const [demoTimeRemaining, setDemoTimeRemaining] = useState(() => {
+    try {
+      const savedTime = localStorage.getItem('marketAlerts_demoTimeRemaining');
+      return savedTime ? parseInt(savedTime, 10) : 0;
+    } catch (error) {
+      return 0;
+    }
+  });
+  
   // Persist alerts to localStorage whenever they change
   useEffect(() => {
     try {
@@ -112,6 +129,91 @@ export function NewsPage() {
       console.error('Failed to save selected alert to localStorage:', error);
     }
   }, [selectedAlert]);
+  
+  // Persist demo mode state
+  useEffect(() => {
+    try {
+      localStorage.setItem('marketAlerts_demoMode', String(isDemoMode));
+    } catch (error) {
+      console.error('Failed to save demo mode to localStorage:', error);
+    }
+  }, [isDemoMode]);
+  
+  // Persist demo time remaining
+  useEffect(() => {
+    try {
+      localStorage.setItem('marketAlerts_demoTimeRemaining', String(demoTimeRemaining));
+    } catch (error) {
+      console.error('Failed to save demo time to localStorage:', error);
+    }
+  }, [demoTimeRemaining]);
+  
+  // Auto-start demo mode on first load (only once)
+  useEffect(() => {
+    // Check if demo mode has ever been started
+    const demoStartTime = localStorage.getItem('marketAlerts_demoStartTime');
+    
+    if (!demoStartTime) {
+      // First time - start demo mode
+      const startTime = Date.now();
+      localStorage.setItem('marketAlerts_demoStartTime', String(startTime));
+      setIsDemoMode(true);
+      setDemoTimeRemaining(60);
+      
+      // Generate first alert immediately
+      setTimeout(() => {
+        triggerMockAlert();
+      }, 100);
+    } else {
+      // Demo was already started, check if it's still active
+      const startTime = parseInt(demoStartTime, 10);
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(60 - elapsed, 0);
+      
+      if (remaining > 0) {
+        setIsDemoMode(true);
+        setDemoTimeRemaining(remaining);
+      } else {
+        setIsDemoMode(false);
+        setDemoTimeRemaining(0);
+      }
+    }
+  }, []); // Run only once on mount
+
+  // Demo mode effect: auto-generate alerts and countdown timer (works across page navigation)
+  useEffect(() => {
+    if (!isDemoMode) return;
+
+    const demoStartTime = parseInt(localStorage.getItem('marketAlerts_demoStartTime') || '0', 10);
+    
+    // Alert generation interval (every 15 seconds)
+    const alertInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - demoStartTime) / 1000);
+      if (elapsed < 60) {
+        triggerMockAlert();
+      }
+    }, 15000); // 15 seconds
+
+    // Countdown timer (every second)
+    const countdownInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - demoStartTime) / 1000);
+      const remaining = Math.max(60 - elapsed, 0);
+      
+      setDemoTimeRemaining(remaining);
+      
+      if (remaining <= 0) {
+        // Time's up, stop demo mode
+        setIsDemoMode(false);
+        localStorage.removeItem('marketAlerts_demoStartTime');
+      }
+    }, 1000);
+
+    // Cleanup intervals when component unmounts (but intervals will restart on remount)
+    return () => {
+      clearInterval(alertInterval);
+      clearInterval(countdownInterval);
+    };
+  }, [isDemoMode]);
   
   // Get stocks from watchlist to subscribe to news
   const { watchedSymbols, hasStocks } = useStockWatchlist();
@@ -443,17 +545,6 @@ export function NewsPage() {
                 </PopoverContent>
               </Popover>
             </div>
-
-            {/* Mock Alert Trigger Button (Dev Only) */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={triggerMockAlert}
-              className="gap-2 bg-gradient-to-r from-orange-50 to-red-50 border-orange-300 hover:from-orange-100 hover:to-red-100"
-            >
-              <Zap className="h-4 w-4 text-orange-600" />
-              <span className="text-orange-700 font-medium">Trigger Alert</span>
-            </Button>
 
             {/* Connection Badge */}
             <div className={cn(
