@@ -41,7 +41,10 @@ const CHART_COLORS = [
 const CustomTreemapContent = (props: any) => {
   const { x, y, width, height, symbol, name, percentage, color } = props;
 
-  if (width < 50 || height < 40) return null;
+  // Hide very small items completely (less than 2% or too small to display)
+  if (width < 50 || height < 40 || (percentage && percentage < 2)) {
+    return null;
+  }
 
   return (
     <g>
@@ -150,11 +153,21 @@ const Performance = () => {
     };
   }, [selectedPortfolio, selectedSummary, prices]);
 
-  // Generate performance history (30 days)
+  // Generate performance history (from earliest holding date or 30 days max)
   const performanceHistory = useMemo(() => {
     if (!portfolioMetrics) return [];
 
-    const days = 30;
+    // Find the earliest date from holdings
+    const earliestDate = portfolioMetrics.holdings.reduce((earliest, holding) => {
+      const holdingDate = new Date(holding.dateAdded);
+      return holdingDate < earliest ? holdingDate : earliest;
+    }, new Date());
+
+    // Calculate days since earliest holding (max 30 days)
+    const today = new Date();
+    const daysSinceEarliest = Math.floor((today.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.min(Math.max(daysSinceEarliest + 1, 1), 30); // At least 1 day, max 30 days
+
     const data = [];
     const currentValue = portfolioMetrics.totalValue;
     const volatility = 1.5;
@@ -182,18 +195,23 @@ const Performance = () => {
     return data;
   }, [portfolioMetrics]);
 
+  // Get the number of days in performance history for chart description
+  const performanceDays = performanceHistory.length;
+
   // Allocation data for pie/treemap
   const allocationData = useMemo(() => {
     if (!portfolioMetrics) return [];
 
-    return portfolioMetrics.holdings.map((holding, index) => ({
-      symbol: holding.symbol,
-      name: holding.name,
-      value: holding.currentValue,
-      percentage: (holding.currentValue / portfolioMetrics.totalValue) * 100,
-      shares: holding.shares,
-      color: CHART_COLORS[index % CHART_COLORS.length],
-    }));
+    return portfolioMetrics.holdings
+      .map((holding, index) => ({
+        symbol: holding.symbol,
+        name: holding.name,
+        value: holding.currentValue,
+        percentage: (holding.currentValue / portfolioMetrics.totalValue) * 100,
+        shares: holding.shares,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      }))
+      .sort((a, b) => b.value - a.value); // Sort by value descending for better treemap layout
   }, [portfolioMetrics]);
 
   // Gain/Loss data
@@ -258,6 +276,10 @@ const Performance = () => {
         scale: 3, // High resolution
         backgroundColor: '#ffffff',
         logging: false,
+        ignoreElements: (element) => {
+          // Exclude export buttons from the screenshot
+          return element.classList.contains('export-button');
+        },
       });
 
       const link = document.createElement('a');
@@ -420,11 +442,16 @@ const Performance = () => {
                   <LineChartIcon className="h-5 w-5" />
                   Portfolio Value Over Time
                 </CardTitle>
-                <CardDescription className="mt-1">30-day performance history</CardDescription>
+                <CardDescription className="mt-1">
+                  {performanceDays === 1 
+                    ? 'Today\'s performance' 
+                    : `${performanceDays}-day performance history`}
+                </CardDescription>
               </div>
               <Button
                 variant="outline"
                 size="sm"
+                className="export-button"
                 onClick={() => exportChart(performanceChartRef, 'performance-history')}
                 disabled={exportingChart === 'performance-history'}
               >
@@ -492,6 +519,7 @@ const Performance = () => {
               <Button
                 variant="outline"
                 size="sm"
+                className="export-button"
                 onClick={() => exportChart(allocationChartRef, 'allocation')}
                 disabled={exportingChart === 'allocation'}
               >
@@ -546,6 +574,7 @@ const Performance = () => {
               <Button
                 variant="outline"
                 size="sm"
+                className="export-button"
                 onClick={() => exportChart(gainLossChartRef, 'gain-loss')}
                 disabled={exportingChart === 'gain-loss'}
               >
