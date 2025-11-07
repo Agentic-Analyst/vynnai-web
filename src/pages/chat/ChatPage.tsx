@@ -31,6 +31,7 @@ const ChatPage = () => {
     deleteConversation,
     setConversations,
     addAssistantMessage,
+    appendNLContent,
     addAssistantLogBatch,
     addDownloadsMessage,
     addReportMessage,
@@ -966,6 +967,22 @@ const ChatPage = () => {
       if (!flushTimer) flushTimer = setTimeout(flush, BATCH_LATENCY_MS);
     };
 
+    // Helper function to extract clean NL content from LLM messages
+    const extractNLContent = (nlMessages: string[]): string => {
+      return nlMessages
+        .map(line => {
+          // Remove timestamp prefix (e.g., "2025-11-07 02:01:00 | INFO | stock-analyst-AMZN | [LLM] ...")
+          let cleaned = line.replace(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*\|\s*\w+\s*\|\s*[\w-]+\s*\|\s*/, '');
+          
+          // Remove [LLM] prefix
+          cleaned = cleaned.replace(/^\[LLM\]\s*/, '');
+          
+          return cleaned.trim();
+        })
+        .filter(line => line.length > 0) // Remove empty lines
+        .join('\n');
+    };
+
     const flush = () => {
       if (flushTimer) {
         clearTimeout(flushTimer);
@@ -974,26 +991,22 @@ const ChatPage = () => {
       
       // Flush NL batch if we have any
       if (nlBatch.length > 0) {
-        const nlSummary = nlBatch.join("\n");
-        console.log("📝 Flushing NL batch:", nlSummary.substring(0, 100) + "...");
+        const cleanedNL = extractNLContent(nlBatch);
+        console.log("📝 Flushing NL batch (cleaned):", cleanedNL.substring(0, 100) + "...");
         
-        // If we also have log batch, add it with NL summary
-        if (logBatch.length > 0) {
-          const logLines = logBatch;
-          addAssistantLogBatch(logLines, nlSummary, convId);
-          logBatch = [];
-          logBatchBytes = 0;
-        } else {
-          // Just NL, add as assistant message
-          addAssistantMessage(nlSummary, convId);
+        // Always append NL content to last message (works for both regular and logbatch messages)
+        if (cleanedNL) {
+          appendNLContent(cleanedNL, convId);
         }
         
         nlBatch = [];
         nlBatchBytes = 0;
-      } 
-      // Flush log batch only if we have logs but no NL
-      else if (logBatch.length > 0) {
+      }
+      
+      // Flush log batch if we have any
+      if (logBatch.length > 0) {
         const logLines = logBatch;
+        // Add logs to existing logbatch or create new one
         addAssistantLogBatch(logLines, "", convId);
         logBatch = [];
         logBatchBytes = 0;
@@ -1056,10 +1069,6 @@ const ChatPage = () => {
       // Reset report capture state
       reportCaptureRef.current.reports = { deterministic: "", llm: "" };
 
-      addAssistantMessage(
-        `🏁 **Analysis Complete**${note ? `: ${note}` : ""}.`,
-        convId
-      );
       console.log("🏁 Analysis completed, clearing job state for job:", jobId);
 
       // Add a small delay before clearing to ensure UI updates properly
@@ -1130,8 +1139,8 @@ const ChatPage = () => {
       onOpen: () => {
         addAssistantMessage(
           opts.fromReconnect
-            ? `🔄 **Reconnected to analysis job ${jobId}**`
-            : `🔗 **Connected to analysis job ${jobId}**`,
+            ? `🔄 **Reconnected to analysis job**`
+            : `🔗 **Connected to analysis job**`,
           convId
         );
       },

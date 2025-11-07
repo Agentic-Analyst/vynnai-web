@@ -179,6 +179,55 @@ export function useConversations(initialIndex = 0) {
     [findIndexById]
   );
 
+  // --- Append NL content to the last assistant message (always uses logbatch for consistent UI) ---
+  const appendNLContent = useCallback(
+    (nlContent: string, convId?: number) => {
+      if (!nlContent) return;
+      const nowIso = new Date().toISOString();
+      setConversations((prev) => {
+        const next = [...prev];
+        const idx = findIndexById(next, convId);
+        const convo = next[idx] ?? {
+          id: Date.now(),
+          title: "New Analysis",
+          messages: [],
+          activeJobId: null,
+          isStreaming: false,
+          jobProgress: null,
+          sessionId: null,
+        };
+        const msgs = [...(convo.messages || [])];
+        const last = msgs[msgs.length - 1];
+        
+        // If last message is a logbatch, append to its nlSummary
+        if (last && last.role === "assistant" && last.kind === "logbatch") {
+          const existingNL = last.nlSummary || "";
+          const newNL = existingNL ? `${existingNL}\n${nlContent}` : nlContent;
+          msgs[msgs.length - 1] = {
+            ...last,
+            nlSummary: newNL,
+            timestamp: nowIso,
+          };
+        } 
+        // Otherwise, create a new logbatch message with NL content (no logs yet)
+        else {
+          msgs.push({
+            role: "assistant",
+            kind: "logbatch",
+            logLines: [], // Empty logs initially
+            nlSummary: nlContent,
+            content: "",
+            timestamp: nowIso,
+          });
+        }
+        
+        next[idx] = { ...convo, messages: msgs };
+        return next;
+      });
+    },
+    [findIndexById]
+  );
+
   // --- assistant log batch ---
   const addAssistantLogBatch = useCallback(
     (logLines: string[], nlSummary?: string, convId?: number) => {
@@ -299,6 +348,7 @@ export function useConversations(initialIndex = 0) {
     deleteConversation,
     setConversations,
     addAssistantMessage,
+    appendNLContent,
     addAssistantLogBatch,
     addDownloadsMessage,
     addReportMessage,
