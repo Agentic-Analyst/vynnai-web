@@ -9,7 +9,7 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import ChatPage from "./pages/ChatPage.tsx";
+import ChatPage from "./pages/chat/ChatPage.tsx";
 import StockDashboardLayout from "./pages/StockDashboardLayout.tsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import OAuthCallback from "./pages/OAuthCallback.jsx";

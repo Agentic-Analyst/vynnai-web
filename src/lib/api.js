@@ -37,6 +37,20 @@ export const api = {
     return resp.json();
   },
 
+  async startChat(payload) {
+    const resp = await fetch(`${API_BASE_URL}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      credentials: 'include',
+    });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => '');
+      throw new Error(`API Error ${resp.status}: ${t}`);
+    }
+    return resp.json();
+  },
+
   async getJobStatus(jobId) {
     const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}`, {
       credentials: 'include',
@@ -118,20 +132,27 @@ export const api = {
    es.onopen = () => handlers.onOpen && handlers.onOpen();
 
     const safeParse = (ev) => {
-      try { return JSON.parse(ev.data); } catch { return null; }
+      try { 
+        console.log('🔍 SSE raw event.data:', ev.data);
+        return JSON.parse(ev.data); 
+      } catch (e) { 
+        console.error('❌ SSE parse error:', e, 'raw data:', ev.data);
+        return null; 
+      }
     };
 
-    const wrap = (fn) => (ev) => {
+    const wrap = (fn, eventName) => (ev) => {
       if (!fn) return;
       const data = safeParse(ev) || {};
+      console.log(`🔍 SSE [${eventName}] received:`, data);
       fn(data);
     };
 
-    es.addEventListener('status', wrap(handlers.onStatus));
-    es.addEventListener('log', wrap(handlers.onLog));
-    es.addEventListener('log_batch', wrap(handlers.onLogBatch));
-    es.addEventListener('completed', wrap(handlers.onCompleted));
-    es.addEventListener('error', wrap(handlers.onServerError));
+    es.addEventListener('status', wrap(handlers.onStatus, 'status'));
+    es.addEventListener('log', wrap(handlers.onLog, 'log'));
+    es.addEventListener('log_batch', wrap(handlers.onLogBatch, 'log_batch'));
+    es.addEventListener('completed', wrap(handlers.onCompleted, 'completed'));
+    es.addEventListener('error', wrap(handlers.onServerError, 'error'));
 
     // Fallback generic message handler (typed "type" messages)
     es.onmessage = (event) => {
