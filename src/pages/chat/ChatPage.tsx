@@ -703,24 +703,20 @@ const ChatPage = () => {
     const currentInput = input;
     setInput("");
     // Don't clear jobId initially - keep existing job state during transition
-    updateCurrentConversationJobState(
-      currentJobId,
-      true,
-      "Starting chat..."
-    ); // Keep current job ID if any, mark as streaming
+    updateCurrentConversationJobState(currentJobId, true, "Starting chat..."); // Keep current job ID if any, mark as streaming
 
     try {
       const email = localStorage.getItem("auth_email");
       const currentConversation = conversations[currentConversationIndex];
       const sessionId = currentConversation?.sessionId || null;
-      
+
       console.log("📤 Sending chat request with session_id:", sessionId);
-      
+
       const chatRequest = {
         email: email,
         timestamp: new Date().toISOString(),
         user_prompt: currentInput,
-        ...(sessionId && { session_id: sessionId })
+        ...(sessionId && { session_id: sessionId }),
       };
 
       addAssistantMessage(
@@ -753,9 +749,10 @@ const ChatPage = () => {
       // Update conversation title if this is the first message
       if (conversations[currentConversationIndex].title === "New Analysis") {
         // Extract a short title from the user prompt
-        const shortTitle = currentInput.length > 50 
-          ? currentInput.substring(0, 47) + "..." 
-          : currentInput;
+        const shortTitle =
+          currentInput.length > 50
+            ? currentInput.substring(0, 47) + "..."
+            : currentInput;
         setConversations((prev) => {
           const updated = [...prev];
           updated[currentConversationIndex].title = shortTitle;
@@ -799,7 +796,10 @@ const ChatPage = () => {
       if (type === "NL") {
         nlBatch.push(s);
         nlBatchBytes += s.length + 1;
-        if (nlBatch.length >= BATCH_COUNT_CAP || nlBatchBytes >= BATCH_BYTE_CAP) {
+        if (
+          nlBatch.length >= BATCH_COUNT_CAP ||
+          nlBatchBytes >= BATCH_BYTE_CAP
+        ) {
           flush();
           return;
         }
@@ -960,7 +960,10 @@ const ChatPage = () => {
 
       logBatch.push(s);
       logBatchBytes += s.length + 1;
-      if (logBatch.length >= BATCH_COUNT_CAP || logBatchBytes >= BATCH_BYTE_CAP) {
+      if (
+        logBatch.length >= BATCH_COUNT_CAP ||
+        logBatchBytes >= BATCH_BYTE_CAP
+      ) {
         flush();
         return;
       }
@@ -970,17 +973,20 @@ const ChatPage = () => {
     // Helper function to extract clean NL content from LLM messages
     const extractNLContent = (nlMessages: string[]): string => {
       return nlMessages
-        .map(line => {
+        .map((line) => {
           // Remove timestamp prefix (e.g., "2025-11-07 02:01:00 | INFO | stock-analyst-AMZN | [LLM] ...")
-          let cleaned = line.replace(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*\|\s*\w+\s*\|\s*[\w-]+\s*\|\s*/, '');
-          
+          let cleaned = line.replace(
+            /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*\|\s*\w+\s*\|\s*[\w-]+\s*\|\s*/,
+            ""
+          );
+
           // Remove [LLM] prefix
-          cleaned = cleaned.replace(/^\[LLM\]\s*/, '');
-          
+          cleaned = cleaned.replace(/^\[LLM\]\s*/, "");
+
           return cleaned.trim();
         })
-        .filter(line => line.length > 0) // Remove empty lines
-        .join('\n');
+        .filter((line) => line.length > 0) // Remove empty lines
+        .join("\n");
     };
 
     const flush = () => {
@@ -988,21 +994,24 @@ const ChatPage = () => {
         clearTimeout(flushTimer);
         flushTimer = null;
       }
-      
+
       // Flush NL batch if we have any
       if (nlBatch.length > 0) {
         const cleanedNL = extractNLContent(nlBatch);
-        console.log("📝 Flushing NL batch (cleaned):", cleanedNL.substring(0, 100) + "...");
-        
+        console.log(
+          "📝 Flushing NL batch (cleaned):",
+          cleanedNL.substring(0, 100) + "..."
+        );
+
         // Always append NL content to last message (works for both regular and logbatch messages)
         if (cleanedNL) {
           appendNLContent(cleanedNL, convId);
         }
-        
+
         nlBatch = [];
         nlBatchBytes = 0;
       }
-      
+
       // Flush log batch if we have any
       if (logBatch.length > 0) {
         const logLines = logBatch;
@@ -1011,7 +1020,7 @@ const ChatPage = () => {
         logBatch = [];
         logBatchBytes = 0;
       }
-      
+
       const count =
         conversations[currentConversationIndex]?.messages?.length || 0;
       if (count > 0) listRef.current?.resetAfterIndex(count - 1);
@@ -1178,7 +1187,7 @@ const ChatPage = () => {
       onLog: (payload) => {
         const { message, type } = payload || {};
         const messageType = type || "LOG"; // Default to LOG if not specified
-        
+
         if (Array.isArray(message)) {
           message.forEach((m) => queue(m, messageType));
         } else if (message) {
@@ -1192,7 +1201,7 @@ const ChatPage = () => {
       onLogBatch: (payload) => {
         const { message, type } = payload || {};
         const messageType = type || "LOG"; // Default to LOG if not specified
-        
+
         if (Array.isArray(message)) {
           message.forEach((m) => queue(m, messageType));
         }
@@ -1200,13 +1209,16 @@ const ChatPage = () => {
       onCompleted: (payload) => {
         try {
           const { message, status, session_id } = payload || {};
-          
+
           // Extract and store session_id if provided
           if (session_id) {
-            console.log("💾 Received session_id from completed event:", session_id);
+            console.log(
+              "💾 Received session_id from completed event:",
+              session_id
+            );
             setConversations((prev) => {
               const next = [...prev];
-              const idx = convId 
+              const idx = convId
                 ? next.findIndex((c) => c.id === convId)
                 : currentConversationIndex;
               if (next[idx]) {
@@ -1215,7 +1227,7 @@ const ChatPage = () => {
               return next;
             });
           }
-          
+
           finalizeDone(status || "completed", message);
         } catch {
           finalizeDone("completed", "Chat completed");
@@ -1522,8 +1534,11 @@ const ChatPage = () => {
               <Bubble measureRef={measureRef} isUser={isUser}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm, remarkBreaks]}
-                  className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
-                      ${isUser ? "prose-invert" : "prose-slate"}`}
+                  className={`prose max-w-none break-words overflow-x-auto 
+                    prose-p:my-1 prose-li:my-0 prose-headings:my-1 prose-pre:p-3 
+                    prose-code:px-1.5 prose-code:py-0.5 ${
+                      isUser ? "prose-invert" : "prose-slate"
+                    }`}
                   components={{
                     code({ node, inline, className, children, ...props }) {
                       const match = /language-(\w+)/.exec(className || "");
