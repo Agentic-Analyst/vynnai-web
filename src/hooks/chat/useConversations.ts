@@ -1,8 +1,18 @@
 // useConversations.ts
-import { Conversation, Message } from "@/features/chat";
+import { Conversation } from "@/features/chat";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { userStorage } from "@/lib/userStorage";
-import { createWelcomeMessage } from "@/pages/chat/utils";
+
+const createBlankConversation = (): Conversation => ({
+  id: Date.now(),
+  title: "New Analysis",
+  messages: [],
+  activeJobId: null,
+  isStreaming: false,
+  jobProgress: null,
+  sessionId: null,
+  isDraft: true,
+});
 
 export function useConversations(initialIndex = 0) {
   const [conversations, setConversations] = useState<Conversation[]>(() => {
@@ -13,18 +23,11 @@ export function useConversations(initialIndex = 0) {
         activeJobId: c.activeJobId || null,
         isStreaming: c.isStreaming || false,
         jobProgress: c.jobProgress || null,
+        sessionId: c.sessionId || null,
+        isDraft: typeof c.isDraft === "boolean" ? c.isDraft : false,
       }));
     }
-    return [
-      {
-        id: Date.now(),
-        title: "New Analysis",
-        messages: [createWelcomeMessage()],
-        activeJobId: null,
-        isStreaming: false,
-        jobProgress: null,
-      },
-    ];
+    return [createBlankConversation()];
   });
 
   const [currentConversationIndex, setCurrentConversationIndex] =
@@ -52,62 +55,15 @@ export function useConversations(initialIndex = 0) {
     return currentConversationIndexRef.current ?? 0;
   }, []);
 
-  // --- add message (shared primitive) ---
-  const addMessage = useCallback(
-    (msg: Message, convId?: number) => {
-      setConversations((prev) => {
-        const next = [...prev];
-        const idx = findIndexById(next, convId);
-        const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-        };
-        convo.messages = [
-          ...(convo.messages || []),
-          { ...msg, timestamp: new Date().toISOString() },
-        ];
-        next[idx] = convo;
-        return next;
-      });
-    },
-    [findIndexById]
-  );
-
-  // --- update conversation ---
-  type Updater = (cur: Conversation) => Partial<Conversation> | Conversation;
-  const updateConversation = useCallback(
-    (idx: number, patchOrUpdater: Partial<Conversation> | Updater) => {
-      setConversations((prev) => {
-        const next = [...prev];
-        const cur = next[idx];
-        if (!cur) return prev;
-        const patch =
-          typeof patchOrUpdater === "function"
-            ? (patchOrUpdater as Updater)(cur)
-            : patchOrUpdater;
-        next[idx] = { ...cur, ...patch };
-        return next;
-      });
-    },
-    []
-  );
-
   // --- start new conversation ---
   const startNewConversation = useCallback(() => {
-    const newConversation: Conversation = {
-      id: Date.now(),
-      title: "New Analysis",
-      messages: [createWelcomeMessage()],
-      activeJobId: null,
-      isStreaming: false,
-      jobProgress: null,
-    };
     setConversations((prev) => {
-      const next = [...prev, newConversation];
+      const existingDraftIdx = prev.findIndex((c) => c.isDraft);
+      if (existingDraftIdx !== -1) {
+        setCurrentConversationIndex(existingDraftIdx);
+        return prev;
+      }
+      const next = [...prev, createBlankConversation()];
       setCurrentConversationIndex(next.length - 1);
       return next;
     });
@@ -120,18 +76,7 @@ export function useConversations(initialIndex = 0) {
         const idx = prev.findIndex((c) => c.id === id);
         if (idx === -1) return prev;
         const next = prev.filter((c) => c.id !== id);
-        const finalList = next.length
-          ? next
-          : [
-              {
-                id: Date.now(),
-                title: "New Analysis",
-                messages: [createWelcomeMessage()],
-                activeJobId: null,
-                isStreaming: false,
-                jobProgress: null,
-              },
-            ];
+        const finalList = next.length ? next : [createBlankConversation()];
         if (!opts?.preserveIndex) setCurrentConversationIndex(0);
         return finalList;
       });
@@ -148,12 +93,8 @@ export function useConversations(initialIndex = 0) {
         const next = [...prev];
         const idx = findIndexById(next, convId);
         const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
+          ...createBlankConversation(),
+          isDraft: false,
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
@@ -188,17 +129,12 @@ export function useConversations(initialIndex = 0) {
         const next = [...prev];
         const idx = findIndexById(next, convId);
         const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-          sessionId: null,
+          ...createBlankConversation(),
+          isDraft: false,
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
-        
+
         // If last message is a logbatch, append to its nlSummary
         if (last && last.role === "assistant" && last.kind === "logbatch") {
           const existingNL = last.nlSummary || "";
@@ -208,7 +144,7 @@ export function useConversations(initialIndex = 0) {
             nlSummary: newNL,
             timestamp: nowIso,
           };
-        } 
+        }
         // Otherwise, create a new logbatch message with NL content (no logs yet)
         else {
           msgs.push({
@@ -220,7 +156,7 @@ export function useConversations(initialIndex = 0) {
             timestamp: nowIso,
           });
         }
-        
+
         next[idx] = { ...convo, messages: msgs };
         return next;
       });
@@ -237,13 +173,8 @@ export function useConversations(initialIndex = 0) {
         const next = [...prev];
         const idx = findIndexById(next, convId);
         const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-          sessionId: null,
+          ...createBlankConversation(),
+          isDraft: false,
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
@@ -334,16 +265,10 @@ export function useConversations(initialIndex = 0) {
     [findIndexById]
   );
 
-  const resetDownloadsPosted = useCallback(() => {
-    downloadsPostedRef.current.clear();
-  }, []);
-
   return {
     conversations,
     currentConversationIndex,
     setCurrentConversationIndex,
-    addMessage,
-    updateConversation,
     startNewConversation,
     deleteConversation,
     setConversations,
@@ -352,6 +277,5 @@ export function useConversations(initialIndex = 0) {
     addAssistantLogBatch,
     addDownloadsMessage,
     addReportMessage,
-    resetDownloadsPosted,
   };
 }

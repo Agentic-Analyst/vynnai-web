@@ -56,12 +56,14 @@ const ChatSidebar = ({
   onDeleteConversation,
 }: ChatSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredConversations, setFilteredConversations] =
-    useState(conversations);
+  const [filteredConversations, setFilteredConversations] = useState(
+    conversations.filter((c) => !c.isDraft)
+  );
 
   useEffect(() => {
     setFilteredConversations(
       conversations
+        .filter((c) => !c.isDraft)
         .map((c, idx) => ({ ...c, _index: idx }))
         .filter((c) =>
           (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())

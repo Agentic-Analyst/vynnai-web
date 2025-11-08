@@ -18,7 +18,6 @@ import {
   ProgressText,
   Message,
 } from "@/features/chat";
-import { createWelcomeMessage } from "./utils";
 import { useConversations } from "@/hooks/chat/useConversations";
 
 const ChatPage = () => {
@@ -36,9 +35,6 @@ const ChatPage = () => {
     addDownloadsMessage,
     addReportMessage,
   } = useConversations();
-  const [analysisParams, setAnalysisParams] = useState(() => {
-    return userStorage.getJSON("analysis_params", {});
-  });
   const [input, setInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -155,14 +151,6 @@ const ChatPage = () => {
     }
   };
 
-  // ---------- Persistence ----------
-  useEffect(() => {
-    if (userStorage.hasUser()) {
-      userStorage.setJSON("conversations", conversations);
-      userStorage.setJSON("analysis_params", analysisParams);
-    }
-  }, [conversations, analysisParams]);
-
   // ---------- Handle user changes ----------
   useEffect(() => {
     const currentUser = userStorage.getCurrentUser();
@@ -174,7 +162,6 @@ const ChatPage = () => {
 
       // Load new user's data
       const newConversations = userStorage.getJSON("conversations");
-      const newAnalysisParams = userStorage.getJSON("analysis_params", {});
       const newActiveJob = userStorage.getJSON("activeJob");
 
       if (newConversations) {
@@ -185,16 +172,16 @@ const ChatPage = () => {
           {
             id: Date.now(),
             title: "New Analysis",
-            messages: [createWelcomeMessage()],
+            messages: [],
             activeJobId: null,
             isStreaming: false,
             jobProgress: null,
             sessionId: null,
+            isDraft: true,
           },
         ]);
       }
 
-      setAnalysisParams(newAnalysisParams);
       setCurrentConversationIndex(0);
 
       // Active job handling is now per-conversation, no global state needed
@@ -405,16 +392,6 @@ const ChatPage = () => {
   }, [lastMessage?.timestamp, isUserAtBottom, autoScrollEnabled, msgs.length]);
 
   // ---------- Helpers ----------
-  const parseAnalysisRequest = (textIn) => {
-    const email = localStorage.getItem("auth_email");
-    const req = { request: textIn, email };
-    Object.keys(analysisParams).forEach((k) => {
-      const v = analysisParams[k];
-      if (v !== undefined && v !== null && v !== "") req[k] = v;
-    });
-    return req;
-  };
-
   // Get current conversation's job state
   const getCurrentConversationJobId = () => {
     const jobId = conversations[currentConversationIndex]?.activeJobId || null;
@@ -516,7 +493,7 @@ const ChatPage = () => {
     };
 
     // Reset message count tracking for new conversation
-    lastMessageCountRef.current = 1; // One welcome message
+    lastMessageCountRef.current = 0;
 
     // Scroll to bottom for new conversation
     requestAnimationFrame(() => {
@@ -693,34 +670,35 @@ const ChatPage = () => {
         isStreaming: false,
         jobProgress: null,
         sessionId: null,
+        isDraft: true,
       };
       const msgs = [...(convo.messages || [])]; // clone messages
       msgs.push(userMessage); // pure append
-      updated[currentConversationIndex] = { ...convo, messages: msgs }; // replace convo
+      updated[currentConversationIndex] = {
+        ...convo,
+        messages: msgs,
+        isDraft: false,
+      }; // replace convo
       return updated;
     });
 
     const currentInput = input;
     setInput("");
     // Don't clear jobId initially - keep existing job state during transition
-    updateCurrentConversationJobState(
-      currentJobId,
-      true,
-      "Starting chat..."
-    ); // Keep current job ID if any, mark as streaming
+    updateCurrentConversationJobState(currentJobId, true, "Starting chat..."); // Keep current job ID if any, mark as streaming
 
     try {
       const email = localStorage.getItem("auth_email");
       const currentConversation = conversations[currentConversationIndex];
       const sessionId = currentConversation?.sessionId || null;
-      
+
       console.log("📤 Sending chat request with session_id:", sessionId);
-      
+
       const chatRequest = {
         email: email,
         timestamp: new Date().toISOString(),
         user_prompt: currentInput,
-        ...(sessionId && { session_id: sessionId })
+        ...(sessionId && { session_id: sessionId }),
       };
 
       addAssistantMessage(
@@ -753,9 +731,10 @@ const ChatPage = () => {
       // Update conversation title if this is the first message
       if (conversations[currentConversationIndex].title === "New Analysis") {
         // Extract a short title from the user prompt
-        const shortTitle = currentInput.length > 50 
-          ? currentInput.substring(0, 47) + "..." 
-          : currentInput;
+        const shortTitle =
+          currentInput.length > 50
+            ? currentInput.substring(0, 47) + "..."
+            : currentInput;
         setConversations((prev) => {
           const updated = [...prev];
           updated[currentConversationIndex].title = shortTitle;
@@ -799,7 +778,10 @@ const ChatPage = () => {
       if (type === "NL") {
         nlBatch.push(s);
         nlBatchBytes += s.length + 1;
-        if (nlBatch.length >= BATCH_COUNT_CAP || nlBatchBytes >= BATCH_BYTE_CAP) {
+        if (
+          nlBatch.length >= BATCH_COUNT_CAP ||
+          nlBatchBytes >= BATCH_BYTE_CAP
+        ) {
           flush();
           return;
         }
@@ -960,7 +942,10 @@ const ChatPage = () => {
 
       logBatch.push(s);
       logBatchBytes += s.length + 1;
-      if (logBatch.length >= BATCH_COUNT_CAP || logBatchBytes >= BATCH_BYTE_CAP) {
+      if (
+        logBatch.length >= BATCH_COUNT_CAP ||
+        logBatchBytes >= BATCH_BYTE_CAP
+      ) {
         flush();
         return;
       }
@@ -970,17 +955,20 @@ const ChatPage = () => {
     // Helper function to extract clean NL content from LLM messages
     const extractNLContent = (nlMessages: string[]): string => {
       return nlMessages
-        .map(line => {
+        .map((line) => {
           // Remove timestamp prefix (e.g., "2025-11-07 02:01:00 | INFO | stock-analyst-AMZN | [LLM] ...")
-          let cleaned = line.replace(/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*\|\s*\w+\s*\|\s*[\w-]+\s*\|\s*/, '');
-          
+          let cleaned = line.replace(
+            /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*\|\s*\w+\s*\|\s*[\w-]+\s*\|\s*/,
+            ""
+          );
+
           // Remove [LLM] prefix
-          cleaned = cleaned.replace(/^\[LLM\]\s*/, '');
-          
+          cleaned = cleaned.replace(/^\[LLM\]\s*/, "");
+
           return cleaned.trim();
         })
-        .filter(line => line.length > 0) // Remove empty lines
-        .join('\n');
+        .filter((line) => line.length > 0) // Remove empty lines
+        .join("\n");
     };
 
     const flush = () => {
@@ -988,21 +976,24 @@ const ChatPage = () => {
         clearTimeout(flushTimer);
         flushTimer = null;
       }
-      
+
       // Flush NL batch if we have any
       if (nlBatch.length > 0) {
         const cleanedNL = extractNLContent(nlBatch);
-        console.log("📝 Flushing NL batch (cleaned):", cleanedNL.substring(0, 100) + "...");
-        
+        console.log(
+          "📝 Flushing NL batch (cleaned):",
+          cleanedNL.substring(0, 100) + "..."
+        );
+
         // Always append NL content to last message (works for both regular and logbatch messages)
         if (cleanedNL) {
           appendNLContent(cleanedNL, convId);
         }
-        
+
         nlBatch = [];
         nlBatchBytes = 0;
       }
-      
+
       // Flush log batch if we have any
       if (logBatch.length > 0) {
         const logLines = logBatch;
@@ -1011,7 +1002,7 @@ const ChatPage = () => {
         logBatch = [];
         logBatchBytes = 0;
       }
-      
+
       const count =
         conversations[currentConversationIndex]?.messages?.length || 0;
       if (count > 0) listRef.current?.resetAfterIndex(count - 1);
@@ -1178,7 +1169,7 @@ const ChatPage = () => {
       onLog: (payload) => {
         const { message, type } = payload || {};
         const messageType = type || "LOG"; // Default to LOG if not specified
-        
+
         if (Array.isArray(message)) {
           message.forEach((m) => queue(m, messageType));
         } else if (message) {
@@ -1192,7 +1183,7 @@ const ChatPage = () => {
       onLogBatch: (payload) => {
         const { message, type } = payload || {};
         const messageType = type || "LOG"; // Default to LOG if not specified
-        
+
         if (Array.isArray(message)) {
           message.forEach((m) => queue(m, messageType));
         }
@@ -1200,13 +1191,16 @@ const ChatPage = () => {
       onCompleted: (payload) => {
         try {
           const { message, status, session_id } = payload || {};
-          
+
           // Extract and store session_id if provided
           if (session_id) {
-            console.log("💾 Received session_id from completed event:", session_id);
+            console.log(
+              "💾 Received session_id from completed event:",
+              session_id
+            );
             setConversations((prev) => {
               const next = [...prev];
-              const idx = convId 
+              const idx = convId
                 ? next.findIndex((c) => c.id === convId)
                 : currentConversationIndex;
               if (next[idx]) {
@@ -1215,7 +1209,7 @@ const ChatPage = () => {
               return next;
             });
           }
-          
+
           finalizeDone(status || "completed", message);
         } catch {
           finalizeDone("completed", "Chat completed");
@@ -1493,197 +1487,212 @@ const ChatPage = () => {
 
       return (
         <div style={style} className="px-4 py-2">
-          <div className={isUser ? "flex justify-end" : "flex justify-start"}>
-            {isDownloads ? (
-              <Bubble measureRef={measureRef} isUser={isUser}>
-                <DownloadMessage
+          <div
+            className={`flex w-full ${
+              isUser ? "justify-center" : "justify-center"
+            }`}
+          >
+            <div
+              className={`w-full max-w-[900px] ${
+                isUser ? "text-right" : "text-left"
+              }`}
+            >
+              {isDownloads ? (
+                <Bubble measureRef={measureRef} isUser={isUser}>
+                  <DownloadMessage
+                    message={message}
+                    onDownload={handleDownload}
+                  />
+                </Bubble>
+              ) : isLogBatch ? (
+                <div ref={measureRef} className="max-w-[1000px]">
+                  <AnalysisLogMessage
+                    message={message}
+                    index={index}
+                    isCollapsed={collapsedLogs.has(index)}
+                    toggleCollapse={toggleLogCollapse}
+                    isStreaming={
+                      data.isStreaming && index === data.messages.length - 1
+                    }
+                  />
+                </div>
+              ) : isReport ? (
+                <AnalysisReportMessage
+                  measureRef={measureRef}
                   message={message}
-                  onDownload={handleDownload}
                 />
-              </Bubble>
-            ) : isLogBatch ? (
-              <div ref={measureRef} className="max-w-[1000px]">
-                <AnalysisLogMessage
-                  message={message}
-                  index={index}
-                  isCollapsed={collapsedLogs.has(index)}
-                  toggleCollapse={toggleLogCollapse}
-                  isStreaming={
-                    data.isStreaming && index === data.messages.length - 1
-                  }
-                />
-              </div>
-            ) : isReport ? (
-              <AnalysisReportMessage
-                measureRef={measureRef}
-                message={message}
-              />
-            ) : (
-              <Bubble measureRef={measureRef} isUser={isUser}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                  className={`prose max-w-none break-words overflow-x-auto prose-p:my-3 prose-headings:mt-0 prose-headings:mb-2
-                      ${isUser ? "prose-invert" : "prose-slate"}`}
-                  components={{
-                    code({ node, inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || "");
-                      return !inline && match ? (
-                        <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
-                          <SyntaxHighlighter
+              ) : (
+                <Bubble measureRef={measureRef} isUser={isUser}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    className={`prose max-w-none break-words overflow-x-auto
+                      prose-headings:my-2 prose-p:my-1 prose-pre:my-2 prose-blockquote:my-2
+                      prose-ul:my-1 prose-ol:my-1 prose-li:my-0
+                      prose-table:my-2
+                      prose-img:my-2
+                      ${isUser ? "prose-invert" : "prose-slate"}
+                    `}
+                    components={{
+                      code({ node, inline, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || "");
+                        return !inline && match ? (
+                          <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
+                            <SyntaxHighlighter
+                              {...props}
+                              style={vscDarkPlus}
+                              language={match[1]}
+                              PreTag="div"
+                              customStyle={{ margin: 0, maxWidth: "100%" }}
+                            >
+                              {String(children).replace(/\n$/, "")}
+                            </SyntaxHighlighter>
+                          </div>
+                        ) : (
+                          <code
                             {...props}
-                            style={vscDarkPlus}
-                            language={match[1]}
-                            PreTag="div"
-                            customStyle={{ margin: 0, maxWidth: "100%" }}
-                          >
-                            {String(children).replace(/\n$/, "")}
-                          </SyntaxHighlighter>
-                        </div>
-                      ) : (
-                        <code
-                          {...props}
-                          className={`${className} break-all px-1.5 py-0.5 rounded ${
-                            isUser ? "bg-white/20 text-white" : "bg-slate-100"
-                          }`}
-                        >
-                          {children}
-                        </code>
-                      );
-                    },
-                    pre({ node, children, ...props }) {
-                      return (
-                        <pre
-                          {...props}
-                          className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3"
-                        >
-                          {children}
-                        </pre>
-                      );
-                    },
-                    p({ node, children, ...props }) {
-                      return (
-                        <p {...props} className="break-words">
-                          {children}
-                        </p>
-                      );
-                    },
-                    ul({ node, children, ...props }) {
-                      return (
-                        <ul
-                          {...props}
-                          className="list-disc list-inside space-y-1 mb-3"
-                        >
-                          {children}
-                        </ul>
-                      );
-                    },
-                    ol({ node, children, ...props }) {
-                      return (
-                        <ol
-                          {...props}
-                          className="list-decimal list-inside space-y-1 mb-3"
-                        >
-                          {children}
-                        </ol>
-                      );
-                    },
-                    li({ node, children, ...props }) {
-                      return (
-                        <li {...props} className="break-words">
-                          {children}
-                        </li>
-                      );
-                    },
-                    table({ node, children, ...props }) {
-                      return (
-                        <div className="overflow-x-auto my-4">
-                          <table
-                            {...props}
-                            className="min-w-full border-collapse border border-slate-300"
+                            className={`${className} break-all px-1.5 py-0.5 rounded ${
+                              isUser ? "bg-white/20 text-white" : "bg-slate-100"
+                            }`}
                           >
                             {children}
-                          </table>
-                        </div>
-                      );
-                    },
-                    thead({ node, children, ...props }) {
-                      return (
-                        <thead
-                          {...props}
-                          className={`${
-                            isUser ? "bg-white/20" : "bg-slate-100"
-                          }`}
-                        >
-                          {children}
-                        </thead>
-                      );
-                    },
-                    tbody({ node, children, ...props }) {
-                      return <tbody {...props}>{children}</tbody>;
-                    },
-                    tr({ node, children, ...props }) {
-                      return (
-                        <tr
-                          {...props}
-                          className={`border-b ${
-                            isUser ? "border-white/20" : "border-slate-200"
-                          }`}
-                        >
-                          {children}
-                        </tr>
-                      );
-                    },
-                    th({ node, children, ...props }) {
-                      return (
-                        <th
-                          {...props}
-                          className={`border px-3 py-2 text-left font-semibold ${
-                            isUser
-                              ? "border-white/20 text-white"
-                              : "border-slate-300 text-slate-700"
-                          }`}
-                        >
-                          {children}
-                        </th>
-                      );
-                    },
-                    td({ node, children, ...props }) {
-                      return (
-                        <td
-                          {...props}
-                          className={`border px-3 py-2 ${
-                            isUser
-                              ? "border-white/20 text-white"
-                              : "border-slate-300 text-slate-600"
-                          }`}
-                        >
-                          {children}
-                        </td>
-                      );
-                    },
-                    blockquote({ node, children, ...props }) {
-                      return (
-                        <blockquote
-                          {...props}
-                          className={`border-l-4 pl-4 italic my-3 ${
-                            isUser
-                              ? "border-white/40 text-white/90"
-                              : "border-slate-300 text-slate-600"
-                          }`}
-                        >
-                          {children}
-                        </blockquote>
-                      );
-                    },
-                    br() {
-                      return <br className="my-1" />;
-                    },
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
-              </Bubble>
-            )}
+                          </code>
+                        );
+                      },
+                      pre({ node, children, ...props }) {
+                        return (
+                          <pre
+                            {...props}
+                            className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3"
+                          >
+                            {children}
+                          </pre>
+                        );
+                      },
+                      p({ node, children, ...props }) {
+                        return (
+                          <p {...props} className="break-words">
+                            {children}
+                          </p>
+                        );
+                      },
+                      ul({ node, children, ...props }) {
+                        return (
+                          <ul
+                            {...props}
+                            className="list-disc list-inside space-y-1 mb-3"
+                          >
+                            {children}
+                          </ul>
+                        );
+                      },
+                      ol({ node, children, ...props }) {
+                        return (
+                          <ol
+                            {...props}
+                            className="list-decimal list-inside space-y-1 mb-3"
+                          >
+                            {children}
+                          </ol>
+                        );
+                      },
+                      li({ node, children, ...props }) {
+                        return (
+                          <li {...props} className="break-words">
+                            {children}
+                          </li>
+                        );
+                      },
+                      table({ node, children, ...props }) {
+                        return (
+                          <div className="overflow-x-auto my-4">
+                            <table
+                              {...props}
+                              className="min-w-full border-collapse border border-slate-300"
+                            >
+                              {children}
+                            </table>
+                          </div>
+                        );
+                      },
+                      thead({ node, children, ...props }) {
+                        return (
+                          <thead
+                            {...props}
+                            className={`${
+                              isUser ? "bg-white/20" : "bg-slate-100"
+                            }`}
+                          >
+                            {children}
+                          </thead>
+                        );
+                      },
+                      tbody({ node, children, ...props }) {
+                        return <tbody {...props}>{children}</tbody>;
+                      },
+                      tr({ node, children, ...props }) {
+                        return (
+                          <tr
+                            {...props}
+                            className={`border-b ${
+                              isUser ? "border-white/20" : "border-slate-200"
+                            }`}
+                          >
+                            {children}
+                          </tr>
+                        );
+                      },
+                      th({ node, children, ...props }) {
+                        return (
+                          <th
+                            {...props}
+                            className={`border px-3 py-2 text-left font-semibold ${
+                              isUser
+                                ? "border-white/20 text-white"
+                                : "border-slate-300 text-slate-700"
+                            }`}
+                          >
+                            {children}
+                          </th>
+                        );
+                      },
+                      td({ node, children, ...props }) {
+                        return (
+                          <td
+                            {...props}
+                            className={`border px-3 py-2 ${
+                              isUser
+                                ? "border-white/20 text-white"
+                                : "border-slate-300 text-slate-600"
+                            }`}
+                          >
+                            {children}
+                          </td>
+                        );
+                      },
+                      blockquote({ node, children, ...props }) {
+                        return (
+                          <blockquote
+                            {...props}
+                            className={`border-l-4 pl-4 italic my-3 ${
+                              isUser
+                                ? "border-white/40 text-white/90"
+                                : "border-slate-300 text-slate-600"
+                            }`}
+                          >
+                            {children}
+                          </blockquote>
+                        );
+                      },
+                      br() {
+                        return <br className="my-1" />;
+                      },
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </Bubble>
+              )}
+            </div>
           </div>
         </div>
       );
@@ -1693,6 +1702,10 @@ const ChatPage = () => {
 
   const getItemSize = (index) =>
     rowHeightsRef.current[index] || DEFAULT_ROW_HEIGHT;
+
+  const currentMessages =
+    conversations[currentConversationIndex]?.messages ?? [];
+  const isEmptyConversation = currentMessages.length === 0;
 
   // ---------- UI ----------
   return (
@@ -1732,57 +1745,81 @@ const ChatPage = () => {
 
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto relative" ref={listContainerRef}>
-            <List
-              ref={listRef}
-              height={listHeight}
-              width={"100%"}
-              itemCount={
-                conversations[currentConversationIndex].messages.length
-              }
-              itemSize={getItemSize}
-              itemData={conversations[currentConversationIndex]}
-              overscanCount={6}
-            >
-              {Row}
-            </List>
-
-            {/* Scroll to Bottom Button */}
-            {showScrollToBottom && (
-              <ScrollToBottomButton
-                scrollToBottom={scrollToBottom}
-                unreadMessages={unreadMessages}
-              />
-            )}
-
-            {/* Debug info - only show when there are unread messages */}
-            {unreadMessages > 0 && (
-              <div className="absolute top-4 right-4 z-50 bg-black text-white p-2 rounded text-xs">
-                Unread: {unreadMessages}
+            {isEmptyConversation ? (
+              <div className="flex flex-col items-center justify-start text-center px-6 pt-[15vh]">
+                <h1 className="text-3xl font-semibold text-slate-700 mb-2">
+                  Vynn AI
+                </h1>
+                <p className="text-slate-500 mb-8">
+                  Ask anything about markets, models, or financial data.
+                </p>
+                <div className="w-full max-w-xl">
+                  <ChatInput
+                    onSubmit={handleSubmit}
+                    value={input}
+                    onChange={(newValue) => setInput(newValue)}
+                    isInputDisabled={
+                      !!getCurrentConversationJobId() ||
+                      getCurrentConversationStreamingState()
+                    }
+                    isButtonDisabled={
+                      isStoppingJob ||
+                      (!getCurrentConversationJobId() &&
+                        (!input.trim() ||
+                          getCurrentConversationStreamingState()))
+                    }
+                    isChatActive={!!getCurrentConversationJobId()}
+                    isChatStopping={isStoppingJob}
+                  />
+                </div>
               </div>
+            ) : (
+              <>
+                <List
+                  ref={listRef}
+                  height={listHeight}
+                  width={"100%"}
+                  itemCount={currentMessages.length}
+                  itemSize={getItemSize}
+                  itemData={conversations[currentConversationIndex]}
+                  overscanCount={6}
+                >
+                  {Row}
+                </List>
+
+                {showScrollToBottom && (
+                  <ScrollToBottomButton
+                    scrollToBottom={scrollToBottom}
+                    unreadMessages={unreadMessages}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
 
-        <div className="p-4">
-          <div className="max-w-3xl mx-auto">
-            <ChatInput
-              onSubmit={handleSubmit}
-              value={input}
-              onChange={(newValue) => setInput(newValue)}
-              isInputDisabled={
-                !!getCurrentConversationJobId() ||
-                getCurrentConversationStreamingState()
-              }
-              isButtonDisabled={
-                isStoppingJob ||
-                (!getCurrentConversationJobId() &&
-                  (!input.trim() || getCurrentConversationStreamingState()))
-              }
-              isChatActive={!!getCurrentConversationJobId()}
-              isChatStopping={isStoppingJob}
-            />
+        {!isEmptyConversation ? (
+          <div className="p-4">
+            <div className="max-w-3xl mx-auto">
+              <ChatInput
+                onSubmit={handleSubmit}
+                value={input}
+                onChange={(newValue) => setInput(newValue)}
+                isInputDisabled={
+                  !!getCurrentConversationJobId() ||
+                  getCurrentConversationStreamingState()
+                }
+                isButtonDisabled={
+                  isStoppingJob ||
+                  (!getCurrentConversationJobId() &&
+                    (!input.trim() || getCurrentConversationStreamingState()))
+                }
+                isChatActive={!!getCurrentConversationJobId()}
+                isChatStopping={isStoppingJob}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );
