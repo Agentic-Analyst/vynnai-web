@@ -109,16 +109,67 @@ const Reports: React.FC = () => {
   const dateInputRef = React.useRef<HTMLInputElement>(null);
   const lastConfirmedDateRef = React.useRef<string>('');
   
-  // Report generation state
+  // Report generation state - persist across navigation
   const [generationDialogOpen, setGenerationDialogOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(() => {
+    try {
+      // Check both the flag AND if there's valid generation data
+      const savedFlag = localStorage.getItem('reports_isGenerating');
+      const generationDataStr = localStorage.getItem('reports_generationData');
+      
+      if (savedFlag === 'true' && generationDataStr) {
+        const generationData = JSON.parse(generationDataStr);
+        const elapsed = Date.now() - generationData.startTime;
+        
+        // Only return true if generation was started less than 5 minutes ago
+        if (elapsed < 5 * 60 * 1000) {
+          console.log('🔄 Resuming generation on mount (still active)');
+          return true;
+        } else {
+          console.log('⚠️ Stale generation data found on mount, cleaning up...');
+          localStorage.removeItem('reports_generationData');
+          localStorage.setItem('reports_isGenerating', 'false');
+          return false;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error loading generation state:', error);
+      return false;
+    }
+  });
   const [generationStatus, setGenerationStatus] = useState<{
     jobId?: string;
     status?: string;
     progress?: string;
     error?: string;
-  }>({});
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('reports_generationStatus');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  // Persist generation state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('reports_isGenerating', String(isGenerating));
+    } catch (error) {
+      console.error('Failed to save generation state:', error);
+    }
+  }, [isGenerating]);
+  
+  useEffect(() => {
+    try {
+      localStorage.setItem('reports_generationStatus', JSON.stringify(generationStatus));
+    } catch (error) {
+      console.error('Failed to save generation status:', error);
+    }
+  }, [generationStatus]);
 
 
   // Use real API data
@@ -312,7 +363,7 @@ const Reports: React.FC = () => {
     }
   };
 
-  // Get Reports for a specific date
+  // Get Reports for a specific date with auto-generation if needed
   const handleGetReports = async () => {
     if (!selectedDate || watchedSymbols.length === 0) {
       if (watchedSymbols.length === 0) {
@@ -331,24 +382,232 @@ const Reports: React.FC = () => {
           .filter((sector): sector is string => sector !== undefined && sector !== null && sector !== '')
       ));
       
-      console.log(`📊 Fetching reports for ${watchedSymbols.length} companies and ${sectors.length} sectors on ${selectedDate}`);
+      console.log(`📊 Step 1: Attempting to fetch reports for ${watchedSymbols.length} companies and ${sectors.length} sectors on ${selectedDate}`);
       
-      // Load company reports for the selected date with stock prices for enrichment
+      // FIRST ATTEMPT: Try to get reports
       await loadReportsForTickers(watchedSymbols, selectedDate, stockPrices);
       
-      // Load sector reports if sectors are available
       if (sectors.length > 0) {
         await loadReportsForSectors(sectors, selectedDate, stockPrices);
       }
       
-      console.log('✅ Reports loaded successfully');
+      // Check if we got all expected reports
+      const companyReportsForDate = apiCompanyReports.filter(r => r.reportDate === selectedDate);
+      const sectorReportsForDate = apiSectorReports.filter(r => r.reportDate === selectedDate);
+      
+      // Expected: one report per company ticker and one per sector
+      const expectedCompanyReports = watchedSymbols.length;
+      const expectedSectorReports = sectors.length;
+      
+      const hasAllCompanyReports = companyReportsForDate.length >= expectedCompanyReports;
+      const hasAllSectorReports = sectors.length === 0 || sectorReportsForDate.length >= expectedSectorReports;
+      
+      const missingCompanyReports = !hasAllCompanyReports;
+      const missingSectorReports = sectors.length > 0 && !hasAllSectorReports;
+      
+      // If we have all expected reports, we're done!
+      if (hasAllCompanyReports && hasAllSectorReports) {
+        console.log(`✅ All reports found: ${companyReportsForDate.length}/${expectedCompanyReports} companies, ${sectorReportsForDate.length}/${expectedSectorReports} sectors`);
+        return;
+      }
+      
+      // Check if selected date is today
+      const today = getTodayDate();
+      const isToday = selectedDate === today;
+      
+      // MISSING REPORTS - Only auto-generate if date is TODAY
+      if (!isToday) {
+        console.log(`⚠️ Missing reports detected for ${selectedDate} (not today). Companies: ${companyReportsForDate.length}/${expectedCompanyReports}, Sectors: ${sectorReportsForDate.length}/${expectedSectorReports}`);
+        console.log(`ℹ️ Auto-generation only works for today's date (${today}). Reports not found for this date.`);
+        // Don't generate, just stop here
+        return;
+      }
+      
+      console.log(`⚠️ Missing reports detected for TODAY. Companies: ${companyReportsForDate.length}/${expectedCompanyReports}, Sectors: ${sectorReportsForDate.length}/${expectedSectorReports}`);
+      console.log('🔄 Auto-generating missing reports...');
+      
+      setIsGenerating(true);
+      setGenerationStatus({ status: 'pending', progress: 'Generating missing reports...' });
+      
+      let companyResult;
+      let sectorResult;
+      
+      // Determine which specific tickers are missing reports
+      const existingCompanyTickers = new Set(companyReportsForDate.map(r => r.ticker));
+      const missingCompanyTickers = watchedSymbols.filter(ticker => !existingCompanyTickers.has(ticker));
+      
+      // Trigger generation ONLY for missing company reports
+      if (missingCompanyTickers.length > 0) {
+        console.log(`📊 Generating missing company reports for ${missingCompanyTickers.length} companies:`, missingCompanyTickers);
+        companyResult = await dailyReportsApi.generateCompanyReports(missingCompanyTickers, selectedDate);
+        console.log(`✅ Company reports generation triggered (batch: ${companyResult.batch_id})`);
+      } else {
+        console.log(`✓ All company reports already complete (${companyReportsForDate.length}/${expectedCompanyReports})`);
+      }
+      
+      // Determine which specific sectors are missing reports
+      const existingSectors = new Set(sectorReportsForDate.map(r => r.sector));
+      const missingSectors = sectors.filter(sector => !existingSectors.has(sector));
+      
+      // Trigger generation ONLY for missing sector reports
+      if (missingSectors.length > 0) {
+        console.log(`📊 Generating missing sector reports for ${missingSectors.length} sectors:`, missingSectors);
+        sectorResult = await dailyReportsApi.generateSectorReports(missingSectors, selectedDate);
+        console.log(`✅ Sector reports generation triggered (batch: ${sectorResult.batch_id})`);
+      } else {
+        console.log(`✓ All sector reports already complete or not needed (${sectorReportsForDate.length}/${expectedSectorReports})`);
+      }
+      
+      // Store batch IDs and metadata in localStorage for persistent polling
+      // Store only the missing tickers/sectors for re-fetching after generation
+      const generationData = {
+        companyBatchId: companyResult?.batch_id,
+        sectorBatchId: sectorResult?.batch_id,
+        selectedDate,
+        watchedSymbols: missingCompanyTickers.length > 0 ? missingCompanyTickers : [],
+        sectors: missingSectors.length > 0 ? missingSectors : [],
+        allWatchedSymbols: watchedSymbols, // Store all for final fetch
+        allSectors: sectors, // Store all for final fetch
+        startTime: Date.now()
+      };
+      localStorage.setItem('reports_generationData', JSON.stringify(generationData));
+      
+      // Build progress message based on what's actually being generated
+      const progressParts = [];
+      if (missingCompanyTickers.length > 0) progressParts.push(`${missingCompanyTickers.length} companies`);
+      if (missingSectors.length > 0) progressParts.push(`${missingSectors.length} sectors`);
+      
+      setGenerationStatus({
+        jobId: companyResult?.batch_id || sectorResult?.batch_id,
+        status: 'running',
+        progress: `Generating ${progressParts.join(' and ')}...`
+      });
+      
+      // Polling will be handled by useEffect below
+      
     } catch (error: any) {
-      console.error('Error loading reports:', error);
-      alert(`Failed to load reports: ${error.message}`);
+      console.error('Error in get/generate reports flow:', error);
+      setGenerationStatus({
+        status: 'failed',
+        error: error.message,
+        progress: 'Failed to get or generate reports'
+      });
+      setIsGenerating(false);
+      localStorage.removeItem('reports_generationData');
     } finally {
       setLoading(false);
     }
   };
+  
+  // Persistent polling effect for report generation (survives page navigation)
+  useEffect(() => {
+    if (!isGenerating) {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        setPollInterval(null);
+      }
+      return;
+    }
+    
+    const generationDataStr = localStorage.getItem('reports_generationData');
+    if (!generationDataStr) {
+      setIsGenerating(false);
+      return;
+    }
+    
+    const generationData = JSON.parse(generationDataStr);
+    const { 
+      companyBatchId, 
+      sectorBatchId, 
+      selectedDate: genDate, 
+      allWatchedSymbols, 
+      allSectors 
+    } = generationData;
+    
+    console.log('🔄 Starting polling for batch generation...');
+    
+    const interval = setInterval(async () => {
+      try {
+        let companyBatchStatus;
+        let sectorBatchStatus;
+        
+        if (companyBatchId) {
+          companyBatchStatus = await dailyReportsApi.getBatchStatus(companyBatchId);
+        }
+        if (sectorBatchId) {
+          sectorBatchStatus = await dailyReportsApi.getBatchStatus(sectorBatchId);
+        }
+        
+        // Check if all batches are complete
+        const companyComplete = !companyBatchStatus || companyBatchStatus.status === 'completed' || companyBatchStatus.status === 'failed';
+        const sectorComplete = !sectorBatchStatus || sectorBatchStatus.status === 'completed' || sectorBatchStatus.status === 'failed';
+        const allComplete = companyComplete && sectorComplete;
+        
+        // Build progress message
+        const progressParts = [];
+        if (companyBatchStatus) progressParts.push(`Companies: ${companyBatchStatus.status}`);
+        if (sectorBatchStatus) progressParts.push(`Sectors: ${sectorBatchStatus.status}`);
+        
+        setGenerationStatus({
+          jobId: companyBatchId || sectorBatchId,
+          status: allComplete ? 'completed' : 'running',
+          progress: progressParts.join(', '),
+        });
+        
+        if (allComplete) {
+          clearInterval(interval);
+          setPollInterval(null);
+          
+          const anySuccess = 
+            (companyBatchStatus && companyBatchStatus.status === 'completed') || 
+            (sectorBatchStatus && sectorBatchStatus.status === 'completed');
+          
+          if (anySuccess) {
+            console.log('✅ Generation complete, fetching reports...');
+            
+            // SECOND ATTEMPT: Fetch ALL reports after generation (not just the newly generated ones)
+            try {
+              await loadReportsForTickers(allWatchedSymbols, genDate, stockPrices);
+              
+              if (allSectors && allSectors.length > 0) {
+                await loadReportsForSectors(allSectors, genDate, stockPrices);
+              }
+              
+              console.log('✅ Reports fetched after generation');
+            } catch (error) {
+              console.error('Error fetching reports after generation:', error);
+            }
+          } else {
+            console.error('❌ Generation failed');
+            setGenerationStatus({
+              status: 'failed',
+              error: 'Report generation failed',
+              progress: 'Generation failed'
+            });
+          }
+          
+          // Cleanup
+          setIsGenerating(false);
+          localStorage.removeItem('reports_generationData');
+        }
+      } catch (error: any) {
+        console.error('Error polling batch status:', error);
+        setGenerationStatus(prev => ({
+          ...prev,
+          error: error.message
+        }));
+      }
+    }, 3000); // Poll every 3 seconds
+    
+    setPollInterval(interval);
+    
+    // Cleanup on unmount
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isGenerating, loadReportsForTickers, loadReportsForSectors, stockPrices]);
 
   // Helper to get today's date in YYYY-MM-DD format (using local timezone)
   const getTodayDate = () => {
@@ -578,7 +837,12 @@ const Reports: React.FC = () => {
         {/* Header Actions */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex items-center gap-3">
-            {reportsLoading ? (
+            {isGenerating ? (
+              <Badge variant="outline" className="gap-1 text-blue-700 border-blue-300 bg-blue-50">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {generationStatus.progress || 'Generating reports...'}
+              </Badge>
+            ) : reportsLoading ? (
               <Badge variant="secondary" className="gap-1">
                 <Clock className="h-3 w-3 animate-spin" />
                 Loading reports...
@@ -651,27 +915,23 @@ const Reports: React.FC = () => {
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setGenerationDialogOpen(true)}
-              className="gap-2"
-            >
-              <PlayCircle className="h-4 w-4" />
-              Generate Reports
-            </Button>
-            <Button
               variant="default"
               size="sm"
               onClick={handleGetReports}
-              disabled={loading || watchedSymbols.length === 0}
+              disabled={loading || isGenerating || watchedSymbols.length === 0}
               className="gap-2"
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+              {loading || isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {isGenerating ? 'Generating...' : 'Loading...'}
+                </>
               ) : (
-                <RefreshCw className="h-4 w-4" />
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Get Reports
+                </>
               )}
-              Get Reports
             </Button>
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
