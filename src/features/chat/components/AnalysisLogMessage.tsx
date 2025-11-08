@@ -118,31 +118,33 @@ const AnalysisLogMessage = memo(
 
               {/* Content */}
               <CollapsibleContent asChild>
-                <div className="relative mt-2">
+                <div className="relative mt-2 ml-3 pl-4">
                   <div
-                    ref={scrollRef}
-                    onScroll={handleScroll}
-                    className={`
-        relative max-h-60 overflow-y-auto
-        bg-transparent rounded-xl border border-slate-200/40 dark:border-slate-700/40 
-        backdrop-blur-sm
-        before:absolute before:top-0 before:bottom-0 before:left-2
-        before:w-[2px] before:bg-slate-200 dark:before:bg-slate-700/60
-        before:rounded-full
-      `}
-                  >
-                    <pre
+                    aria-hidden
+                    className="absolute top-0 bottom-0 left-0 w-px rounded-full bg-slate-200 dark:bg-slate-700/60"
+                  />
+                  <div className="relative">
+                    <div
+                      ref={scrollRef}
+                      onScroll={handleScroll}
                       className={`
-          text-xs font-mono whitespace-pre-wrap pl-5 pr-3 py-3 
-          text-slate-600 dark:text-slate-400
+          relative max-h-60 overflow-y-auto
+          bg-transparent
         `}
                     >
-                      {logLines.join("\n")}
-                    </pre>
+                      <pre
+                        className={`
+            text-xs font-mono whitespace-pre-wrap pr-3 
+            text-slate-600 dark:text-slate-400
+          `}
+                      >
+                        {logLines.join("\n")}
+                      </pre>
+                    </div>
+                    {!autoScrollEnabled && (
+                      <ScrollToBottomButton scrollToBottom={scrollToBottom} />
+                    )}
                   </div>
-                  {!autoScrollEnabled && (
-                    <ScrollToBottomButton scrollToBottom={scrollToBottom} />
-                  )}
                 </div>
               </CollapsibleContent>
             </Collapsible>
