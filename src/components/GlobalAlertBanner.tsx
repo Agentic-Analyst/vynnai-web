@@ -249,6 +249,21 @@ export function GlobalAlertBanner() {
                   </p>
                 </div>
 
+                {/* Source Information */}
+                {selectedAlert.sourceUrl && (
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase">Source:</span>
+                    <a 
+                      href={selectedAlert.sourceUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline ml-2 break-all block mt-1"
+                    >
+                      {selectedAlert.sourceUrl}
+                    </a>
+                  </div>
+                )}
+
                 {selectedAlert.affectedSymbols.length > 0 && (
                   <div>
                     <h4 className="font-semibold mb-2">Affected Securities ({selectedAlert.affectedSymbols.length})</h4>

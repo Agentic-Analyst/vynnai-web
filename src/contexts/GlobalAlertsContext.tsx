@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import alertExamples from '@/lib/alertExamples';
 
 export interface GlobalAlert {
   id: string;
@@ -10,6 +11,8 @@ export interface GlobalAlert {
   impact: 'high' | 'medium' | 'low';
   category: string;
   read: boolean;
+  // Optional field for news source URL
+  sourceUrl?: string;
 }
 
 interface GlobalAlertsContextType {
@@ -44,6 +47,21 @@ export function GlobalAlertsProvider({ children }: { children: ReactNode }) {
       console.error('Failed to save alerts to localStorage:', error);
     }
   }, [alerts]);
+
+  // Seed with example alerts in dev when no alerts exist
+  useEffect(() => {
+    try {
+      // import.meta.env.DEV is the Vite dev flag; only seed during development
+      // If you prefer to seed in other environments, adjust this check.
+      if ((alerts || []).length === 0 && import.meta.env && import.meta.env.DEV) {
+        setAlerts(alertExamples as any);
+      }
+    } catch (e) {
+      // ignore
+    }
+    // run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addAlert = (alert: GlobalAlert) => {
     setAlerts(prev => [alert, ...prev]);
