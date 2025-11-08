@@ -702,9 +702,7 @@ const ChatPage = () => {
       };
 
       addAssistantMessage(
-        `🚀 **Processing your request...**
-
-⚡ **Connecting to AI assistant...**`
+        `🚀 **Connecting to Vynn AI agent**`
       );
 
       const result = await api.startChat(chatRequest);
@@ -1130,8 +1128,8 @@ const ChatPage = () => {
       onOpen: () => {
         addAssistantMessage(
           opts.fromReconnect
-            ? `🔄 **Reconnected to analysis job**`
-            : `🔗 **Connected to analysis job**`,
+            ? `🔄 **Reconnected to Vynn AI agent**`
+            : `🔗 **Vynn AI agent is analyzing your request**`,
           convId
         );
       },

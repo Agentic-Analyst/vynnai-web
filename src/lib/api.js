@@ -176,6 +176,22 @@ export const buildDownloadEntries = (apiBase, jobId, ticker, files) => {
       suggestedName: `${T} professional report.pdf`
     });
   }
+  if (files?.financial_summary) {
+    entries.push({
+      key: 'financial_summary',
+      label: `${T} financial summary.pdf`,
+      url: `${base}/download/financial-summary`,
+      suggestedName: `${T} financial summary.pdf`
+    });
+  }
+  if (files?.news_summary) {
+    entries.push({
+      key: 'news_summary',
+      label: `${T} news summary.pdf`,
+      url: `${base}/download/news-summary`,
+      suggestedName: `${T} news summary.pdf`
+    });
+  }
 
   return Object.fromEntries(entries.map(e => [e.key, e]));
 };
