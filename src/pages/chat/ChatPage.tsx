@@ -185,7 +185,7 @@ const ChatPage = () => {
           {
             id: Date.now(),
             title: "New Analysis",
-            messages: [createWelcomeMessage()],
+            messages: [],
             activeJobId: null,
             isStreaming: false,
             jobProgress: null,
@@ -1721,6 +1721,10 @@ const ChatPage = () => {
   const getItemSize = (index) =>
     rowHeightsRef.current[index] || DEFAULT_ROW_HEIGHT;
 
+  const currentMessages =
+    conversations[currentConversationIndex]?.messages ?? [];
+  const isEmptyConversation = currentMessages.length === 0;
+
   // ---------- UI ----------
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-50 to-slate-100 overflow-x-hidden">
@@ -1759,57 +1763,81 @@ const ChatPage = () => {
 
         <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-auto relative" ref={listContainerRef}>
-            <List
-              ref={listRef}
-              height={listHeight}
-              width={"100%"}
-              itemCount={
-                conversations[currentConversationIndex].messages.length
-              }
-              itemSize={getItemSize}
-              itemData={conversations[currentConversationIndex]}
-              overscanCount={6}
-            >
-              {Row}
-            </List>
-
-            {/* Scroll to Bottom Button */}
-            {showScrollToBottom && (
-              <ScrollToBottomButton
-                scrollToBottom={scrollToBottom}
-                unreadMessages={unreadMessages}
-              />
-            )}
-
-            {/* Debug info - only show when there are unread messages */}
-            {unreadMessages > 0 && (
-              <div className="absolute top-4 right-4 z-50 bg-black text-white p-2 rounded text-xs">
-                Unread: {unreadMessages}
+            {isEmptyConversation ? (
+              <div className="flex flex-col items-center justify-start text-center px-6 pt-[15vh]">
+                <h1 className="text-3xl font-semibold text-slate-700 mb-2">
+                  Vynn AI
+                </h1>
+                <p className="text-slate-500 mb-8">
+                  Ask anything about markets, models, or financial data.
+                </p>
+                <div className="w-full max-w-xl">
+                  <ChatInput
+                    onSubmit={handleSubmit}
+                    value={input}
+                    onChange={(newValue) => setInput(newValue)}
+                    isInputDisabled={
+                      !!getCurrentConversationJobId() ||
+                      getCurrentConversationStreamingState()
+                    }
+                    isButtonDisabled={
+                      isStoppingJob ||
+                      (!getCurrentConversationJobId() &&
+                        (!input.trim() ||
+                          getCurrentConversationStreamingState()))
+                    }
+                    isChatActive={!!getCurrentConversationJobId()}
+                    isChatStopping={isStoppingJob}
+                  />
+                </div>
               </div>
+            ) : (
+              <>
+                <List
+                  ref={listRef}
+                  height={listHeight}
+                  width={"100%"}
+                  itemCount={currentMessages.length}
+                  itemSize={getItemSize}
+                  itemData={conversations[currentConversationIndex]}
+                  overscanCount={6}
+                >
+                  {Row}
+                </List>
+
+                {showScrollToBottom && (
+                  <ScrollToBottomButton
+                    scrollToBottom={scrollToBottom}
+                    unreadMessages={unreadMessages}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
 
-        <div className="p-4">
-          <div className="max-w-3xl mx-auto">
-            <ChatInput
-              onSubmit={handleSubmit}
-              value={input}
-              onChange={(newValue) => setInput(newValue)}
-              isInputDisabled={
-                !!getCurrentConversationJobId() ||
-                getCurrentConversationStreamingState()
-              }
-              isButtonDisabled={
-                isStoppingJob ||
-                (!getCurrentConversationJobId() &&
-                  (!input.trim() || getCurrentConversationStreamingState()))
-              }
-              isChatActive={!!getCurrentConversationJobId()}
-              isChatStopping={isStoppingJob}
-            />
+        {!isEmptyConversation ? (
+          <div className="p-4">
+            <div className="max-w-3xl mx-auto">
+              <ChatInput
+                onSubmit={handleSubmit}
+                value={input}
+                onChange={(newValue) => setInput(newValue)}
+                isInputDisabled={
+                  !!getCurrentConversationJobId() ||
+                  getCurrentConversationStreamingState()
+                }
+                isButtonDisabled={
+                  isStoppingJob ||
+                  (!getCurrentConversationJobId() &&
+                    (!input.trim() || getCurrentConversationStreamingState()))
+                }
+                isChatActive={!!getCurrentConversationJobId()}
+                isChatStopping={isStoppingJob}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

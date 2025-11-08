@@ -19,7 +19,7 @@ export function useConversations(initialIndex = 0) {
       {
         id: Date.now(),
         title: "New Analysis",
-        messages: [createWelcomeMessage()],
+        messages: [],
         activeJobId: null,
         isStreaming: false,
         jobProgress: null,
@@ -101,7 +101,7 @@ export function useConversations(initialIndex = 0) {
     const newConversation: Conversation = {
       id: Date.now(),
       title: "New Analysis",
-      messages: [createWelcomeMessage()],
+      messages: [],
       activeJobId: null,
       isStreaming: false,
       jobProgress: null,
@@ -126,7 +126,7 @@ export function useConversations(initialIndex = 0) {
               {
                 id: Date.now(),
                 title: "New Analysis",
-                messages: [createWelcomeMessage()],
+                messages: [],
                 activeJobId: null,
                 isStreaming: false,
                 jobProgress: null,
@@ -198,7 +198,7 @@ export function useConversations(initialIndex = 0) {
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
-        
+
         // If last message is a logbatch, append to its nlSummary
         if (last && last.role === "assistant" && last.kind === "logbatch") {
           const existingNL = last.nlSummary || "";
@@ -208,7 +208,7 @@ export function useConversations(initialIndex = 0) {
             nlSummary: newNL,
             timestamp: nowIso,
           };
-        } 
+        }
         // Otherwise, create a new logbatch message with NL content (no logs yet)
         else {
           msgs.push({
@@ -220,7 +220,7 @@ export function useConversations(initialIndex = 0) {
             timestamp: nowIso,
           });
         }
-        
+
         next[idx] = { ...convo, messages: msgs };
         return next;
       });
