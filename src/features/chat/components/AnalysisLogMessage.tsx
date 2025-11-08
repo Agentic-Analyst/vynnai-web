@@ -65,7 +65,7 @@ const AnalysisLogMessage = memo(
     const hasLogs = logLines && logLines.length > 0;
 
     return (
-      <div className="my-3">
+      <>
         {/* Natural Language Summary */}
         {nlSummary && (
           <div
@@ -105,7 +105,7 @@ const AnalysisLogMessage = memo(
                   <span>{logLines.length} technical log lines</span>
                   <div className="flex gap-2 items-center">
                     <StatusIcon
-                      className={`h-4 w-4 text-blue-500 ${
+                      className={`h-4 w-4 ${iconColor} ${
                         isStreaming ? "animate-spin" : ""
                       } `}
                     />
@@ -150,7 +150,7 @@ const AnalysisLogMessage = memo(
             </Collapsible>
           </div>
         )}
-      </div>
+      </>
     );
   }
 );
