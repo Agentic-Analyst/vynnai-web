@@ -63,6 +63,16 @@ const ChatPage = () => {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [isUserAtBottom, setIsUserAtBottom] = useState(true);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const isUserAtBottomRef = useRef(isUserAtBottom);
+  const autoScrollEnabledRef = useRef(autoScrollEnabled);
+
+  useEffect(() => {
+    isUserAtBottomRef.current = isUserAtBottom;
+  }, [isUserAtBottom]);
+
+  useEffect(() => {
+    autoScrollEnabledRef.current = autoScrollEnabled;
+  }, [autoScrollEnabled]);
 
   // Deterministic explanation report state
   const reportCaptureRef = useRef({
@@ -383,10 +393,10 @@ const ChatPage = () => {
 
     if (isUserAtBottom && autoScrollEnabled) {
       requestAnimationFrame(() => {
-        if (listRef.current) {
-          listRef.current.resetAfterIndex(currentMessageCount - 1, true);
-          listRef.current.scrollToItem(currentMessageCount - 1, "end");
-        }
+        listRef.current?.resetAfterIndex(currentMessageCount - 1, true);
+        requestAnimationFrame(() => {
+          listRef.current?.scrollToItem(currentMessageCount - 1, "end");
+        });
       });
     }
   }, [lastMessage?.timestamp, isUserAtBottom, autoScrollEnabled, msgs.length]);
@@ -459,17 +469,19 @@ const ChatPage = () => {
 
   // Manual scroll to bottom function for user interaction
   const scrollToBottom = () => {
+    const count =
+      conversations[currentConversationIndex]?.messages?.length || 0;
+    if (!count || !listRef.current) return;
+
     requestAnimationFrame(() => {
-      const count =
-        conversations[currentConversationIndex]?.messages?.length || 0;
-      if (count > 0 && listRef.current) {
-        listRef.current.resetAfterIndex(count - 1, true);
-        listRef.current.scrollToItem(count - 1, "end");
+      listRef.current?.resetAfterIndex(count - 1, true);
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToItem(count - 1, "end");
         setShowScrollToBottom(false);
         setUnreadMessages(0);
         setAutoScrollEnabled(true); // Re-enable auto-scroll when user manually goes to bottom
         console.log("Manual scroll to bottom - auto-scroll re-enabled");
-      }
+      });
     });
   };
 
@@ -497,10 +509,10 @@ const ChatPage = () => {
 
     // Scroll to bottom for new conversation
     requestAnimationFrame(() => {
-      if (listRef.current) {
-        listRef.current.resetAfterIndex(0, true);
-        listRef.current.scrollToItem(0, "end");
-      }
+      listRef.current?.resetAfterIndex(0, true);
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToItem(0, "end");
+      });
     });
   };
 
@@ -526,13 +538,13 @@ const ChatPage = () => {
 
     // Scroll to bottom after switching conversation
     requestAnimationFrame(() => {
-      if (listRef.current) {
-        listRef.current.resetAfterIndex(0, true);
-        const msgs = conversations[index]?.messages ?? [];
-        if (msgs.length > 0) {
-          listRef.current.scrollToItem(msgs.length - 1, "end");
+      listRef.current?.resetAfterIndex(0, true);
+      requestAnimationFrame(() => {
+        const msgsAfter = conversations[index]?.messages ?? [];
+        if (msgsAfter.length > 0) {
+          listRef.current?.scrollToItem(msgsAfter.length - 1, "end");
         }
-      }
+      });
     });
   };
 
@@ -548,29 +560,10 @@ const ChatPage = () => {
       return newSet;
     });
 
-    // Force immediate re-measurement and virtual list reset
-    setTimeout(() => {
-      // Clear the height cache for this specific row
+    requestAnimationFrame(() => {
       delete rowHeightsRef.current[messageIndex];
-
-      // Reset the virtual list starting from this index
-      if (listRef.current) {
-        listRef.current.resetAfterIndex(messageIndex, true);
-
-        // Force a re-render by scrolling slightly and back
-        const currentScroll = listRef.current._outerRef?.scrollTop || 0;
-        requestAnimationFrame(() => {
-          if (listRef.current?._outerRef) {
-            listRef.current._outerRef.scrollTop = currentScroll + 1;
-            requestAnimationFrame(() => {
-              if (listRef.current?._outerRef) {
-                listRef.current._outerRef.scrollTop = currentScroll;
-              }
-            });
-          }
-        });
-      }
-    }, 0);
+      listRef.current?.resetAfterIndex(messageIndex, true);
+    });
   };
 
   // ---------- Job Control ----------
@@ -1460,30 +1453,44 @@ const ChatPage = () => {
       const isReport = message.kind === "report";
       const measureRef = useRef(null);
 
+      const messageCount = data.messages.length;
+      const isLastMessage = index === messageCount - 1;
+
       useEffect(() => {
         if (!measureRef.current) return;
+        const node = measureRef.current;
+        let rafId: number | null = null;
 
-        const measureHeight = () => {
-          const rect = measureRef.current.getBoundingClientRect();
-          const h = Math.ceil(rect.height) + 16;
+        const observer = new ResizeObserver((entries) => {
+          const entry = entries[entries.length - 1];
+          if (!entry) return;
+          const h = Math.ceil(entry.contentRect.height) + 16;
+          if (h <= 0 || rowHeightsRef.current[index] === h) return;
+          rowHeightsRef.current[index] = h;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => {
+            listRef.current?.resetAfterIndex(index);
+            if (
+              isLastMessage &&
+              isUserAtBottomRef.current &&
+              autoScrollEnabledRef.current
+            ) {
+              const lastIndex = messageCount - 1;
+              if (lastIndex >= 0) {
+                requestAnimationFrame(() => {
+                  listRef.current?.scrollToItem(lastIndex, "end");
+                });
+              }
+            }
+          });
+        });
 
-          if (rowHeightsRef.current[index] !== h && h > 0) {
-            rowHeightsRef.current[index] = h;
-            // Use requestAnimationFrame for smooth updates
-            requestAnimationFrame(() => {
-              listRef.current?.resetAfterIndex(index);
-            });
-          }
+        observer.observe(node);
+        return () => {
+          observer.disconnect();
+          if (rafId) cancelAnimationFrame(rafId);
         };
-
-        // Measure immediately
-        measureHeight();
-
-        // Also measure after a small delay to catch any async rendering
-        const timer = setTimeout(measureHeight, 50);
-
-        return () => clearTimeout(timer);
-      }, [index, message, collapsedLogs.has(index)]);
+      }, [index, message, isLastMessage, messageCount]);
 
       return (
         <div style={style} className="px-4 py-2">
