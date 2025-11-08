@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNewsWebSocket } from '@/contexts/NewsWebSocketContext';
 import { useStockWatchlist } from '@/hooks/useStockWatchlist';
 import { useGlobalAlerts } from '@/contexts/GlobalAlertsContext';
+import alertExamples from '@/lib/alertExamples';
 import { formatDate, formatTimestamp } from '@/utils/stocksApi';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +54,7 @@ export function NewsPage() {
     impact: 'high' | 'medium' | 'low';
     category: string;
     read: boolean;
+    sourceUrl?: string;
   }>>(() => {
     try {
       const savedAlerts = localStorage.getItem('marketAlerts');
@@ -80,6 +82,25 @@ export function NewsPage() {
       return false;
     }
   });
+  
+  // Alert counter for sequential rotation - persist across page navigation
+  const [alertCounter, setAlertCounter] = useState(() => {
+    try {
+      const savedCounter = localStorage.getItem('marketAlerts_counter');
+      return savedCounter ? parseInt(savedCounter, 10) : 0;
+    } catch (error) {
+      return 0;
+    }
+  });
+  
+  // Persist alert counter
+  useEffect(() => {
+    try {
+      localStorage.setItem('marketAlerts_counter', String(alertCounter));
+    } catch (error) {
+      console.error('Failed to save alert counter to localStorage:', error);
+    }
+  }, [alertCounter]);
   
   // Demo mode states for auto-generating alerts - persist across page navigation
   const [isDemoMode, setIsDemoMode] = useState(() => {
@@ -373,55 +394,38 @@ export function NewsPage() {
   const triggerMockAlert = () => {
     console.log('🚨 triggerMockAlert called at', new Date().toISOString());
     
-    const mockAlerts = [
-      {
-        id: `alert-${Date.now()}`,
-        type: 'critical' as const,
-        title: 'Federal Reserve Interest Rate Decision',
-        message: 'The Federal Reserve has announced an unexpected 0.75% interest rate hike, marking the largest increase in 28 years. This decision is likely to cause significant market volatility across all sectors, with particular impact on growth stocks and real estate.',
-        affectedSymbols: ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL'],
+    // Use functional update to get current counter and increment atomically
+    setAlertCounter(prevCounter => {
+      const currentIndex = prevCounter % alertExamples.length;
+      const selectedExample = alertExamples[currentIndex];
+      
+      // Create alert with fresh timestamp and ID, preserving sourceUrl
+      const newAlert = {
+        ...selectedExample,
+        id: `alert-${Date.now()}-${currentIndex}`,
+        type: selectedExample.type as 'critical' | 'warning' | 'info',
         timestamp: new Date().toISOString(),
-        impact: 'high' as const,
-        category: 'Monetary Policy',
-        read: false
-      },
-      {
-        id: `alert-${Date.now() + 1}`,
-        type: 'warning' as const,
-        title: 'Major Tech Earnings Miss',
-        message: 'Leading technology companies reported earnings significantly below analyst expectations, citing slowing consumer demand and increased competition. Market sentiment for tech sector may turn bearish in the short term.',
-        affectedSymbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META'],
-        timestamp: new Date().toISOString(),
-        impact: 'medium' as const,
-        category: 'Earnings',
-        read: false
-      },
-      {
-        id: `alert-${Date.now() + 2}`,
-        type: 'info' as const,
-        title: 'Geopolitical Tensions Rising',
-        message: 'Escalating tensions in key oil-producing regions may impact energy sector stocks. Analysts recommend monitoring positions in energy and related sectors.',
-        affectedSymbols: ['XLE', 'XOM', 'CVX'],
-        timestamp: new Date().toISOString(),
-        impact: 'medium' as const,
-        category: 'Geopolitics',
-        read: false
+        impact: selectedExample.impact as 'high' | 'medium' | 'low',
+        read: false,
+        sourceUrl: selectedExample.sourceUrl // Explicitly preserve sourceUrl
+      };
+      
+      console.log('📢 Generated alert:', newAlert.title, 'Index:', currentIndex, '/', alertExamples.length, 'sourceUrl:', newAlert.sourceUrl);
+      
+      // Add to local alerts for News page history
+      setAlerts(prev => [newAlert, ...prev]);
+      setShowAlertBanner(true);
+      setSelectedAlert(newAlert);
+      
+      // Add to global alerts context for cross-page display (if high impact)
+      if (newAlert.impact === 'high') {
+        console.log('🌍 Adding to global alerts (high impact)');
+        addGlobalAlert(newAlert);
       }
-    ];
-    
-    const randomAlert = mockAlerts[Math.floor(Math.random() * mockAlerts.length)];
-    console.log('📢 Generated alert:', randomAlert.title, 'ID:', randomAlert.id);
-    
-    // Add to local alerts for News page history
-    setAlerts(prev => [randomAlert, ...prev]);
-    setShowAlertBanner(true);
-    setSelectedAlert(randomAlert);
-    
-    // Add to global alerts context for cross-page display (if high impact)
-    if (randomAlert.impact === 'high') {
-      console.log('🌍 Adding to global alerts (high impact)');
-      addGlobalAlert(randomAlert);
-    }
+      
+      // Return incremented counter for next time
+      return prevCounter + 1;
+    });
   };
 
   const handleAlertClick = (alert: typeof alerts[0]) => {
@@ -1240,6 +1244,24 @@ export function NewsPage() {
                 </p>
               </div>
 
+              {/* Source URL */}
+              {selectedAlert.sourceUrl && (
+                <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border">
+                  <ExternalLink className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">SOURCE:</p>
+                    <a
+                      href={selectedAlert.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline break-all"
+                    >
+                      {selectedAlert.sourceUrl}
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* Affected Symbols */}
               {selectedAlert.affectedSymbols.length > 0 && (
                 <div>
@@ -1285,22 +1307,38 @@ export function NewsPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => dismissAlert(selectedAlert.id)}
-                >
-                  Dismiss
-                </Button>
-                <Button
-                  variant="default"
-                  onClick={() => {
-                    setSelectedTickers(selectedAlert.affectedSymbols);
-                    setShowAlertDialog(false);
-                  }}
-                >
-                  Filter by Affected Symbols
-                </Button>
+              <div className="flex justify-between gap-2 pt-2 border-t">
+                <div className="flex gap-2">
+                  {selectedAlert.sourceUrl && (
+                    <Button
+                      variant="outline"
+                      onClick={() => window.open(selectedAlert.sourceUrl, '_blank', 'noopener,noreferrer')}
+                      className="gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Go to News
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => dismissAlert(selectedAlert.id)}
+                  >
+                    Dismiss
+                  </Button>
+                  {selectedAlert.affectedSymbols.length > 0 && (
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        setSelectedTickers(selectedAlert.affectedSymbols);
+                        setShowAlertDialog(false);
+                      }}
+                    >
+                      Filter by Affected Symbols
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
