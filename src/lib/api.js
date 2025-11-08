@@ -15,28 +15,6 @@ const contentDispositionName = (cdHeader) => {
 export const api = {
   base: API_BASE_URL,
 
-  async getJobLogs(jobId) {
-    const resp = await fetch(`${API_BASE_URL}/jobs/${encodeURIComponent(jobId)}/logs`, {
-      credentials: 'include',
-    });
-    if (!resp.ok) return null;
-    return resp.json();
-  },
-
-  async startAnalysis(payload) {
-    const resp = await fetch(`${API_BASE_URL}/nl/request`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      credentials: 'include',
-    });
-    if (!resp.ok) {
-      const t = await resp.text().catch(() => '');
-      throw new Error(`API Error ${resp.status}: ${t}`);
-    }
-    return resp.json();
-  },
-
   async startChat(payload) {
     const resp = await fetch(`${API_BASE_URL}/chat`, {
       method: 'POST',

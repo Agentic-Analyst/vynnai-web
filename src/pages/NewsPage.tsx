@@ -153,15 +153,23 @@ export function NewsPage() {
     // Check if demo mode has ever been started
     const demoStartTime = localStorage.getItem('marketAlerts_demoStartTime');
     
+    console.log('🔍 Demo mode check:', {
+      demoStartTime,
+      hasStartTime: !!demoStartTime,
+      currentTime: Date.now()
+    });
+    
     if (!demoStartTime) {
       // First time - start demo mode
       const startTime = Date.now();
+      console.log('✅ Starting demo mode for the first time at:', startTime);
       localStorage.setItem('marketAlerts_demoStartTime', String(startTime));
       setIsDemoMode(true);
       setDemoTimeRemaining(60);
       
       // Generate first alert immediately
       setTimeout(() => {
+        console.log('🔔 Generating first alert');
         triggerMockAlert();
       }, 100);
     } else {
@@ -170,10 +178,21 @@ export function NewsPage() {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const remaining = Math.max(60 - elapsed, 0);
       
+      console.log('⏰ Demo mode was already started:', {
+        startTime,
+        elapsed,
+        remaining,
+        isExpired: remaining <= 0
+      });
+      
       if (remaining > 0) {
+        console.log('▶️ Resuming demo mode with', remaining, 'seconds remaining');
         setIsDemoMode(true);
         setDemoTimeRemaining(remaining);
       } else {
+        console.log('⏹️ Demo mode expired, resetting for next visit');
+        // Demo expired - clear it so it can restart on next fresh visit
+        localStorage.removeItem('marketAlerts_demoStartTime');
         setIsDemoMode(false);
         setDemoTimeRemaining(0);
       }
@@ -182,15 +201,23 @@ export function NewsPage() {
 
   // Demo mode effect: auto-generate alerts and countdown timer (works across page navigation)
   useEffect(() => {
-    if (!isDemoMode) return;
+    if (!isDemoMode) {
+      console.log('⏸️ Demo mode is not active');
+      return;
+    }
 
     const demoStartTime = parseInt(localStorage.getItem('marketAlerts_demoStartTime') || '0', 10);
+    console.log('🎬 Demo mode effect running, start time:', demoStartTime);
     
     // Alert generation interval (every 15 seconds)
     const alertInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - demoStartTime) / 1000);
+      console.log('⏱️ Alert interval check - elapsed:', elapsed, 'seconds');
       if (elapsed < 60) {
+        console.log('🔔 Generating alert at', elapsed, 'seconds');
         triggerMockAlert();
+      } else {
+        console.log('⏹️ Alert generation stopped - time expired');
       }
     }, 15000); // 15 seconds
 
@@ -203,6 +230,7 @@ export function NewsPage() {
       
       if (remaining <= 0) {
         // Time's up, stop demo mode
+        console.log('🛑 Demo mode finished - 60 seconds elapsed');
         setIsDemoMode(false);
         localStorage.removeItem('marketAlerts_demoStartTime');
       }
@@ -210,6 +238,7 @@ export function NewsPage() {
 
     // Cleanup intervals when component unmounts (but intervals will restart on remount)
     return () => {
+      console.log('🧹 Cleaning up demo mode intervals');
       clearInterval(alertInterval);
       clearInterval(countdownInterval);
     };
@@ -342,6 +371,8 @@ export function NewsPage() {
 
   // Mock Alert Trigger (for testing - will be replaced with real WebSocket/API)
   const triggerMockAlert = () => {
+    console.log('🚨 triggerMockAlert called at', new Date().toISOString());
+    
     const mockAlerts = [
       {
         id: `alert-${Date.now()}`,
@@ -379,6 +410,7 @@ export function NewsPage() {
     ];
     
     const randomAlert = mockAlerts[Math.floor(Math.random() * mockAlerts.length)];
+    console.log('📢 Generated alert:', randomAlert.title, 'ID:', randomAlert.id);
     
     // Add to local alerts for News page history
     setAlerts(prev => [randomAlert, ...prev]);
@@ -387,6 +419,7 @@ export function NewsPage() {
     
     // Add to global alerts context for cross-page display (if high impact)
     if (randomAlert.impact === 'high') {
+      console.log('🌍 Adding to global alerts (high impact)');
       addGlobalAlert(randomAlert);
     }
   };
