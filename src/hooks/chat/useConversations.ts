@@ -3,6 +3,17 @@ import { Conversation } from "@/features/chat";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { userStorage } from "@/lib/userStorage";
 
+const createBlankConversation = (): Conversation => ({
+  id: Date.now(),
+  title: "New Analysis",
+  messages: [],
+  activeJobId: null,
+  isStreaming: false,
+  jobProgress: null,
+  sessionId: null,
+  isDraft: true,
+});
+
 export function useConversations(initialIndex = 0) {
   const [conversations, setConversations] = useState<Conversation[]>(() => {
     const saved = userStorage.getJSON("conversations");
@@ -12,18 +23,11 @@ export function useConversations(initialIndex = 0) {
         activeJobId: c.activeJobId || null,
         isStreaming: c.isStreaming || false,
         jobProgress: c.jobProgress || null,
+        sessionId: c.sessionId || null,
+        isDraft: typeof c.isDraft === "boolean" ? c.isDraft : false,
       }));
     }
-    return [
-      {
-        id: Date.now(),
-        title: "New Analysis",
-        messages: [],
-        activeJobId: null,
-        isStreaming: false,
-        jobProgress: null,
-      },
-    ];
+    return [createBlankConversation()];
   });
 
   const [currentConversationIndex, setCurrentConversationIndex] =
@@ -53,16 +57,13 @@ export function useConversations(initialIndex = 0) {
 
   // --- start new conversation ---
   const startNewConversation = useCallback(() => {
-    const newConversation: Conversation = {
-      id: Date.now(),
-      title: "New Analysis",
-      messages: [],
-      activeJobId: null,
-      isStreaming: false,
-      jobProgress: null,
-    };
     setConversations((prev) => {
-      const next = [...prev, newConversation];
+      const existingDraftIdx = prev.findIndex((c) => c.isDraft);
+      if (existingDraftIdx !== -1) {
+        setCurrentConversationIndex(existingDraftIdx);
+        return prev;
+      }
+      const next = [...prev, createBlankConversation()];
       setCurrentConversationIndex(next.length - 1);
       return next;
     });
@@ -75,18 +76,7 @@ export function useConversations(initialIndex = 0) {
         const idx = prev.findIndex((c) => c.id === id);
         if (idx === -1) return prev;
         const next = prev.filter((c) => c.id !== id);
-        const finalList = next.length
-          ? next
-          : [
-              {
-                id: Date.now(),
-                title: "New Analysis",
-                messages: [],
-                activeJobId: null,
-                isStreaming: false,
-                jobProgress: null,
-              },
-            ];
+        const finalList = next.length ? next : [createBlankConversation()];
         if (!opts?.preserveIndex) setCurrentConversationIndex(0);
         return finalList;
       });
@@ -103,12 +93,8 @@ export function useConversations(initialIndex = 0) {
         const next = [...prev];
         const idx = findIndexById(next, convId);
         const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
+          ...createBlankConversation(),
+          isDraft: false,
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
@@ -143,13 +129,8 @@ export function useConversations(initialIndex = 0) {
         const next = [...prev];
         const idx = findIndexById(next, convId);
         const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-          sessionId: null,
+          ...createBlankConversation(),
+          isDraft: false,
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];
@@ -192,13 +173,8 @@ export function useConversations(initialIndex = 0) {
         const next = [...prev];
         const idx = findIndexById(next, convId);
         const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-          sessionId: null,
+          ...createBlankConversation(),
+          isDraft: false,
         };
         const msgs = [...(convo.messages || [])];
         const last = msgs[msgs.length - 1];

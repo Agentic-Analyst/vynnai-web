@@ -177,6 +177,7 @@ const ChatPage = () => {
             isStreaming: false,
             jobProgress: null,
             sessionId: null,
+            isDraft: true,
           },
         ]);
       }
@@ -492,7 +493,7 @@ const ChatPage = () => {
     };
 
     // Reset message count tracking for new conversation
-    lastMessageCountRef.current = 1; // One welcome message
+    lastMessageCountRef.current = 0;
 
     // Scroll to bottom for new conversation
     requestAnimationFrame(() => {
@@ -669,10 +670,15 @@ const ChatPage = () => {
         isStreaming: false,
         jobProgress: null,
         sessionId: null,
+        isDraft: true,
       };
       const msgs = [...(convo.messages || [])]; // clone messages
       msgs.push(userMessage); // pure append
-      updated[currentConversationIndex] = { ...convo, messages: msgs }; // replace convo
+      updated[currentConversationIndex] = {
+        ...convo,
+        messages: msgs,
+        isDraft: false,
+      }; // replace convo
       return updated;
     });
 
