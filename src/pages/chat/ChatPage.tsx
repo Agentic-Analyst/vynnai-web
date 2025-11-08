@@ -701,10 +701,6 @@ const ChatPage = () => {
         ...(sessionId && { session_id: sessionId }),
       };
 
-      addAssistantMessage(
-        `🚀 **Connecting to Vynn AI agent**`
-      );
-
       const result = await api.startChat(chatRequest);
       console.log("🎯 Chat started with job ID:", result.job_id);
       updateCurrentConversationJobState(
@@ -1126,12 +1122,6 @@ const ChatPage = () => {
     // open EventSource via API helper
     const es = api.openLogStream(jobId, {
       onOpen: () => {
-        addAssistantMessage(
-          opts.fromReconnect
-            ? `🔄 **Reconnected to Vynn AI agent**`
-            : `🔗 **Vynn AI agent is analyzing your request**`,
-          convId
-        );
       },
       onStatus: (payload) => {
         const { message, progress } = payload || {};
@@ -1414,7 +1404,6 @@ const ChatPage = () => {
         blob,
         filename || entry.suggestedName || entry.label || "download.xlsx"
       );
-      addAssistantMessage(`✅ **Downloaded:** ${filename}`);
     } catch (e) {
       if (
         typeof e.message === "string" &&
@@ -1423,7 +1412,6 @@ const ChatPage = () => {
         return;
       }
       console.error("Download error:", e);
-      addAssistantMessage(`❌ **Download Failed:** ${e.message}`);
     }
   };
 
