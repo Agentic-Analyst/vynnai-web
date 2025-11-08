@@ -23,13 +23,12 @@ import { GlobalAlertBanner } from "./components/GlobalAlertBanner.tsx";
 // Stock Dashboard Pages
 import Stocks from "./pages/Stocks.tsx";
 import { NewsPage } from "./pages/NewsPage.tsx";
-import Markets from "./pages/Markets.tsx";
 import Currencies from "./pages/Currencies.tsx";
 import Global from "./pages/Global.tsx";
 import Portfolio from "./pages/Portfolio.tsx";
 import PortfolioList from "./pages/PortfolioList.tsx";
 import Performance from "./pages/Performance.tsx";
-import Analysis from "./pages/Analysis.tsx";
+import Crypto from "./pages/Crypto.tsx";
 import Settings from "./pages/Settings.tsx";
 import Reports from "./pages/Reports.tsx";
 import Navigation from "./components/Navigation.jsx";
@@ -144,7 +143,6 @@ const App = () => {
                             />
                             <Route path="news" element={<NewsPage />} />
                             <Route path="stocks" element={<Stocks />} />
-                            <Route path="markets" element={<Markets />} />
                             <Route path="currencies" element={<Currencies />} />
                             <Route path="global" element={<Global />} />
                             <Route path="reports" element={<Reports />} />
@@ -160,7 +158,7 @@ const App = () => {
                               path="performance"
                               element={<Performance />}
                             />
-                            <Route path="analysis" element={<Analysis />} />
+                            <Route path="analysis" element={<Crypto />} />
                             <Route path="settings" element={<Settings />} />
                             <Route
                               path="test/news-websocket"

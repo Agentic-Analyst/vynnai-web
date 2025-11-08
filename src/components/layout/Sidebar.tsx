@@ -97,11 +97,16 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
                   isActive ? "text-primary scale-110" : "group-hover:scale-105"
                 )} />
                 <span className={cn(
-                  "text-sm font-medium transition-all duration-200",
+                  "text-sm font-medium transition-all duration-200 flex items-center gap-2",
                   isCollapsed ? "opacity-0 w-0" : "opacity-100",
                   isActive ? "font-semibold" : "group-hover:font-medium"
                 )}>
                   {item.title}
+                  {item.comingSoon && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded-md bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                      Soon
+                    </span>
+                  )}
                 </span>
                 
                 {/* Modern hover indicator */}

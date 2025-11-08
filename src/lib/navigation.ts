@@ -1,6 +1,6 @@
 import { 
   BarChart, PieChart, BarChart3, Wallet, LineChart, Globe, 
-  DollarSign, Settings, MessageSquare, Newspaper, FileText
+  DollarSign, Settings, MessageSquare, Newspaper, FileText, Bitcoin
 } from 'lucide-react';
 
 // Top-level navigation (Chat vs Dashboard)
@@ -47,24 +47,22 @@ export const dashboardNavItems = [
     href: '/dashboard/performance',
   },
   {
-    title: 'Markets',
-    icon: BarChart3,
-    href: '/dashboard/markets',
-  },
-  {
     title: 'Currencies',
     icon: DollarSign,
     href: '/dashboard/currencies',
+    comingSoon: true,
   },
   {
     title: 'Global',
     icon: Globe,
     href: '/dashboard/global',
+    comingSoon: true,
   },
   {
-    title: 'Analysis',
-    icon: PieChart,
+    title: 'Crypto',
+    icon: Bitcoin,
     href: '/dashboard/analysis',
+    comingSoon: true,
   },
   {
     title: 'Settings',
@@ -81,6 +79,7 @@ export type NavItem = {
   icon: React.ElementType;
   href: string;
   pathPattern?: string;
+  comingSoon?: boolean;
 };
 
 // Helper functions
