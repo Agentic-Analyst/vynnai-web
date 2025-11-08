@@ -3,7 +3,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
 import {
   ChevronDown,
   ChevronUp,
@@ -124,17 +123,19 @@ const AnalysisLogMessage = memo(
                     ref={scrollRef}
                     onScroll={handleScroll}
                     className={`
-                      max-h-60 overflow-y-auto
-                      bg-transparent
-                      rounded-xl border border-slate-200/40 dark:border-slate-700/40 
-                      backdrop-blur-sm
-                    `}
+        relative max-h-60 overflow-y-auto
+        bg-transparent rounded-xl border border-slate-200/40 dark:border-slate-700/40 
+        backdrop-blur-sm
+        before:absolute before:top-0 before:bottom-0 before:left-2
+        before:w-[2px] before:bg-slate-200 dark:before:bg-slate-700/60
+        before:rounded-full
+      `}
                   >
                     <pre
                       className={`
-                        text-xs font-mono whitespace-pre-wrap p-3 
-                        text-slate-600 dark:text-slate-400
-                      `}
+          text-xs font-mono whitespace-pre-wrap pl-5 pr-3 py-3 
+          text-slate-600 dark:text-slate-400
+        `}
                     >
                       {logLines.join("\n")}
                     </pre>
