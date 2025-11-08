@@ -76,7 +76,13 @@ const AnalysisLogMessage = memo(
       bg-transparent
     `}
           >
-            <div className="text-left">{nlSummary}</div>
+            <div className="text-left whitespace-pre-wrap leading-relaxed [&>*:not(:last-child)]:mb-3">
+              {nlSummary.split('\n').map((line, idx) => (
+                <div key={idx} className={idx > 0 ? 'mt-3' : ''}>
+                  {line}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

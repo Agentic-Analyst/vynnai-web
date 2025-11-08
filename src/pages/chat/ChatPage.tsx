@@ -1715,7 +1715,7 @@ const ChatPage = () => {
       <div className="flex flex-col flex-grow h-full">
         <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
           <div className="text-lg font-semibold text-gray-700 flex items-center gap-3">
-            AI Stock Analyst
+            Vynn AI Agent
             {getCurrentConversationJobId() && (
               <div className="flex items-center gap-3 rounded-full bg-white/80 px-4 py-2 ring-1 ring-gray-200/80 shadow-sm backdrop-blur-sm">
                 <ProgressText
