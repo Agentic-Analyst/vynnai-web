@@ -1505,200 +1505,212 @@ const ChatPage = () => {
 
       return (
         <div style={style} className="px-4 py-2">
-          <div className={isUser ? "flex justify-end" : "flex justify-start"}>
-            {isDownloads ? (
-              <Bubble measureRef={measureRef} isUser={isUser}>
-                <DownloadMessage
+          <div
+            className={`flex w-full ${
+              isUser ? "justify-center" : "justify-center"
+            }`}
+          >
+            <div
+              className={`w-full max-w-[900px] ${
+                isUser ? "text-right" : "text-left"
+              }`}
+            >
+              {isDownloads ? (
+                <Bubble measureRef={measureRef} isUser={isUser}>
+                  <DownloadMessage
+                    message={message}
+                    onDownload={handleDownload}
+                  />
+                </Bubble>
+              ) : isLogBatch ? (
+                <div ref={measureRef} className="max-w-[1000px]">
+                  <AnalysisLogMessage
+                    message={message}
+                    index={index}
+                    isCollapsed={collapsedLogs.has(index)}
+                    toggleCollapse={toggleLogCollapse}
+                    isStreaming={
+                      data.isStreaming && index === data.messages.length - 1
+                    }
+                  />
+                </div>
+              ) : isReport ? (
+                <AnalysisReportMessage
+                  measureRef={measureRef}
                   message={message}
-                  onDownload={handleDownload}
                 />
-              </Bubble>
-            ) : isLogBatch ? (
-              <div ref={measureRef} className="max-w-[1000px]">
-                <AnalysisLogMessage
-                  message={message}
-                  index={index}
-                  isCollapsed={collapsedLogs.has(index)}
-                  toggleCollapse={toggleLogCollapse}
-                  isStreaming={
-                    data.isStreaming && index === data.messages.length - 1
-                  }
-                />
-              </div>
-            ) : isReport ? (
-              <AnalysisReportMessage
-                measureRef={measureRef}
-                message={message}
-              />
-            ) : (
-              <Bubble measureRef={measureRef} isUser={isUser}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                  className={`prose max-w-none break-words overflow-x-auto 
-                    prose-p:my-1 prose-li:my-0 prose-headings:my-1 prose-pre:p-3 
-                    prose-code:px-1.5 prose-code:py-0.5 ${
-                      isUser ? "prose-invert" : "prose-slate"
-                    }`}
-                  components={{
-                    code({ node, inline, className, children, ...props }) {
-                      const match = /language-(\w+)/.exec(className || "");
-                      return !inline && match ? (
-                        <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
-                          <SyntaxHighlighter
+              ) : (
+                <Bubble measureRef={measureRef} isUser={isUser}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    className={`prose max-w-none break-words overflow-x-auto
+                      prose-headings:my-2 prose-p:my-1 prose-pre:my-2 prose-blockquote:my-2
+                      prose-ul:my-1 prose-ol:my-1 prose-li:my-0
+                      prose-table:my-2
+                      prose-img:my-2
+                      ${isUser ? "prose-invert" : "prose-slate"}
+                    `}
+                    components={{
+                      code({ node, inline, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || "");
+                        return !inline && match ? (
+                          <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
+                            <SyntaxHighlighter
+                              {...props}
+                              style={vscDarkPlus}
+                              language={match[1]}
+                              PreTag="div"
+                              customStyle={{ margin: 0, maxWidth: "100%" }}
+                            >
+                              {String(children).replace(/\n$/, "")}
+                            </SyntaxHighlighter>
+                          </div>
+                        ) : (
+                          <code
                             {...props}
-                            style={vscDarkPlus}
-                            language={match[1]}
-                            PreTag="div"
-                            customStyle={{ margin: 0, maxWidth: "100%" }}
-                          >
-                            {String(children).replace(/\n$/, "")}
-                          </SyntaxHighlighter>
-                        </div>
-                      ) : (
-                        <code
-                          {...props}
-                          className={`${className} break-all px-1.5 py-0.5 rounded ${
-                            isUser ? "bg-white/20 text-white" : "bg-slate-100"
-                          }`}
-                        >
-                          {children}
-                        </code>
-                      );
-                    },
-                    pre({ node, children, ...props }) {
-                      return (
-                        <pre
-                          {...props}
-                          className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3"
-                        >
-                          {children}
-                        </pre>
-                      );
-                    },
-                    p({ node, children, ...props }) {
-                      return (
-                        <p {...props} className="break-words">
-                          {children}
-                        </p>
-                      );
-                    },
-                    ul({ node, children, ...props }) {
-                      return (
-                        <ul
-                          {...props}
-                          className="list-disc list-inside space-y-1 mb-3"
-                        >
-                          {children}
-                        </ul>
-                      );
-                    },
-                    ol({ node, children, ...props }) {
-                      return (
-                        <ol
-                          {...props}
-                          className="list-decimal list-inside space-y-1 mb-3"
-                        >
-                          {children}
-                        </ol>
-                      );
-                    },
-                    li({ node, children, ...props }) {
-                      return (
-                        <li {...props} className="break-words">
-                          {children}
-                        </li>
-                      );
-                    },
-                    table({ node, children, ...props }) {
-                      return (
-                        <div className="overflow-x-auto my-4">
-                          <table
-                            {...props}
-                            className="min-w-full border-collapse border border-slate-300"
+                            className={`${className} break-all px-1.5 py-0.5 rounded ${
+                              isUser ? "bg-white/20 text-white" : "bg-slate-100"
+                            }`}
                           >
                             {children}
-                          </table>
-                        </div>
-                      );
-                    },
-                    thead({ node, children, ...props }) {
-                      return (
-                        <thead
-                          {...props}
-                          className={`${
-                            isUser ? "bg-white/20" : "bg-slate-100"
-                          }`}
-                        >
-                          {children}
-                        </thead>
-                      );
-                    },
-                    tbody({ node, children, ...props }) {
-                      return <tbody {...props}>{children}</tbody>;
-                    },
-                    tr({ node, children, ...props }) {
-                      return (
-                        <tr
-                          {...props}
-                          className={`border-b ${
-                            isUser ? "border-white/20" : "border-slate-200"
-                          }`}
-                        >
-                          {children}
-                        </tr>
-                      );
-                    },
-                    th({ node, children, ...props }) {
-                      return (
-                        <th
-                          {...props}
-                          className={`border px-3 py-2 text-left font-semibold ${
-                            isUser
-                              ? "border-white/20 text-white"
-                              : "border-slate-300 text-slate-700"
-                          }`}
-                        >
-                          {children}
-                        </th>
-                      );
-                    },
-                    td({ node, children, ...props }) {
-                      return (
-                        <td
-                          {...props}
-                          className={`border px-3 py-2 ${
-                            isUser
-                              ? "border-white/20 text-white"
-                              : "border-slate-300 text-slate-600"
-                          }`}
-                        >
-                          {children}
-                        </td>
-                      );
-                    },
-                    blockquote({ node, children, ...props }) {
-                      return (
-                        <blockquote
-                          {...props}
-                          className={`border-l-4 pl-4 italic my-3 ${
-                            isUser
-                              ? "border-white/40 text-white/90"
-                              : "border-slate-300 text-slate-600"
-                          }`}
-                        >
-                          {children}
-                        </blockquote>
-                      );
-                    },
-                    br() {
-                      return <br className="my-1" />;
-                    },
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
-              </Bubble>
-            )}
+                          </code>
+                        );
+                      },
+                      pre({ node, children, ...props }) {
+                        return (
+                          <pre
+                            {...props}
+                            className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3"
+                          >
+                            {children}
+                          </pre>
+                        );
+                      },
+                      p({ node, children, ...props }) {
+                        return (
+                          <p {...props} className="break-words">
+                            {children}
+                          </p>
+                        );
+                      },
+                      ul({ node, children, ...props }) {
+                        return (
+                          <ul
+                            {...props}
+                            className="list-disc list-inside space-y-1 mb-3"
+                          >
+                            {children}
+                          </ul>
+                        );
+                      },
+                      ol({ node, children, ...props }) {
+                        return (
+                          <ol
+                            {...props}
+                            className="list-decimal list-inside space-y-1 mb-3"
+                          >
+                            {children}
+                          </ol>
+                        );
+                      },
+                      li({ node, children, ...props }) {
+                        return (
+                          <li {...props} className="break-words">
+                            {children}
+                          </li>
+                        );
+                      },
+                      table({ node, children, ...props }) {
+                        return (
+                          <div className="overflow-x-auto my-4">
+                            <table
+                              {...props}
+                              className="min-w-full border-collapse border border-slate-300"
+                            >
+                              {children}
+                            </table>
+                          </div>
+                        );
+                      },
+                      thead({ node, children, ...props }) {
+                        return (
+                          <thead
+                            {...props}
+                            className={`${
+                              isUser ? "bg-white/20" : "bg-slate-100"
+                            }`}
+                          >
+                            {children}
+                          </thead>
+                        );
+                      },
+                      tbody({ node, children, ...props }) {
+                        return <tbody {...props}>{children}</tbody>;
+                      },
+                      tr({ node, children, ...props }) {
+                        return (
+                          <tr
+                            {...props}
+                            className={`border-b ${
+                              isUser ? "border-white/20" : "border-slate-200"
+                            }`}
+                          >
+                            {children}
+                          </tr>
+                        );
+                      },
+                      th({ node, children, ...props }) {
+                        return (
+                          <th
+                            {...props}
+                            className={`border px-3 py-2 text-left font-semibold ${
+                              isUser
+                                ? "border-white/20 text-white"
+                                : "border-slate-300 text-slate-700"
+                            }`}
+                          >
+                            {children}
+                          </th>
+                        );
+                      },
+                      td({ node, children, ...props }) {
+                        return (
+                          <td
+                            {...props}
+                            className={`border px-3 py-2 ${
+                              isUser
+                                ? "border-white/20 text-white"
+                                : "border-slate-300 text-slate-600"
+                            }`}
+                          >
+                            {children}
+                          </td>
+                        );
+                      },
+                      blockquote({ node, children, ...props }) {
+                        return (
+                          <blockquote
+                            {...props}
+                            className={`border-l-4 pl-4 italic my-3 ${
+                              isUser
+                                ? "border-white/40 text-white/90"
+                                : "border-slate-300 text-slate-600"
+                            }`}
+                          >
+                            {children}
+                          </blockquote>
+                        );
+                      },
+                      br() {
+                        return <br className="my-1" />;
+                      },
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
+                </Bubble>
+              )}
+            </div>
           </div>
         </div>
       );

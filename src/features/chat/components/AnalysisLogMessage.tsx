@@ -66,55 +66,80 @@ const AnalysisLogMessage = memo(
     const hasLogs = logLines && logLines.length > 0;
 
     return (
-      <div className="my-2">
-        {/* NL Summary - Modern chat message style */}
+      <div className="my-3">
+        {/* Natural Language Summary */}
         {nlSummary && (
-          <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-            <div className="flex items-start gap-3">
-              <StatusIcon
-                className={`h-5 w-5 mt-0.5 flex-shrink-0 ${iconColor} ${
-                  isStreaming ? "animate-spin" : ""
-                }`}
-              />
-              <div className="flex-1 text-base text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed">
-                {nlSummary}
-              </div>
-            </div>
+          <div
+            className={`
+      group relative flex flex-col items-left text-left
+      rounded-2xl px-4 py-3
+      backdrop-blur-sm transition-colors
+      bg-transparent
+    `}
+          >
+            <div className="text-left">{nlSummary}</div>
           </div>
         )}
 
-        {/* Technical Logs - Collapsible, subtle design */}
+        {/* Technical Logs - collapsible */}
         {hasLogs && (
           <div className="mt-2">
             <Collapsible
               open={!isCollapsed}
               onOpenChange={() => toggleCollapse(index)}
             >
-              {/* Collapsible Trigger */}
+              {/* Trigger */}
               <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
+                <button
+                  className={`
+                    flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 
+                    hover:text-slate-700 dark:hover:text-slate-200 transition-colors 
+                    px-2 py-1.5 rounded-lg 
+                    hover:bg-black/[0.05] dark:hover:bg-white/[0.05]
+                  `}
+                >
                   {isCollapsed ? (
                     <ChevronDown className="h-3 w-3" />
                   ) : (
                     <ChevronUp className="h-3 w-3" />
                   )}
                   <span>{logLines.length} technical log lines</span>
+                  <div className="flex gap-2 items-center">
+                    <StatusIcon
+                      className={`h-4 w-4 text-blue-500 ${
+                        isStreaming ? "animate-spin" : ""
+                      } `}
+                    />
+                    <span className="text-xs text-slate-500 uppercase tracking-wide">
+                      {isStreaming ? "Analyzing" : "Analysis Completed"}
+                    </span>
+                  </div>
                 </button>
               </CollapsibleTrigger>
 
-              {/* Collapsible Content (The Logs) */}
+              {/* Content */}
               <CollapsibleContent asChild>
                 <div className="relative mt-2">
                   <div
-                    className="max-h-60 overflow-y-auto bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700"
                     ref={scrollRef}
                     onScroll={handleScroll}
+                    className={`
+                      max-h-60 overflow-y-auto
+                      bg-transparent
+                      rounded-xl border border-slate-200/40 dark:border-slate-700/40 
+                      backdrop-blur-sm
+                    `}
                   >
-                    <pre className="text-xs font-mono whitespace-pre-wrap p-3 text-slate-600 dark:text-slate-400">
+                    <pre
+                      className={`
+                        text-xs font-mono whitespace-pre-wrap p-3 
+                        text-slate-600 dark:text-slate-400
+                      `}
+                    >
                       {logLines.join("\n")}
                     </pre>
                   </div>
-                  {autoScrollEnabled ? null : (
+                  {!autoScrollEnabled && (
                     <ScrollToBottomButton scrollToBottom={scrollToBottom} />
                   )}
                 </div>
