@@ -18,7 +18,6 @@ import {
   ProgressText,
   Message,
 } from "@/features/chat";
-import { createWelcomeMessage } from "./utils";
 import { useConversations } from "@/hooks/chat/useConversations";
 
 const ChatPage = () => {
@@ -36,9 +35,6 @@ const ChatPage = () => {
     addDownloadsMessage,
     addReportMessage,
   } = useConversations();
-  const [analysisParams, setAnalysisParams] = useState(() => {
-    return userStorage.getJSON("analysis_params", {});
-  });
   const [input, setInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
@@ -155,14 +151,6 @@ const ChatPage = () => {
     }
   };
 
-  // ---------- Persistence ----------
-  useEffect(() => {
-    if (userStorage.hasUser()) {
-      userStorage.setJSON("conversations", conversations);
-      userStorage.setJSON("analysis_params", analysisParams);
-    }
-  }, [conversations, analysisParams]);
-
   // ---------- Handle user changes ----------
   useEffect(() => {
     const currentUser = userStorage.getCurrentUser();
@@ -174,7 +162,6 @@ const ChatPage = () => {
 
       // Load new user's data
       const newConversations = userStorage.getJSON("conversations");
-      const newAnalysisParams = userStorage.getJSON("analysis_params", {});
       const newActiveJob = userStorage.getJSON("activeJob");
 
       if (newConversations) {
@@ -194,7 +181,6 @@ const ChatPage = () => {
         ]);
       }
 
-      setAnalysisParams(newAnalysisParams);
       setCurrentConversationIndex(0);
 
       // Active job handling is now per-conversation, no global state needed
@@ -405,16 +391,6 @@ const ChatPage = () => {
   }, [lastMessage?.timestamp, isUserAtBottom, autoScrollEnabled, msgs.length]);
 
   // ---------- Helpers ----------
-  const parseAnalysisRequest = (textIn) => {
-    const email = localStorage.getItem("auth_email");
-    const req = { request: textIn, email };
-    Object.keys(analysisParams).forEach((k) => {
-      const v = analysisParams[k];
-      if (v !== undefined && v !== null && v !== "") req[k] = v;
-    });
-    return req;
-  };
-
   // Get current conversation's job state
   const getCurrentConversationJobId = () => {
     const jobId = conversations[currentConversationIndex]?.activeJobId || null;

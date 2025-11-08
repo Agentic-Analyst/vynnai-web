@@ -1,8 +1,7 @@
 // useConversations.ts
-import { Conversation, Message } from "@/features/chat";
+import { Conversation } from "@/features/chat";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { userStorage } from "@/lib/userStorage";
-import { createWelcomeMessage } from "@/pages/chat/utils";
 
 export function useConversations(initialIndex = 0) {
   const [conversations, setConversations] = useState<Conversation[]>(() => {
@@ -51,50 +50,6 @@ export function useConversations(initialIndex = 0) {
     }
     return currentConversationIndexRef.current ?? 0;
   }, []);
-
-  // --- add message (shared primitive) ---
-  const addMessage = useCallback(
-    (msg: Message, convId?: number) => {
-      setConversations((prev) => {
-        const next = [...prev];
-        const idx = findIndexById(next, convId);
-        const convo = next[idx] ?? {
-          id: Date.now(),
-          title: "New Analysis",
-          messages: [],
-          activeJobId: null,
-          isStreaming: false,
-          jobProgress: null,
-        };
-        convo.messages = [
-          ...(convo.messages || []),
-          { ...msg, timestamp: new Date().toISOString() },
-        ];
-        next[idx] = convo;
-        return next;
-      });
-    },
-    [findIndexById]
-  );
-
-  // --- update conversation ---
-  type Updater = (cur: Conversation) => Partial<Conversation> | Conversation;
-  const updateConversation = useCallback(
-    (idx: number, patchOrUpdater: Partial<Conversation> | Updater) => {
-      setConversations((prev) => {
-        const next = [...prev];
-        const cur = next[idx];
-        if (!cur) return prev;
-        const patch =
-          typeof patchOrUpdater === "function"
-            ? (patchOrUpdater as Updater)(cur)
-            : patchOrUpdater;
-        next[idx] = { ...cur, ...patch };
-        return next;
-      });
-    },
-    []
-  );
 
   // --- start new conversation ---
   const startNewConversation = useCallback(() => {
@@ -334,16 +289,10 @@ export function useConversations(initialIndex = 0) {
     [findIndexById]
   );
 
-  const resetDownloadsPosted = useCallback(() => {
-    downloadsPostedRef.current.clear();
-  }, []);
-
   return {
     conversations,
     currentConversationIndex,
     setCurrentConversationIndex,
-    addMessage,
-    updateConversation,
     startNewConversation,
     deleteConversation,
     setConversations,
@@ -352,6 +301,5 @@ export function useConversations(initialIndex = 0) {
     addAssistantLogBatch,
     addDownloadsMessage,
     addReportMessage,
-    resetDownloadsPosted,
   };
 }
