@@ -85,7 +85,7 @@ const ChatPage = () => {
   // NEW — select by id (safe when filtering)
   const switchConversationById = (id) => {
     const idx = conversations.findIndex((c) => c.id === id);
-    if (idx !== -1) switchConversation(idx);
+    if (idx !== -1 && currentConversationIndex !== idx) switchConversation(idx);
   };
 
   // NEW — rename helpers
@@ -1114,8 +1114,7 @@ const ChatPage = () => {
 
     // open EventSource via API helper
     const es = api.openLogStream(jobId, {
-      onOpen: () => {
-      },
+      onOpen: () => {},
       onStatus: (payload) => {
         const { message, progress } = payload || {};
         console.log("📡 SSE onStatus received:", {
