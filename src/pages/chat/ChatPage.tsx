@@ -19,6 +19,7 @@ import {
   Message,
 } from "@/features/chat";
 import { useConversations } from "@/hooks/chat/useConversations";
+import { useTypewriter } from "@/hooks/useTypewriter";
 
 const ChatPage = () => {
   // ---------- Local state ----------
@@ -73,6 +74,24 @@ const ChatPage = () => {
   useEffect(() => {
     autoScrollEnabledRef.current = autoScrollEnabled;
   }, [autoScrollEnabled]);
+
+  // Get current conversation ID for typewriter reset
+  const currentConversationId = conversations[currentConversationIndex]?.id;
+
+  // Typewriter effect for greeting - reset on conversation change
+  const titleTypewriter = useTypewriter({ 
+    text: 'Vynn AI', 
+    speed: 100,
+    delay: 300,
+    resetKey: currentConversationId // Reset when conversation changes
+  });
+  
+  const subtitleTypewriter = useTypewriter({ 
+    text: 'Ask anything about markets, models, or financial data.', 
+    speed: 30,
+    delay: 1000,
+    resetKey: currentConversationId // Reset when conversation changes
+  });
 
   // Deterministic explanation report state
   const reportCaptureRef = useRef({
@@ -1739,11 +1758,17 @@ const ChatPage = () => {
           <div className="flex-1 overflow-auto relative" ref={listContainerRef}>
             {isEmptyConversation ? (
               <div className="flex flex-col items-center justify-start text-center px-6 pt-[15vh]">
-                <h1 className="text-3xl font-semibold text-slate-700 mb-2">
-                  Vynn AI
+                <h1 className="text-3xl font-semibold text-slate-700 mb-2 min-h-[2.5rem]">
+                  {titleTypewriter.displayedText}
+                  {!titleTypewriter.isComplete && (
+                    <span className="inline-block w-0.5 h-8 bg-slate-700 ml-1 animate-pulse" />
+                  )}
                 </h1>
-                <p className="text-slate-500 mb-8">
-                  Ask anything about markets, models, or financial data.
+                <p className="text-slate-500 mb-8 min-h-[1.5rem]">
+                  {subtitleTypewriter.displayedText}
+                  {titleTypewriter.isComplete && !subtitleTypewriter.isComplete && (
+                    <span className="inline-block w-0.5 h-5 bg-slate-500 ml-1 animate-pulse" />
+                  )}
                 </p>
                 <div className="w-full max-w-xl">
                   <ChatInput
