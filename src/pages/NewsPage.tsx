@@ -992,30 +992,44 @@ export function NewsPage() {
                 const isScrapingNews = tickersBeingFetched.length > 0;
                 console.log('🔍 Is scraping news?', isScrapingNews, 'Tickers being fetched:', tickersBeingFetched);
                 
+                // Check if watchlist is empty
+                const noStocksInWatchlist = !hasStocks || watchedSymbols.length === 0;
+                
                 return (
                   <>
                     <div className="inline-flex p-4 bg-muted rounded-full mb-4">
-                      {allArticles.length === 0 || isScrapingNews ? (
+                      {noStocksInWatchlist ? (
+                        <TrendingUp className="h-8 w-8 text-primary" />
+                      ) : allArticles.length === 0 || isScrapingNews ? (
                         <RefreshCw className="h-8 w-8 animate-spin text-primary" />
                       ) : (
                         <NewspaperIcon className="h-8 w-8 opacity-50" />
                       )}
                     </div>
                     <h3 className="text-lg font-semibold mb-2 text-foreground">
-                      {isScrapingNews 
-                        ? 'Screening News for Your Stocks' 
-                        : allArticles.length === 0 
-                          ? 'Loading News' 
-                          : 'No News Found'}
+                      {noStocksInWatchlist
+                        ? 'No Stocks in Watchlist'
+                        : isScrapingNews 
+                          ? 'Screening News for Your Stocks' 
+                          : allArticles.length === 0 
+                            ? 'Loading News' 
+                            : 'No News Found'}
                     </h3>
                     <p className="text-sm">
-                      {isScrapingNews
-                        ? `We're currently scraping news articles for ${tickersBeingFetched.join(', ')}. This may take a moment...`
-                        : allArticles.length === 0 
-                          ? 'Fetching the latest news for your watchlist stocks...'
-                          : 'Try adjusting your search terms or filters.'
+                      {noStocksInWatchlist
+                        ? 'Add stocks to your watchlist to receive personalized news updates'
+                        : isScrapingNews
+                          ? `We're currently scraping news articles for ${tickersBeingFetched.join(', ')}. This may take a moment...`
+                          : allArticles.length === 0 
+                            ? 'Fetching the latest news for your watchlist stocks...'
+                            : 'Try adjusting your search terms or filters.'
                       }
                     </p>
+                    {noStocksInWatchlist && (
+                      <Button onClick={() => navigate('/dashboard/stocks')} className="mt-4">
+                        Browse Stocks
+                      </Button>
+                    )}
                     {isScrapingNews && tickersBeingFetched.length > 0 && (
                       <div className="mt-4 space-y-2">
                         {tickersBeingFetched.map(ticker => {
