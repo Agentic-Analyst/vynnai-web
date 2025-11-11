@@ -146,6 +146,15 @@ export function useRealTimeStockPrices(symbols: string[]) {
               
             case 'price_update':
               console.log('🔍 DEBUG: Received price_update:', message.data);
+              
+              // CRITICAL FIX: If we're receiving price updates, we ARE connected
+              // This handles cases where isConnected state got out of sync
+              if (!isConnected) {
+                console.log('✅ Received price data - setting isConnected=true');
+                setIsConnected(true);
+                setConnectionStatus('connected');
+              }
+              
               if (message.data && message.data.symbol) {
                 try {
                   // Backend sends comprehensive price data directly in message.data
@@ -185,6 +194,14 @@ export function useRealTimeStockPrices(symbols: string[]) {
               
             case 'current_price':
               console.log('🔍 DEBUG: Received current_price:', message.data);
+              
+              // CRITICAL FIX: If we're receiving price data, we ARE connected
+              if (!isConnected) {
+                console.log('✅ Received current price - setting isConnected=true');
+                setIsConnected(true);
+                setConnectionStatus('connected');
+              }
+              
               if (message.data?.price && message.data.price.symbol) {
                 try {
                   // Backend sends price object nested in message.data.price

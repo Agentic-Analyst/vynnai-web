@@ -16,7 +16,7 @@ interface StockPricesContextType {
   connect: () => void;
   disconnect: () => void;
   subscribeToSymbols: (symbols: string[], subscriberId?: string) => void;
-  unsubscribeFromSymbols: (symbols: string[], subscriberId?: string) => void;
+  unsubscribeFromSymbols: (symbols: string[], subscriberId?: string, delay?: number) => void;
 }
 
 // Create the context
@@ -27,9 +27,15 @@ export function StockPricesWebSocketProvider({ children }: { children: React.Rea
   const [allSubscribedSymbols, setAllSubscribedSymbols] = useState<Set<string>>(new Set());
   const hasInitialized = useRef(false);
   const subscribersRef = useRef<Map<string, Set<string>>>(new Map()); // Track which components subscribe to which symbols
+  const pendingCleanupsRef = useRef<Map<string, NodeJS.Timeout>>(new Map()); // Track pending cleanups
 
   // Convert Set to Array for the hook
   const symbolsArray = Array.from(allSubscribedSymbols);
+  
+  // Debug logging for symbol changes
+  useEffect(() => {
+    console.log('📈 Stock prices CONTEXT: allSubscribedSymbols changed to:', symbolsArray, 'from subscribers:', Array.from(subscribersRef.current.keys()));
+  }, [symbolsArray.join(',')]);
   
   // Use the stock prices hook with all subscribed symbols
   const stockPricesHook = useRealTimeStockPrices(symbolsArray);
@@ -38,6 +44,13 @@ export function StockPricesWebSocketProvider({ children }: { children: React.Rea
   const subscribeToSymbols = useCallback((symbols: string[], subscriberId?: string) => {
     const id = subscriberId || 'default';
     const normalizedSymbols = symbols.map(s => s.toUpperCase());
+    
+    // Cancel any pending cleanup for this subscriber
+    if (pendingCleanupsRef.current.has(id)) {
+      console.log('📈 Stock prices: Canceling pending cleanup for subscriber:', id);
+      clearTimeout(pendingCleanupsRef.current.get(id)!);
+      pendingCleanupsRef.current.delete(id);
+    }
     
     // Check if this subscriber's symbols actually changed
     const existingSymbols = subscribersRef.current.get(id);
@@ -68,10 +81,25 @@ export function StockPricesWebSocketProvider({ children }: { children: React.Rea
     });
   }, []);
 
-  // Function to unsubscribe from symbols
-  const unsubscribeFromSymbols = useCallback((symbols: string[], subscriberId?: string) => {
+  // Function to unsubscribe from symbols - with optional delay
+  const unsubscribeFromSymbols = useCallback((symbols: string[], subscriberId?: string, delay: number = 0) => {
     const id = subscriberId || 'default';
     
+    if (delay > 0) {
+      // Schedule delayed cleanup
+      console.log(`📈 Stock prices: Scheduling delayed unsubscribe for subscriber ${id} (${delay}ms)`);
+      
+      const cleanupTimer = setTimeout(() => {
+        console.log('📈 Stock prices: Executing delayed unsubscribe for subscriber:', id);
+        unsubscribeFromSymbols(symbols, id, 0); // Call without delay
+        pendingCleanupsRef.current.delete(id);
+      }, delay);
+      
+      pendingCleanupsRef.current.set(id, cleanupTimer);
+      return;
+    }
+    
+    // Immediate unsubscribe
     // Remove this subscriber's symbols
     const hadSubscriber = subscribersRef.current.has(id);
     subscribersRef.current.delete(id);
@@ -113,7 +141,7 @@ export function StockPricesWebSocketProvider({ children }: { children: React.Rea
     };
   }, []);
 
-  const contextValue: StockPricesContextType = {
+  const contextValue: StockPricesContextType = React.useMemo(() => ({
     prices: stockPricesHook.prices,
     isConnected: stockPricesHook.isConnected,
     connectionStatus: stockPricesHook.connectionStatus,
@@ -121,7 +149,15 @@ export function StockPricesWebSocketProvider({ children }: { children: React.Rea
     disconnect: stockPricesHook.disconnect,
     subscribeToSymbols,
     unsubscribeFromSymbols
-  };
+  }), [
+    stockPricesHook.prices,
+    stockPricesHook.isConnected,
+    stockPricesHook.connectionStatus,
+    stockPricesHook.connect,
+    stockPricesHook.disconnect,
+    subscribeToSymbols,
+    unsubscribeFromSymbols
+  ]);
 
   return (
     <StockPricesWebSocketContext.Provider value={contextValue}>
@@ -145,9 +181,17 @@ export function useStockPricesSubscription(symbols: string[], subscriberId?: str
   const symbolsRef = useRef<string[]>([]);
   const subscriberIdRef = useRef(subscriberId || `subscriber-${Math.random().toString(36).substr(2, 9)}`);
   const isInitializedRef = useRef(false);
+  const cleanupTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Subscribe to symbols when they change
   useEffect(() => {
+    // Cancel any pending cleanup since component is active
+    if (cleanupTimerRef.current) {
+      console.log('📈 Stock prices: Canceling pending cleanup for subscriber:', subscriberIdRef.current);
+      clearTimeout(cleanupTimerRef.current);
+      cleanupTimerRef.current = null;
+    }
+    
     if (symbols.length > 0) {
       const normalizedSymbols = symbols.map(s => s.toUpperCase());
       const previousSymbols = symbolsRef.current;
@@ -178,12 +222,14 @@ export function useStockPricesSubscription(symbols: string[], subscriberId?: str
     }
   }, [symbols.join(',')]); // Removed context from dependencies
 
-  // Cleanup only on unmount
+  // Cleanup only on unmount - with delay to handle React StrictMode remounting
   useEffect(() => {
     return () => {
       if (symbolsRef.current.length > 0) {
-        console.log('📈 Stock prices: Component unmounting, cleaning up subscriber:', subscriberIdRef.current);
-        context.unsubscribeFromSymbols(symbolsRef.current, subscriberIdRef.current);
+        console.log('📈 Stock prices: Component unmounting for subscriber:', subscriberIdRef.current);
+        
+        // Use the context's delayed unsubscribe (delay happens in the context)
+        context.unsubscribeFromSymbols(symbolsRef.current, subscriberIdRef.current, 1000);
       }
     };
   }, []); // Empty dependency array - only runs on mount/unmount
