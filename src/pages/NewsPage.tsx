@@ -301,6 +301,13 @@ export function NewsPage() {
   // Get all articles and extract available tickers and sources
   const allArticles = getAllArticles();
   
+  // Debug ticker statuses
+  useEffect(() => {
+    console.log('📊 Ticker Statuses:', tickerStatuses);
+    console.log('📊 Subscribed Tickers:', Array.from(connectionState.subscribedTickers));
+    console.log('📊 All Articles Count:', allArticles.length);
+  }, [tickerStatuses, connectionState.subscribedTickers, allArticles.length]);
+  
   const availableTickers = useMemo(() => {
     const tickers = new Set<string>();
     allArticles.forEach(article => {
@@ -891,6 +898,69 @@ export function NewsPage() {
 
       {/* Modern News Feed */}
       <div className="space-y-4" style={{ '--delay': '300ms' } as React.CSSProperties}>
+        {/* Scraping Status Banner - Show when tickers are being fetched */}
+        {(() => {
+          const subscribedTickers = Array.from(connectionState.subscribedTickers);
+          const tickersBeingFetched = subscribedTickers.filter(ticker => {
+            const status = tickerStatuses[ticker];
+            console.log(`🔍 Banner check - Ticker ${ticker}:`, status);
+            // Only show tickers that are actively being processed/fetched
+            return status && (status.status === 'processing' || status.status === 'fetching');
+          });
+          
+          // If no specific tickers have status yet, check if we just subscribed and have no articles
+          const hasNoArticlesForTicker = subscribedTickers.some(ticker => {
+            const tickerArticles = allArticles.filter(article => 
+              article.relatedSymbols && article.relatedSymbols.includes(ticker)
+            );
+            return tickerArticles.length === 0;
+          });
+          
+          console.log('🎯 Banner render check:', {
+            subscribedTickers,
+            tickerStatuses,
+            tickersBeingFetched,
+            hasNoArticlesForTicker,
+            shouldShowBanner: tickersBeingFetched.length > 0
+          });
+          
+          if (tickersBeingFetched.length > 0) {
+            console.log('✅ Rendering scraping banner for:', tickersBeingFetched);
+            return (
+              <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 animate-pulse">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                        Screening News for Your Stocks
+                      </h4>
+                      <p className="text-sm text-blue-700 mb-3">
+                        We're currently scraping news articles for {tickersBeingFetched.join(', ')}. New articles will appear automatically as they're found.
+                      </p>
+                      <div className="space-y-2">
+                        {tickersBeingFetched.map(ticker => {
+                          const status = tickerStatuses[ticker];
+                          return (
+                            <div key={ticker} className="flex items-center gap-2 text-xs text-blue-600">
+                              <Activity className="h-3 w-3 animate-pulse" />
+                              <span className="font-medium">{ticker}</span>
+                              {status?.message && <span className="text-blue-500">- {status.message}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }
+          return null;
+        })()}
+        
         {!connectionState.isConnected ? (
           <Card className="p-16 text-center border-2 border-dashed">
             <div className="text-muted-foreground max-w-md mx-auto">
@@ -901,43 +971,73 @@ export function NewsPage() {
               <p className="text-sm">Establishing real-time connection to news service...</p>
             </div>
           </Card>
-        ) : !hasStocks ? (
-          <Card className="p-16 text-center border-2 border-dashed">
-            <div className="text-muted-foreground max-w-md mx-auto">
-              <div className="inline-flex p-4 bg-primary/10 rounded-full mb-4">
-                <TrendingUp className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-foreground">No Stocks in Watchlist</h3>
-              <p className="text-sm mb-4">Add stocks to your watchlist to receive personalized news updates</p>
-              <Button onClick={() => navigate('/dashboard/stocks')} className="mt-2">
-                Browse Stocks
-              </Button>
-            </div>
-          </Card>
         ) : paginatedArticles.length === 0 ? (
           <Card className="p-16 text-center border-2 border-dashed">
             <div className="text-muted-foreground max-w-md mx-auto">
-              <div className="inline-flex p-4 bg-muted rounded-full mb-4">
-                {allArticles.length === 0 ? (
-                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                ) : (
-                  <NewspaperIcon className="h-8 w-8 opacity-50" />
-                )}
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-foreground">
-                {allArticles.length === 0 ? 'Loading News' : 'No News Found'}
-              </h3>
-              <p className="text-sm">
-                {allArticles.length === 0 
-                  ? 'Fetching the latest news for your watchlist stocks...'
-                  : 'Try adjusting your search terms or filters.'
-                }
-              </p>
-              {allArticles.length === 0 && connectionState.subscribedTickers.size > 0 && (
-                <p className="text-xs mt-3 text-muted-foreground">
-                  Subscribed to: <span className="font-medium">{Array.from(connectionState.subscribedTickers).join(', ')}</span>
-                </p>
-              )}
+              {(() => {
+                // Check if any tickers are being fetched/processed
+                const subscribedTickers = Array.from(connectionState.subscribedTickers);
+                console.log('🔍 Checking ticker statuses for empty state:', {
+                  subscribedTickers,
+                  tickerStatuses,
+                  allArticlesLength: allArticles.length
+                });
+                
+                const tickersBeingFetched = subscribedTickers.filter(ticker => {
+                  const status = tickerStatuses[ticker];
+                  console.log(`🔍 Ticker ${ticker} status:`, status);
+                  return status && (status.status === 'processing' || status.status === 'fetching');
+                });
+                
+                const isScrapingNews = tickersBeingFetched.length > 0;
+                console.log('🔍 Is scraping news?', isScrapingNews, 'Tickers being fetched:', tickersBeingFetched);
+                
+                return (
+                  <>
+                    <div className="inline-flex p-4 bg-muted rounded-full mb-4">
+                      {allArticles.length === 0 || isScrapingNews ? (
+                        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                      ) : (
+                        <NewspaperIcon className="h-8 w-8 opacity-50" />
+                      )}
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-foreground">
+                      {isScrapingNews 
+                        ? 'Screening News for Your Stocks' 
+                        : allArticles.length === 0 
+                          ? 'Loading News' 
+                          : 'No News Found'}
+                    </h3>
+                    <p className="text-sm">
+                      {isScrapingNews
+                        ? `We're currently scraping news articles for ${tickersBeingFetched.join(', ')}. This may take a moment...`
+                        : allArticles.length === 0 
+                          ? 'Fetching the latest news for your watchlist stocks...'
+                          : 'Try adjusting your search terms or filters.'
+                      }
+                    </p>
+                    {isScrapingNews && tickersBeingFetched.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {tickersBeingFetched.map(ticker => {
+                          const status = tickerStatuses[ticker];
+                          return (
+                            <div key={ticker} className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                              <Activity className="h-3 w-3 animate-pulse text-primary" />
+                              <span className="font-medium">{ticker}</span>
+                              {status?.message && <span>- {status.message}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {allArticles.length === 0 && connectionState.subscribedTickers.size > 0 && !isScrapingNews && (
+                      <p className="text-xs mt-3 text-muted-foreground">
+                        Subscribed to: <span className="font-medium">{subscribedTickers.join(', ')}</span>
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </Card>
         ) : (
