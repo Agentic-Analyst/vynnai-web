@@ -384,11 +384,17 @@ const Reports: React.FC = () => {
       
       console.log(`📊 Step 1: Attempting to fetch reports for ${watchedSymbols.length} companies and ${sectors.length} sectors on ${selectedDate}`);
       
-      // FIRST ATTEMPT: Try to get reports
-      await loadReportsForTickers(watchedSymbols, selectedDate, stockPrices);
-      
-      if (sectors.length > 0) {
-        await loadReportsForSectors(sectors, selectedDate, stockPrices);
+      // FIRST ATTEMPT: Try to get reports (but don't fail if they don't exist)
+      try {
+        await loadReportsForTickers(watchedSymbols, selectedDate, stockPrices);
+        
+        if (sectors.length > 0) {
+          await loadReportsForSectors(sectors, selectedDate, stockPrices);
+        }
+      } catch (fetchError: any) {
+        // It's OK if fetching fails - reports might not exist yet
+        // We'll check what we have and generate if needed
+        console.log('ℹ️ Initial fetch completed with some missing reports (expected):', fetchError.message);
       }
       
       // Check if we got all expected reports
@@ -408,6 +414,7 @@ const Reports: React.FC = () => {
       // If we have all expected reports, we're done!
       if (hasAllCompanyReports && hasAllSectorReports) {
         console.log(`✅ All reports found: ${companyReportsForDate.length}/${expectedCompanyReports} companies, ${sectorReportsForDate.length}/${expectedSectorReports} sectors`);
+        setLoading(false); // Clear loading since we're done
         return;
       }
       
@@ -419,18 +426,49 @@ const Reports: React.FC = () => {
       if (!isToday) {
         console.log(`⚠️ Missing reports detected for ${selectedDate} (not today). Companies: ${companyReportsForDate.length}/${expectedCompanyReports}, Sectors: ${sectorReportsForDate.length}/${expectedSectorReports}`);
         console.log(`ℹ️ Auto-generation only works for today's date (${today}). Reports not found for this date.`);
-        // Don't generate, just stop here
+        // Clear loading state and don't generate
+        setLoading(false);
         return;
       }
       
       console.log(`⚠️ Missing reports detected for TODAY. Companies: ${companyReportsForDate.length}/${expectedCompanyReports}, Sectors: ${sectorReportsForDate.length}/${expectedSectorReports}`);
       console.log('🔄 Auto-generating missing reports...');
       
-      setIsGenerating(true);
-      setGenerationStatus({ status: 'pending', progress: 'Generating missing reports...' });
+      // CRITICAL: Set UI to "Generating..." state IMMEDIATELY, before any API calls
+      // This ensures the button changes as soon as we know generation is needed
+      const progressParts = [];
+      if (missingCompanyReports) progressParts.push('companies');
+      if (missingSectorReports) progressParts.push('sectors');
       
+      const preliminaryStatus = {
+        jobId: undefined,
+        status: 'running' as const,
+        progress: `Generating ${progressParts.join(' and ')}...`
+      };
+      
+      const preliminaryData = {
+        selectedDate,
+        allWatchedSymbols: watchedSymbols,
+        allSectors: sectors,
+        startTime: Date.now()
+      };
+      
+      // Save to localStorage and update state BEFORE making API calls
+      localStorage.setItem('reports_generationData', JSON.stringify(preliminaryData));
+      localStorage.setItem('reports_generationStatus', JSON.stringify(preliminaryStatus));
+      localStorage.setItem('reports_isGenerating', 'true');
+      
+      setGenerationStatus(preliminaryStatus);
+      setIsGenerating(true);
+      setLoading(false);
+      
+      console.log('✅ UI updated to "Generating..." state BEFORE API calls');
+      
+      // Now proceed with API calls
       let companyResult;
       let sectorResult;
+      let companyAttempted = false;
+      let sectorAttempted = false;
       
       // Determine which specific tickers are missing reports
       const existingCompanyTickers = new Set(companyReportsForDate.map(r => r.ticker));
@@ -439,8 +477,15 @@ const Reports: React.FC = () => {
       // Trigger generation ONLY for missing company reports
       if (missingCompanyTickers.length > 0) {
         console.log(`📊 Generating missing company reports for ${missingCompanyTickers.length} companies:`, missingCompanyTickers);
-        companyResult = await dailyReportsApi.generateCompanyReports(missingCompanyTickers, selectedDate);
-        console.log(`✅ Company reports generation triggered (batch: ${companyResult.batch_id})`);
+        companyAttempted = true;
+        try {
+          companyResult = await dailyReportsApi.generateCompanyReports(missingCompanyTickers, selectedDate);
+          console.log(`✅ Company reports generation triggered (batch: ${companyResult.batch_id})`);
+        } catch (error: any) {
+          console.error('❌ Failed to trigger company reports generation:', error);
+          // Continue anyway - the backend job might still be running
+          // We'll proceed to show "Generating..." state
+        }
       } else {
         console.log(`✓ All company reports already complete (${companyReportsForDate.length}/${expectedCompanyReports})`);
       }
@@ -452,41 +497,60 @@ const Reports: React.FC = () => {
       // Trigger generation ONLY for missing sector reports
       if (missingSectors.length > 0) {
         console.log(`📊 Generating missing sector reports for ${missingSectors.length} sectors:`, missingSectors);
-        sectorResult = await dailyReportsApi.generateSectorReports(missingSectors, selectedDate);
-        console.log(`✅ Sector reports generation triggered (batch: ${sectorResult.batch_id})`);
+        sectorAttempted = true;
+        try {
+          sectorResult = await dailyReportsApi.generateSectorReports(missingSectors, selectedDate);
+          console.log(`✅ Sector reports generation triggered (batch: ${sectorResult.batch_id})`);
+        } catch (error: any) {
+          console.error('❌ Failed to trigger sector reports generation:', error);
+          // Continue anyway - the backend job might still be running
+          // We'll proceed to show "Generating..." state
+        }
       } else {
         console.log(`✓ All sector reports already complete or not needed (${sectorReportsForDate.length}/${expectedSectorReports})`);
       }
       
-      // Store batch IDs and metadata in localStorage for persistent polling
-      // Store only the missing tickers/sectors for re-fetching after generation
-      const generationData = {
-        companyBatchId: companyResult?.batch_id,
-        sectorBatchId: sectorResult?.batch_id,
-        selectedDate,
-        watchedSymbols: missingCompanyTickers.length > 0 ? missingCompanyTickers : [],
-        sectors: missingSectors.length > 0 ? missingSectors : [],
-        allWatchedSymbols: watchedSymbols, // Store all for final fetch
-        allSectors: sectors, // Store all for final fetch
-        startTime: Date.now()
-      };
-      localStorage.setItem('reports_generationData', JSON.stringify(generationData));
-      
-      // Build progress message based on what's actually being generated
-      const progressParts = [];
-      if (missingCompanyTickers.length > 0) progressParts.push(`${missingCompanyTickers.length} companies`);
-      if (missingSectors.length > 0) progressParts.push(`${missingSectors.length} sectors`);
-      
-      setGenerationStatus({
-        jobId: companyResult?.batch_id || sectorResult?.batch_id,
-        status: 'running',
-        progress: `Generating ${progressParts.join(' and ')}...`
-      });
+      // After API calls, update localStorage with batch IDs if we got them
+      if (companyResult?.batch_id || sectorResult?.batch_id) {
+        const updatedData = {
+          companyBatchId: companyResult?.batch_id,
+          sectorBatchId: sectorResult?.batch_id,
+          selectedDate,
+          watchedSymbols: missingCompanyTickers.length > 0 ? missingCompanyTickers : [],
+          sectors: missingSectors.length > 0 ? missingSectors : [],
+          allWatchedSymbols: watchedSymbols,
+          allSectors: sectors,
+          startTime: Date.now()
+        };
+        
+        const updatedProgressParts = [];
+        if (missingCompanyTickers.length > 0) updatedProgressParts.push(`${missingCompanyTickers.length} companies`);
+        if (missingSectors.length > 0) updatedProgressParts.push(`${missingSectors.length} sectors`);
+        
+        const updatedStatus = {
+          jobId: companyResult?.batch_id || sectorResult?.batch_id,
+          status: 'running' as const,
+          progress: `Generating ${updatedProgressParts.join(' and ')}...`
+        };
+        
+        // Update localStorage with batch IDs for more precise polling
+        localStorage.setItem('reports_generationData', JSON.stringify(updatedData));
+        localStorage.setItem('reports_generationStatus', JSON.stringify(updatedStatus));
+        
+        // Update state with batch IDs
+        setGenerationStatus(updatedStatus);
+        
+        console.log('💾 Updated generation state with batch IDs:', {
+          companyBatchId: companyResult?.batch_id,
+          sectorBatchId: sectorResult?.batch_id
+        });
+      }
       
       // Polling will be handled by useEffect below
       
     } catch (error: any) {
       console.error('Error in get/generate reports flow:', error);
+      setLoading(false); // Always clear loading on error
       setGenerationStatus({
         status: 'failed',
         error: error.message,
@@ -494,18 +558,19 @@ const Reports: React.FC = () => {
       });
       setIsGenerating(false);
       localStorage.removeItem('reports_generationData');
-    } finally {
-      setLoading(false);
+      // Don't call setLoading(false) here - it's already handled earlier
     }
   };
   
   // Persistent polling effect for report generation (survives page navigation)
   useEffect(() => {
+    // Clean up any existing interval first
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
+    }
+    
     if (!isGenerating) {
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        setPollInterval(null);
-      }
       return;
     }
     
@@ -526,6 +591,82 @@ const Reports: React.FC = () => {
     
     console.log('🔄 Starting polling for batch generation...');
     
+    // If we don't have any batch IDs (API calls failed), we'll just retry fetching after delays
+    const hasBatchIds = companyBatchId || sectorBatchId;
+    
+    if (!hasBatchIds) {
+      console.log('⚠️ No batch IDs available - will retry fetching reports periodically');
+      let retryCount = 0;
+      const maxRetries = 20; // Poll for up to 1 minute (20 * 3 seconds)
+      
+      const interval = setInterval(async () => {
+        retryCount++;
+        console.log(`🔄 Retry ${retryCount}/${maxRetries} - Checking if reports are ready...`);
+        
+        try {
+          // Try to fetch reports
+          await loadReportsForTickers(allWatchedSymbols, genDate, stockPrices);
+          if (allSectors && allSectors.length > 0) {
+            await loadReportsForSectors(allSectors, genDate, stockPrices);
+          }
+          
+          // Check if we got the reports
+          const companyReportsForDate = apiCompanyReports.filter((r: any) => r.reportDate === genDate);
+          const sectorReportsForDate = apiSectorReports.filter((r: any) => r.reportDate === genDate);
+          
+          const hasAllReports = 
+            companyReportsForDate.length >= allWatchedSymbols.length &&
+            (allSectors.length === 0 || sectorReportsForDate.length >= allSectors.length);
+          
+          if (hasAllReports) {
+            console.log('✅ Reports are now available!');
+            clearInterval(interval);
+            setPollInterval(null);
+            
+            setGenerationStatus({
+              status: 'completed',
+              progress: 'Reports ready!'
+            });
+            
+            setTimeout(() => {
+              setIsGenerating(false);
+              localStorage.removeItem('reports_generationData');
+            }, 2000);
+          } else if (retryCount >= maxRetries) {
+            console.log('⏰ Max retries reached - stopping polling');
+            clearInterval(interval);
+            setPollInterval(null);
+            
+            setGenerationStatus({
+              status: 'failed',
+              error: 'Timeout waiting for reports',
+              progress: 'Generation timed out'
+            });
+            
+            setIsGenerating(false);
+            localStorage.removeItem('reports_generationData');
+          } else {
+            setGenerationStatus({
+              status: 'running',
+              progress: `Waiting for reports... (${retryCount}/${maxRetries})`
+            });
+          }
+        } catch (error) {
+          console.error('Error checking for reports:', error);
+          // Continue polling
+        }
+      }, 3000);
+      
+      setPollInterval(interval);
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    }
+    
+    // Normal polling with batch IDs
     const interval = setInterval(async () => {
       try {
         let companyBatchStatus;
@@ -565,17 +706,49 @@ const Reports: React.FC = () => {
           if (anySuccess) {
             console.log('✅ Generation complete, fetching reports...');
             
+            setGenerationStatus({
+              status: 'completed',
+              progress: 'Generation complete, refreshing reports...'
+            });
+            
             // SECOND ATTEMPT: Fetch ALL reports after generation (not just the newly generated ones)
             try {
-              await loadReportsForTickers(allWatchedSymbols, genDate, stockPrices);
+              // Re-fetch stock prices data to ensure we have latest sector info
+              const latestStockPrices = stockPrices;
+              
+              await loadReportsForTickers(allWatchedSymbols, genDate, latestStockPrices);
               
               if (allSectors && allSectors.length > 0) {
-                await loadReportsForSectors(allSectors, genDate, stockPrices);
+                await loadReportsForSectors(allSectors, genDate, latestStockPrices);
               }
               
               console.log('✅ Reports fetched after generation');
+              
+              // Update the status to show reports are ready
+              setGenerationStatus({
+                status: 'completed',
+                progress: 'Reports ready!'
+              });
+              
+              // Give user a moment to see the success message, then clear it
+              setTimeout(() => {
+                setIsGenerating(false);
+                localStorage.removeItem('reports_generationData');
+              }, 2000);
+              
             } catch (error) {
               console.error('Error fetching reports after generation:', error);
+              setGenerationStatus({
+                status: 'failed',
+                error: 'Failed to fetch reports after generation',
+                progress: 'Generation succeeded but fetch failed'
+              });
+              
+              // Still clean up after a delay
+              setTimeout(() => {
+                setIsGenerating(false);
+                localStorage.removeItem('reports_generationData');
+              }, 3000);
             }
           } else {
             console.error('❌ Generation failed');
@@ -584,11 +757,11 @@ const Reports: React.FC = () => {
               error: 'Report generation failed',
               progress: 'Generation failed'
             });
+            
+            // Cleanup immediately on failure
+            setIsGenerating(false);
+            localStorage.removeItem('reports_generationData');
           }
-          
-          // Cleanup
-          setIsGenerating(false);
-          localStorage.removeItem('reports_generationData');
         }
       } catch (error: any) {
         console.error('Error polling batch status:', error);
@@ -607,7 +780,7 @@ const Reports: React.FC = () => {
         clearInterval(interval);
       }
     };
-  }, [isGenerating, loadReportsForTickers, loadReportsForSectors, stockPrices]);
+  }, [isGenerating]); // Removed stockPrices and loader functions from dependencies to prevent re-runs
 
   // Helper to get today's date in YYYY-MM-DD format (using local timezone)
   const getTodayDate = () => {
