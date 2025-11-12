@@ -19,7 +19,7 @@ const Bubble = ({ measureRef, children, isUser = false }: BubbleProps) => {
             "bg-transparent text-slate-800 dark:text-slate-100",
       ].join(" ")}
     >
-      <div className={isUser ? "p-3 sm:p-4" : "p-4 sm:p-5"}>{children}</div>
+      <div className={`${isUser ? "p-3 sm:p-4 text-left" : "p-4 sm:p-5 text-left"}`}>{children}</div>
     </div>
   );
 };
