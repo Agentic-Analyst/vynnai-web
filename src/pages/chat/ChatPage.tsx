@@ -35,6 +35,7 @@ const ChatPage = () => {
     addAssistantLogBatch,
     addDownloadsMessage,
     addReportMessage,
+    moveConversationToTop,
   } = useConversations();
   const [input, setInput] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -104,7 +105,11 @@ const ChatPage = () => {
   // NEW — select by id (safe when filtering)
   const switchConversationById = (id) => {
     const idx = conversations.findIndex((c) => c.id === id);
-    if (idx !== -1 && currentConversationIndex !== idx) switchConversation(idx);
+    if (idx !== -1 && currentConversationIndex !== idx) {
+      // Just switch to the conversation without moving it
+      // It will only move to top when user actually sends a message
+      switchConversation(idx);
+    }
   };
 
   // NEW — rename helpers
@@ -113,11 +118,11 @@ const ChatPage = () => {
     setRenameValue(currentTitle || "");
   };
 
-  const commitRename = () => {
-    const val = (renameValue || "").trim();
+  const commitRename = (id, newName) => {
+    const val = (newName || renameValue || "").trim();
     setConversations((prev) =>
       prev.map((c) =>
-        c.id === renamingId ? { ...c, title: val || "Untitled chat" } : c
+        c.id === (id || renamingId) ? { ...c, title: val || "Untitled chat" } : c
       )
     );
     setRenamingId(null);
@@ -207,6 +212,7 @@ const ChatPage = () => {
             jobProgress: null,
             sessionId: null,
             isDraft: true,
+            lastUsedAt: Date.now(),
           },
         ]);
       }
@@ -278,7 +284,8 @@ const ChatPage = () => {
             true,
             status.progress || "Reconnecting to analysis..."
           );
-          startJobMonitoring(cached.id, { fromReconnect: true });
+          // Pass the conversation ID for reconnection
+          startJobMonitoring(cached.id, { convId: currentConversation.id });
         } else {
           userStorage.removeItem("activeJob");
           updateCurrentConversationJobState(null, false, null);
@@ -421,7 +428,11 @@ const ChatPage = () => {
   }, [lastMessage?.timestamp, isUserAtBottom, autoScrollEnabled, msgs.length]);
 
   // ---------- Helpers ----------
-  // Get current conversation's job state
+  // Get current conversation's job state - using ID for reliability after reordering
+  const getCurrentConversationId = () => {
+    return conversations[currentConversationIndex]?.id || null;
+  };
+
   const getCurrentConversationJobId = () => {
     const jobId = conversations[currentConversationIndex]?.activeJobId || null;
     if (jobId) {
@@ -450,23 +461,25 @@ const ChatPage = () => {
     return progress;
   };
 
-  // Update current conversation's job state
-  const updateCurrentConversationJobState = (
+  // Update conversation's job state by ID (more reliable after reordering)
+  const updateConversationJobStateById = (
+    conversationId,
     jobId,
     streaming = false,
     progress = null
   ) => {
-    console.log("🔄 Updating conversation job state:", {
+    console.log("🔄 Updating conversation job state by ID:", {
+      conversationId,
       jobId,
       streaming,
       progress,
-      currentConversationIndex,
     });
 
     setConversations((prev) => {
       const updated = [...prev];
-      const convo = updated[currentConversationIndex];
-      if (convo) {
+      const idx = updated.findIndex(c => c.id === conversationId);
+      if (idx !== -1) {
+        const convo = updated[idx];
         console.log("📝 Job state change:", {
           previousJobId: convo.activeJobId,
           newJobId: jobId,
@@ -475,15 +488,29 @@ const ChatPage = () => {
           previousStreaming: convo.isStreaming,
           newStreaming: streaming,
         });
-        updated[currentConversationIndex] = {
+        updated[idx] = {
           ...convo,
           activeJobId: jobId,
           isStreaming: streaming,
           jobProgress: progress,
         };
+      } else {
+        console.warn("⚠️ Could not find conversation with ID:", conversationId);
       }
       return updated;
     });
+  };
+
+  // Legacy wrapper that uses current conversation index
+  const updateCurrentConversationJobState = (
+    jobId,
+    streaming = false,
+    progress = null
+  ) => {
+    const conversationId = getCurrentConversationId();
+    if (conversationId) {
+      updateConversationJobStateById(conversationId, jobId, streaming, progress);
+    }
   };
 
   // Manual scroll to bottom function for user interaction
@@ -672,6 +699,9 @@ const ChatPage = () => {
     if (!input.trim() || currentStreaming) return;
 
     const userMessage: Message = { role: "user", content: input };
+    const currentConvId = conversations[currentConversationIndex]?.id;
+    const wasAtTop = currentConversationIndex === 0;
+    
     setConversations((prev) => {
       const updated = [...prev];
       const convo = updated[currentConversationIndex] ?? {
@@ -683,6 +713,7 @@ const ChatPage = () => {
         jobProgress: null,
         sessionId: null,
         isDraft: true,
+        lastUsedAt: Date.now(),
       };
       const msgs = [...(convo.messages || [])]; // clone messages
       msgs.push(userMessage); // pure append
@@ -690,9 +721,16 @@ const ChatPage = () => {
         ...convo,
         messages: msgs,
         isDraft: false,
+        lastUsedAt: Date.now(), // Update last used timestamp
       }; // replace convo
       return updated;
     });
+
+    // Move conversation to top if it's not already at position 0
+    // This happens AFTER the message is added
+    if (!wasAtTop && currentConvId) {
+      moveConversationToTop(currentConvId);
+    }
 
     const currentInput = input;
     setInput("");
@@ -701,7 +739,9 @@ const ChatPage = () => {
 
     try {
       const email = localStorage.getItem("auth_email");
-      const currentConversation = conversations[currentConversationIndex];
+      // After moveConversationToTop, the current conversation will be at index 0
+      // We need to find the conversation by ID to get the latest state
+      const currentConversation = conversations.find(c => c.id === currentConvId);
       const sessionId = currentConversation?.sessionId || null;
 
       console.log("📤 Sending chat request with session_id:", sessionId);
@@ -722,7 +762,7 @@ const ChatPage = () => {
       ); // Set new job ID, streaming, and initial progress
 
       // Start both SSE monitoring and periodic status checking
-      const convId = conversations[currentConversationIndex].id;
+      const convId = currentConvId; // Use the saved conversation ID
 
       userStorage.setJSON("activeJob", {
         id: result.job_id,
@@ -732,21 +772,22 @@ const ChatPage = () => {
       });
 
       startJobMonitoring(result.job_id, { convId });
-      startPeriodicStatusCheck(result.job_id);
+      startPeriodicStatusCheck(result.job_id, convId);
 
       // Update conversation title if this is the first message
-      if (conversations[currentConversationIndex].title === "New Analysis") {
-        // Extract a short title from the user prompt
-        const shortTitle =
-          currentInput.length > 50
-            ? currentInput.substring(0, 47) + "..."
-            : currentInput;
-        setConversations((prev) => {
-          const updated = [...prev];
-          updated[currentConversationIndex].title = shortTitle;
-          return updated;
-        });
-      }
+      setConversations((prev) => {
+        const updated = [...prev];
+        const idx = updated.findIndex(c => c.id === currentConvId);
+        if (idx !== -1 && updated[idx]?.title === "New Analysis") {
+          // Extract a short title from the user prompt
+          const shortTitle =
+            currentInput.length > 50
+              ? currentInput.substring(0, 47) + "..."
+              : currentInput;
+          updated[idx] = { ...updated[idx], title: shortTitle };
+        }
+        return updated;
+      });
     } catch (error) {
       addAssistantMessage(`❌ **Chat Failed:** ${error.message}`);
       updateCurrentConversationJobState(null, false, null); // Clear job state on error
@@ -754,7 +795,7 @@ const ChatPage = () => {
   };
 
   // ---------- SSE monitoring ----------
-  const startJobMonitoring = (jobId, opts = {}) => {
+  const startJobMonitoring = (jobId, opts: { convId?: number } = {}) => {
     const { convId } = opts;
     if (eventSourceRef.current) {
       try {
@@ -839,8 +880,10 @@ const ChatPage = () => {
               "from line:",
               s.substring(0, 100)
             );
-            // Use the jobId parameter to maintain consistency
-            updateCurrentConversationJobState(jobId, true, progressText);
+            // Use the conversation ID to update the correct conversation
+            if (convId) {
+              updateConversationJobStateById(convId, jobId, true, progressText);
+            }
             break; // Use first match
           }
         }
@@ -1070,7 +1113,9 @@ const ChatPage = () => {
 
       // Add a small delay before clearing to ensure UI updates properly
       setTimeout(() => {
-        updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
+        if (convId) {
+          updateConversationJobStateById(convId, null, false, null); // Clear job state for the conversation
+        }
         userStorage.removeItem("activeJob");
         console.log("✅ Job state cleared after completion");
       }, 1000); // 1 second delay
@@ -1115,7 +1160,9 @@ const ChatPage = () => {
 
       // Add a small delay before clearing to ensure UI updates properly
       setTimeout(() => {
-        updateCurrentConversationJobState(null, false, null); // Clear job state for current conversation
+        if (convId) {
+          updateConversationJobStateById(convId, null, false, null); // Clear job state for the conversation
+        }
         userStorage.removeItem("activeJob");
         console.log("✅ Job state cleared after failure");
       }, 1000); // 1 second delay
@@ -1154,8 +1201,10 @@ const ChatPage = () => {
 
           if (cleanProgress && cleanProgress.length > 0) {
             console.log("📈 Progress update:", cleanProgress);
-            // Use the jobId parameter to avoid race conditions with state reads
-            updateCurrentConversationJobState(jobId, true, cleanProgress);
+            // Use the conversation ID to update the correct conversation
+            if (convId) {
+              updateConversationJobStateById(convId, jobId, true, cleanProgress);
+            }
           }
         }
         queue(
@@ -1243,7 +1292,9 @@ const ChatPage = () => {
                   "ℹ️ **Analysis completed. Connection closed.**",
                   convId
                 );
-                updateCurrentConversationJobState(null, false, null);
+                if (convId) {
+                  updateConversationJobStateById(convId, null, false, null);
+                }
                 userStorage.removeItem("activeJob");
               } else {
                 addAssistantMessage(
@@ -1251,11 +1302,14 @@ const ChatPage = () => {
                   convId
                 );
                 // Keep job state but mark as not streaming
-                updateCurrentConversationJobState(
-                  jobId,
-                  false,
-                  "Connection lost - monitoring..."
-                );
+                if (convId) {
+                  updateConversationJobStateById(
+                    convId,
+                    jobId,
+                    false,
+                    "Connection lost - monitoring..."
+                  );
+                }
               }
             } catch (error) {
               console.log("Failed to check job status after SSE close:", error);
@@ -1281,14 +1335,14 @@ const ChatPage = () => {
   };
 
   // ---------- Periodic Status Check ----------
-  const startPeriodicStatusCheck = (jobId) => {
+  const startPeriodicStatusCheck = (jobId, conversationId) => {
     // Clear any existing status check interval
     if (progressPollRef.current) {
       clearInterval(progressPollRef.current);
       progressPollRef.current = null;
     }
 
-    console.log("🔄 Starting periodic status check for job:", jobId);
+    console.log("🔄 Starting periodic status check for job:", jobId, "conversation:", conversationId);
     let failureCount = 0;
     const maxFailures = 3;
 
@@ -1321,7 +1375,9 @@ const ChatPage = () => {
               status.status === "processing" ||
               status.status === "active"
             ) {
-              updateCurrentConversationJobState(jobId, true, status.progress);
+              if (conversationId) {
+                updateConversationJobStateById(conversationId, jobId, true, status.progress);
+              }
             }
           }
 

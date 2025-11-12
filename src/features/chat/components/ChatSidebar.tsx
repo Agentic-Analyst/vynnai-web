@@ -64,6 +64,8 @@ const ChatSidebar = ({
     setFilteredConversations(
       conversations
         .filter((c) => !c.isDraft)
+        // Sort by lastUsedAt in descending order (most recent first)
+        .sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0))
         .map((c, idx) => ({ ...c, _index: idx }))
         .filter((c) =>
           (c.title || "").toLowerCase().includes(searchQuery.toLowerCase())

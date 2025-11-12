@@ -12,6 +12,7 @@ const createBlankConversation = (): Conversation => ({
   jobProgress: null,
   sessionId: null,
   isDraft: true,
+  lastUsedAt: Date.now(),
 });
 
 export function useConversations(initialIndex = 0) {
@@ -25,6 +26,7 @@ export function useConversations(initialIndex = 0) {
         jobProgress: c.jobProgress || null,
         sessionId: c.sessionId || null,
         isDraft: typeof c.isDraft === "boolean" ? c.isDraft : false,
+        lastUsedAt: c.lastUsedAt || Date.now(), // Initialize if missing
       }));
     }
     return [createBlankConversation()];
@@ -63,8 +65,10 @@ export function useConversations(initialIndex = 0) {
         setCurrentConversationIndex(existingDraftIdx);
         return prev;
       }
-      const next = [...prev, createBlankConversation()];
-      setCurrentConversationIndex(next.length - 1);
+      // Add new conversation at the beginning (index 0) instead of the end
+      const newConvo = createBlankConversation();
+      const next = [newConvo, ...prev];
+      setCurrentConversationIndex(0); // Set to first position
       return next;
     });
   }, []);
@@ -265,6 +269,25 @@ export function useConversations(initialIndex = 0) {
     [findIndexById]
   );
 
+  // --- move conversation to top (most recently used) ---
+  const moveConversationToTop = useCallback((id: number) => {
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === id);
+      if (idx === -1 || idx === 0) return prev; // Already at top or not found
+      
+      const next = [...prev];
+      const [conversation] = next.splice(idx, 1); // Remove from current position
+      
+      // Update lastUsedAt timestamp
+      conversation.lastUsedAt = Date.now();
+      
+      next.unshift(conversation); // Add to beginning
+      setCurrentConversationIndex(0); // Update index to 0 (top position)
+      
+      return next;
+    });
+  }, []);
+
   return {
     conversations,
     currentConversationIndex,
@@ -277,5 +300,6 @@ export function useConversations(initialIndex = 0) {
     addAssistantLogBatch,
     addDownloadsMessage,
     addReportMessage,
+    moveConversationToTop,
   };
 }

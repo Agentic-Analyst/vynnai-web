@@ -15,4 +15,5 @@ export type Conversation = {
   jobProgress?: string | null;
   sessionId?: string | null;
   isDraft?: boolean;
+  lastUsedAt?: number; // Timestamp for sorting by most recently used
 };
