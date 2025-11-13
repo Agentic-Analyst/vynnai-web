@@ -21,6 +21,27 @@ import {
 import { useConversations } from "@/hooks/chat/useConversations";
 import { useTypewriter } from "@/hooks/useTypewriter";
 
+// Global refs to persist SSE connections across component unmounts
+// This allows jobs to continue running when user navigates away from chat
+let globalEventSourceRef = null;
+let globalProgressPollRef = null;
+
+// Global callback refs to ensure SSE handlers always use latest component functions
+// This solves the stale closure problem when component remounts
+let globalCallbacksRef = {
+  setConversations: null,
+  addAssistantMessage: null,
+  appendNLContent: null,
+  addAssistantLogBatch: null,
+  addDownloadsMessage: null,
+  addReportMessage: null,
+  updateConversationJobStateById: null,
+  conversations: null,
+  currentConversationIndex: null,
+  listRef: null,
+  isMounted: null, // Track if component is currently mounted
+};
+
 const ChatPage = () => {
   // ---------- Local state ----------
   const {
@@ -47,9 +68,9 @@ const ChatPage = () => {
   const rowHeightsRef = useRef({});
   const DEFAULT_ROW_HEIGHT = 56;
 
-  // job state
-  const eventSourceRef = useRef(null);
-  const progressPollRef = useRef(null);
+  // job state - use global refs for SSE connections
+  const eventSourceRef = { get current() { return globalEventSourceRef; }, set current(v) { globalEventSourceRef = v; } };
+  const progressPollRef = { get current() { return globalProgressPollRef; }, set current(v) { globalProgressPollRef = v; } };
   const [availableFiles, setAvailableFiles] = useState({});
   const [isStoppingJob, setIsStoppingJob] = useState(false);
 
@@ -102,6 +123,10 @@ const ChatPage = () => {
     reports: { deterministic: "", llm: "" }, // Store both reports
   });
 
+  // Update global callbacks when dependencies change so SSE handlers use latest functions
+  // We update this in a useEffect near the end of the component after all functions are defined
+  // This ensures SSE handlers always have access to current state and callbacks
+
   // NEW — select by id (safe when filtering)
   const switchConversationById = (id) => {
     const idx = conversations.findIndex((c) => c.id === id);
@@ -143,18 +168,26 @@ const ChatPage = () => {
     if (idx === currentConversationIndex) {
       const conversation = conversations[idx];
       if (conversation?.activeJobId) {
-        userStorage.removeItem("activeJob");
-
-        if (eventSourceRef.current) {
-          try {
-            eventSourceRef.current.close();
-          } catch {}
-          eventSourceRef.current = null;
+        // Check if the active job in storage matches this conversation's job
+        const cachedJob = userStorage.getJSON("activeJob");
+        if (cachedJob && cachedJob.id === conversation.activeJobId) {
+          userStorage.removeItem("activeJob");
         }
 
-        if (progressPollRef.current) {
-          clearInterval(progressPollRef.current);
-          progressPollRef.current = null;
+        // Close SSE connections only if they belong to this conversation
+        // Check the cached job to ensure we're closing the right connection
+        if (cachedJob && cachedJob.conversationId === conversation.id) {
+          if (eventSourceRef.current) {
+            try {
+              eventSourceRef.current.close();
+            } catch {}
+            eventSourceRef.current = null;
+          }
+
+          if (progressPollRef.current) {
+            clearInterval(progressPollRef.current);
+            progressPollRef.current = null;
+          }
         }
       }
     }
@@ -240,8 +273,19 @@ const ChatPage = () => {
       const storedUser = localStorage.getItem("lastActiveUser");
 
       if (!currentUser) {
-        // User logged out
+        // User logged out - clean up SSE connections
         localStorage.removeItem("lastActiveUser");
+        
+        if (eventSourceRef.current) {
+          try {
+            eventSourceRef.current.close();
+          } catch {}
+          eventSourceRef.current = null;
+        }
+        if (progressPollRef.current) {
+          clearInterval(progressPollRef.current);
+          progressPollRef.current = null;
+        }
       } else if (currentUser !== storedUser) {
         // User changed - force page reload to reset all state properly
         window.location.reload();
@@ -303,18 +347,12 @@ const ChatPage = () => {
     document.addEventListener("visibilitychange", onVis);
 
     return () => {
+      // Clean up only the interval and listener, NOT the SSE connections
+      // This allows jobs to continue running when user navigates away
       clearInterval(reconnectInterval);
       document.removeEventListener("visibilitychange", onVis);
-      if (eventSourceRef.current) {
-        try {
-          eventSourceRef.current.close();
-        } catch {}
-        eventSourceRef.current = null;
-      }
-      if (progressPollRef.current) {
-        clearInterval(progressPollRef.current);
-        progressPollRef.current = null;
-      }
+      // Note: eventSourceRef and progressPollRef are intentionally NOT closed here
+      // They will be closed explicitly when stopping a job or on logout
     };
   }, []);
 
@@ -435,14 +473,6 @@ const ChatPage = () => {
 
   const getCurrentConversationJobId = () => {
     const jobId = conversations[currentConversationIndex]?.activeJobId || null;
-    if (jobId) {
-      console.log(
-        "🆔 Current conversation job ID:",
-        jobId,
-        "for conversation:",
-        currentConversationIndex
-      );
-    }
     return jobId;
   };
 
@@ -453,11 +483,7 @@ const ChatPage = () => {
   };
 
   const getCurrentConversationProgress = () => {
-    const progress =
-      conversations[currentConversationIndex]?.jobProgress || null;
-    if (progress) {
-      console.log("📊 Current progress:", progress);
-    }
+    const progress = conversations[currentConversationIndex]?.jobProgress || null;
     return progress;
   };
 
@@ -881,8 +907,8 @@ const ChatPage = () => {
               s.substring(0, 100)
             );
             // Use the conversation ID to update the correct conversation
-            if (convId) {
-              updateConversationJobStateById(convId, jobId, true, progressText);
+            if (convId && globalCallbacksRef.updateConversationJobStateById) {
+              globalCallbacksRef.updateConversationJobStateById(convId, jobId, true, progressText);
             }
             break; // Use first match
           }
@@ -1035,8 +1061,8 @@ const ChatPage = () => {
         );
 
         // Always append NL content to last message (works for both regular and logbatch messages)
-        if (cleanedNL) {
-          appendNLContent(cleanedNL, convId);
+        if (cleanedNL && globalCallbacksRef.appendNLContent) {
+          globalCallbacksRef.appendNLContent(cleanedNL, convId);
         }
 
         nlBatch = [];
@@ -1047,14 +1073,30 @@ const ChatPage = () => {
       if (logBatch.length > 0) {
         const logLines = logBatch;
         // Add logs to existing logbatch or create new one
-        addAssistantLogBatch(logLines, "", convId);
+        if (globalCallbacksRef.addAssistantLogBatch) {
+          globalCallbacksRef.addAssistantLogBatch(logLines, "", convId);
+        }
         logBatch = [];
         logBatchBytes = 0;
       }
 
-      const count =
-        conversations[currentConversationIndex]?.messages?.length || 0;
-      if (count > 0) listRef.current?.resetAfterIndex(count - 1);
+      // Only reset the list if we're updating the currently visible conversation
+      // This prevents corruption of the virtualized list when updates happen to background conversations
+      if (convId) {
+        const currentConvId = globalCallbacksRef.conversations?.[globalCallbacksRef.currentConversationIndex]?.id;
+        if (currentConvId === convId && globalCallbacksRef.listRef?.current) {
+          const count = globalCallbacksRef.conversations?.[globalCallbacksRef.currentConversationIndex]?.messages?.length || 0;
+          if (count > 0) {
+            globalCallbacksRef.listRef.current.resetAfterIndex(count - 1);
+          }
+        }
+      } else {
+        // Fallback for cases without convId (shouldn't happen in SSE context)
+        const count = globalCallbacksRef.conversations?.[globalCallbacksRef.currentConversationIndex]?.messages?.length || 0;
+        if (count > 0 && globalCallbacksRef.listRef?.current) {
+          globalCallbacksRef.listRef.current.resetAfterIndex(count - 1);
+        }
+      }
     };
 
     const finalizeDone = (status = "completed", note) => {
@@ -1079,24 +1121,24 @@ const ChatPage = () => {
       }
 
       // Display both captured reports if available
-      if (reportCaptureRef.current.reports.deterministic) {
+      if (reportCaptureRef.current.reports.deterministic && globalCallbacksRef.addReportMessage) {
         console.log(
           "📊 Displaying deterministic report with length:",
           reportCaptureRef.current.reports.deterministic.length
         );
-        addReportMessage(
+        globalCallbacksRef.addReportMessage(
           reportCaptureRef.current.reports.deterministic,
           "deterministic",
           convId
         );
       }
 
-      if (reportCaptureRef.current.reports.llm) {
+      if (reportCaptureRef.current.reports.llm && globalCallbacksRef.addReportMessage) {
         console.log(
           "🤖 Displaying LLM report with length:",
           reportCaptureRef.current.reports.llm.length
         );
-        addReportMessage(reportCaptureRef.current.reports.llm, "llm", convId);
+        globalCallbacksRef.addReportMessage(reportCaptureRef.current.reports.llm, "llm", convId);
       }
 
       if (
@@ -1113,8 +1155,8 @@ const ChatPage = () => {
 
       // Add a small delay before clearing to ensure UI updates properly
       setTimeout(() => {
-        if (convId) {
-          updateConversationJobStateById(convId, null, false, null); // Clear job state for the conversation
+        if (convId && globalCallbacksRef.updateConversationJobStateById) {
+          globalCallbacksRef.updateConversationJobStateById(convId, null, false, null); // Clear job state for the conversation
         }
         userStorage.removeItem("activeJob");
         console.log("✅ Job state cleared after completion");
@@ -1127,9 +1169,9 @@ const ChatPage = () => {
             console.log(files);
             const ticker = (detail.ticker || "").toUpperCase();
             const mapped = buildDownloadEntries(api.base, jobId, ticker, files);
-            if (Object.keys(mapped).length > 0) {
+            if (Object.keys(mapped).length > 0 && globalCallbacksRef.addDownloadsMessage) {
               setAvailableFiles(mapped);
-              addDownloadsMessage(jobId, mapped, convId);
+              globalCallbacksRef.addDownloadsMessage(jobId, mapped, convId);
             }
           }
         } catch {
@@ -1150,18 +1192,20 @@ const ChatPage = () => {
 
     const finalizeFail = (status = "failed", detail) => {
       flush();
-      addAssistantMessage(
-        `❌ **Analysis Failed** (status: ${status})${
-          detail ? `\n\n${detail}` : ""
-        }`,
-        convId
-      );
+      if (globalCallbacksRef.addAssistantMessage) {
+        globalCallbacksRef.addAssistantMessage(
+          `❌ **Analysis Failed** (status: ${status})${
+            detail ? `\n\n${detail}` : ""
+          }`,
+          convId
+        );
+      }
       console.log("❌ Analysis failed, clearing job state for job:", jobId);
 
       // Add a small delay before clearing to ensure UI updates properly
       setTimeout(() => {
-        if (convId) {
-          updateConversationJobStateById(convId, null, false, null); // Clear job state for the conversation
+        if (convId && globalCallbacksRef.updateConversationJobStateById) {
+          globalCallbacksRef.updateConversationJobStateById(convId, null, false, null); // Clear job state for the conversation
         }
         userStorage.removeItem("activeJob");
         console.log("✅ Job state cleared after failure");
@@ -1183,11 +1227,6 @@ const ChatPage = () => {
       onOpen: () => {},
       onStatus: (payload) => {
         const { message, progress } = payload || {};
-        console.log("📡 SSE onStatus received:", {
-          message,
-          progress,
-          payload,
-        });
 
         // Update conversation progress - prefer progress field, fallback to message
         const progressText = progress || message;
@@ -1202,8 +1241,8 @@ const ChatPage = () => {
           if (cleanProgress && cleanProgress.length > 0) {
             console.log("📈 Progress update:", cleanProgress);
             // Use the conversation ID to update the correct conversation
-            if (convId) {
-              updateConversationJobStateById(convId, jobId, true, cleanProgress);
+            if (convId && globalCallbacksRef.updateConversationJobStateById) {
+              globalCallbacksRef.updateConversationJobStateById(convId, jobId, true, cleanProgress);
             }
           }
         }
@@ -1241,16 +1280,16 @@ const ChatPage = () => {
           const { message, status, session_id } = payload || {};
 
           // Extract and store session_id if provided
-          if (session_id) {
+          if (session_id && globalCallbacksRef.setConversations) {
             console.log(
               "💾 Received session_id from completed event:",
               session_id
             );
-            setConversations((prev) => {
+            globalCallbacksRef.setConversations((prev) => {
               const next = [...prev];
               const idx = convId
                 ? next.findIndex((c) => c.id === convId)
-                : currentConversationIndex;
+                : globalCallbacksRef.currentConversationIndex;
               if (next[idx]) {
                 next[idx] = { ...next[idx], sessionId: session_id };
               }
@@ -1288,22 +1327,26 @@ const ChatPage = () => {
                 status &&
                 (status.status === "completed" || status.status === "failed")
               ) {
-                addAssistantMessage(
-                  "ℹ️ **Analysis completed. Connection closed.**",
-                  convId
-                );
-                if (convId) {
-                  updateConversationJobStateById(convId, null, false, null);
+                if (globalCallbacksRef.addAssistantMessage) {
+                  globalCallbacksRef.addAssistantMessage(
+                    "ℹ️ **Analysis completed. Connection closed.**",
+                    convId
+                  );
+                }
+                if (convId && globalCallbacksRef.updateConversationJobStateById) {
+                  globalCallbacksRef.updateConversationJobStateById(convId, null, false, null);
                 }
                 userStorage.removeItem("activeJob");
               } else {
-                addAssistantMessage(
-                  "⚠️ **Connection lost. Monitoring may resume automatically.**",
-                  convId
-                );
+                if (globalCallbacksRef.addAssistantMessage) {
+                  globalCallbacksRef.addAssistantMessage(
+                    "⚠️ **Connection lost. Monitoring may resume automatically.**",
+                    convId
+                  );
+                }
                 // Keep job state but mark as not streaming
-                if (convId) {
-                  updateConversationJobStateById(
+                if (convId && globalCallbacksRef.updateConversationJobStateById) {
+                  globalCallbacksRef.updateConversationJobStateById(
                     convId,
                     jobId,
                     false,
@@ -1313,7 +1356,9 @@ const ChatPage = () => {
               }
             } catch (error) {
               console.log("Failed to check job status after SSE close:", error);
-              addAssistantMessage("ℹ️ **Connection closed.**", convId);
+              if (globalCallbacksRef.addAssistantMessage) {
+                globalCallbacksRef.addAssistantMessage("ℹ️ **Connection closed.**", convId);
+              }
             }
           }, 500);
 
@@ -1323,10 +1368,12 @@ const ChatPage = () => {
           eventSourceRef.current = null;
         } else {
           flush();
-          addAssistantMessage(
-            "⚠️ **Connection issue:** Monitoring may resume automatically.",
-            convId
-          );
+          if (globalCallbacksRef.addAssistantMessage) {
+            globalCallbacksRef.addAssistantMessage(
+              "⚠️ **Connection issue:** Monitoring may resume automatically.",
+              convId
+            );
+          }
         }
       },
     });
@@ -1375,8 +1422,8 @@ const ChatPage = () => {
               status.status === "processing" ||
               status.status === "active"
             ) {
-              if (conversationId) {
-                updateConversationJobStateById(conversationId, jobId, true, status.progress);
+              if (conversationId && globalCallbacksRef.updateConversationJobStateById) {
+                globalCallbacksRef.updateConversationJobStateById(conversationId, jobId, true, status.progress);
               }
             }
           }
@@ -1773,6 +1820,31 @@ const ChatPage = () => {
   const currentMessages =
     conversations[currentConversationIndex]?.messages ?? [];
   const isEmptyConversation = currentMessages.length === 0;
+
+  // Update global callbacks when dependencies change so SSE handlers use latest functions
+  // Placed here after all functions are defined to avoid "used before declaration" errors
+  useEffect(() => {
+    globalCallbacksRef.setConversations = setConversations;
+    globalCallbacksRef.addAssistantMessage = addAssistantMessage;
+    globalCallbacksRef.appendNLContent = appendNLContent;
+    globalCallbacksRef.addAssistantLogBatch = addAssistantLogBatch;
+    globalCallbacksRef.addDownloadsMessage = addDownloadsMessage;
+    globalCallbacksRef.addReportMessage = addReportMessage;
+    globalCallbacksRef.updateConversationJobStateById = updateConversationJobStateById;
+    globalCallbacksRef.conversations = conversations;
+    globalCallbacksRef.currentConversationIndex = currentConversationIndex;
+    globalCallbacksRef.listRef = listRef;
+  }, [
+    setConversations,
+    addAssistantMessage,
+    appendNLContent,
+    addAssistantLogBatch,
+    addDownloadsMessage,
+    addReportMessage,
+    updateConversationJobStateById,
+    conversations,
+    currentConversationIndex,
+  ]);
 
   // ---------- UI ----------
   return (
