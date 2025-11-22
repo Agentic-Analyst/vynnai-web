@@ -14,9 +14,9 @@ const Bubble = ({ measureRef, children, isUser = false }: BubbleProps) => {
         "inline-block max-w-[920px] break-words rounded-2xl",
         isUser
           ? // User bubble — keep gradient and ring
-            "bg-gradient-to-br from-blue-600 to-indigo-600 text-white ring-1 ring-blue-700/30 shadow-sm"
+            "bg-gradient-to-br from-blue-700 to-indigo-900 text-white ring-1 ring-blue-500/30 shadow-lg shadow-blue-900/20"
           : // AI bubble — transparent, no ring or shadow
-            "bg-transparent text-slate-800 dark:text-slate-100",
+            "bg-transparent text-slate-200",
       ].join(" ")}
     >
       <div className={`${isUser ? "p-3 sm:p-4 text-left" : "p-4 sm:p-5 text-left"}`}>{children}</div>

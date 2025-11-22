@@ -1644,19 +1644,25 @@ const ChatPage = () => {
                       prose-ul:my-1 prose-ol:my-1 prose-li:my-0
                       prose-table:my-2
                       prose-img:my-2
-                      ${isUser ? "prose-invert" : "prose-slate"}
+                      prose-invert
+                      prose-headings:text-slate-200 prose-headings:font-serif
+                      prose-p:text-slate-300 prose-p:font-light
+                      prose-strong:text-amber-400 prose-strong:font-medium
+                      prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline
+                      prose-code:text-amber-200
                     `}
                     components={{
-                      code({ node, inline, className, children, ...props }) {
+                      code({ node, className, children, ...props }: any) {
                         const match = /language-(\w+)/.exec(className || "");
+                        const inline = props.inline;
                         return !inline && match ? (
-                          <div className="overflow-x-auto rounded-md ring-1 ring-slate-200">
+                          <div className="overflow-x-auto rounded-lg ring-1 ring-slate-700/50 bg-slate-900/50 my-4 shadow-inner">
                             <SyntaxHighlighter
                               {...props}
                               style={vscDarkPlus}
                               language={match[1]}
                               PreTag="div"
-                              customStyle={{ margin: 0, maxWidth: "100%" }}
+                              customStyle={{ margin: 0, maxWidth: "100%", background: "transparent" }}
                             >
                               {String(children).replace(/\n$/, "")}
                             </SyntaxHighlighter>
@@ -1665,7 +1671,7 @@ const ChatPage = () => {
                           <code
                             {...props}
                             className={`${className} break-all px-1.5 py-0.5 rounded ${
-                              isUser ? "bg-white/20 text-white" : "bg-slate-100"
+                              isUser ? "bg-white/20 text-white" : "bg-slate-800/50 text-amber-200 border border-slate-700/50"
                             }`}
                           >
                             {children}
@@ -1676,7 +1682,7 @@ const ChatPage = () => {
                         return (
                           <pre
                             {...props}
-                            className="whitespace-pre-wrap break-words overflow-x-auto rounded-md ring-1 ring-slate-200 bg-slate-50 p-3"
+                            className="whitespace-pre-wrap break-words overflow-x-auto rounded-lg ring-1 ring-slate-700/50 bg-slate-900/50 p-4 shadow-inner"
                           >
                             {children}
                           </pre>
@@ -1684,7 +1690,7 @@ const ChatPage = () => {
                       },
                       p({ node, children, ...props }) {
                         return (
-                          <p {...props} className="break-words">
+                          <p {...props} className="break-words leading-relaxed">
                             {children}
                           </p>
                         );
@@ -1693,7 +1699,7 @@ const ChatPage = () => {
                         return (
                           <ul
                             {...props}
-                            className="list-disc list-inside space-y-1 mb-3"
+                            className="list-disc list-inside space-y-1 mb-3 text-slate-300 marker:text-amber-500/70"
                           >
                             {children}
                           </ul>
@@ -1703,7 +1709,7 @@ const ChatPage = () => {
                         return (
                           <ol
                             {...props}
-                            className="list-decimal list-inside space-y-1 mb-3"
+                            className="list-decimal list-inside space-y-1 mb-3 text-slate-300 marker:text-amber-500/70"
                           >
                             {children}
                           </ol>
@@ -1718,10 +1724,10 @@ const ChatPage = () => {
                       },
                       table({ node, children, ...props }) {
                         return (
-                          <div className="overflow-x-auto my-4">
+                          <div className="overflow-x-auto my-4 rounded-lg border border-slate-700/50 shadow-sm">
                             <table
                               {...props}
-                              className="min-w-full border-collapse border border-slate-300"
+                              className="min-w-full border-collapse bg-slate-900/30"
                             >
                               {children}
                             </table>
@@ -1733,7 +1739,7 @@ const ChatPage = () => {
                           <thead
                             {...props}
                             className={`${
-                              isUser ? "bg-white/20" : "bg-slate-100"
+                              isUser ? "bg-white/20" : "bg-slate-800/50"
                             }`}
                           >
                             {children}
@@ -1748,7 +1754,7 @@ const ChatPage = () => {
                           <tr
                             {...props}
                             className={`border-b ${
-                              isUser ? "border-white/20" : "border-slate-200"
+                              isUser ? "border-white/20" : "border-slate-800/50"
                             }`}
                           >
                             {children}
@@ -1759,10 +1765,10 @@ const ChatPage = () => {
                         return (
                           <th
                             {...props}
-                            className={`border px-3 py-2 text-left font-semibold ${
+                            className={`border-r last:border-r-0 px-4 py-3 text-left font-medium text-xs uppercase tracking-wider ${
                               isUser
                                 ? "border-white/20 text-white"
-                                : "border-slate-300 text-slate-700"
+                                : "border-slate-700/50 text-slate-400"
                             }`}
                           >
                             {children}
@@ -1773,10 +1779,10 @@ const ChatPage = () => {
                         return (
                           <td
                             {...props}
-                            className={`border px-3 py-2 ${
+                            className={`border-r last:border-r-0 px-4 py-3 text-sm ${
                               isUser
                                 ? "border-white/20 text-white"
-                                : "border-slate-300 text-slate-600"
+                                : "border-slate-700/50 text-slate-300"
                             }`}
                           >
                             {children}
@@ -1787,10 +1793,10 @@ const ChatPage = () => {
                         return (
                           <blockquote
                             {...props}
-                            className={`border-l-4 pl-4 italic my-3 ${
+                            className={`border-l-2 pl-4 italic my-4 ${
                               isUser
                                 ? "border-white/40 text-white/90"
-                                : "border-slate-300 text-slate-600"
+                                : "border-amber-500/50 text-slate-400"
                             }`}
                           >
                             {children}
@@ -1848,7 +1854,7 @@ const ChatPage = () => {
 
   // ---------- UI ----------
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-50 to-slate-100 overflow-x-hidden">
+    <div className="flex h-[calc(100vh-4rem)] bg-slate-950 overflow-x-hidden font-sans selection:bg-amber-500/30">
       <ChatSidebar
         isSidebarOpen={isSidebarOpen}
         onSidebarOpenChange={setIsSidebarOpen}
@@ -1866,16 +1872,16 @@ const ChatPage = () => {
       />
 
       <div className="flex flex-col flex-grow h-full">
-        <div className="flex justify-between items-center p-4 bg-white/90 backdrop-blur border-b">
-          <div className="text-lg font-semibold text-gray-700 flex items-center gap-3">
-            VYNN AI Agent
+        <div className="flex justify-between items-center p-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800/50 sticky top-0 z-10">
+          <div className="text-lg font-light tracking-wide text-slate-100 flex items-center gap-3">
+            <span className="font-serif text-amber-500 font-medium">VYNN</span> AI Agent
             {getCurrentConversationJobId() && (
-              <div className="flex items-center gap-3 rounded-full bg-white/80 px-4 py-2 ring-1 ring-gray-200/80 shadow-sm backdrop-blur-sm">
+              <div className="flex items-center gap-3 rounded-full bg-slate-800/50 px-4 py-1.5 ring-1 ring-slate-700/50 shadow-sm backdrop-blur-sm">
                 <ProgressText
                   text={
                     getCurrentConversationProgress() || "Starting analysis..."
                   }
-                  className="text-sm"
+                  className="text-xs font-medium text-amber-400/90"
                 />
               </div>
             )}
@@ -1886,19 +1892,19 @@ const ChatPage = () => {
           <div className="flex-1 overflow-auto relative" ref={listContainerRef}>
             {isEmptyConversation ? (
               <div className="flex flex-col items-center justify-start text-center px-6 pt-[15vh]">
-                <h1 className="text-3xl font-semibold text-slate-700 mb-2 min-h-[2.5rem]">
+                <h1 className="text-4xl md:text-5xl font-serif font-medium text-slate-100 mb-4 min-h-[3.5rem] tracking-tight">
                   {titleTypewriter.displayedText}
                   {!titleTypewriter.isComplete && (
-                    <span className="inline-block w-0.5 h-8 bg-slate-700 ml-1 animate-pulse" />
+                    <span className="inline-block w-0.5 h-8 md:h-10 bg-amber-500 ml-1 animate-pulse" />
                   )}
                 </h1>
-                <p className="text-slate-500 mb-8 min-h-[1.5rem]">
+                <p className="text-slate-400 text-lg font-light mb-12 min-h-[1.5rem] max-w-2xl leading-relaxed">
                   {subtitleTypewriter.displayedText}
                   {titleTypewriter.isComplete && !subtitleTypewriter.isComplete && (
-                    <span className="inline-block w-0.5 h-5 bg-slate-500 ml-1 animate-pulse" />
+                    <span className="inline-block w-0.5 h-5 bg-amber-500/50 ml-1 animate-pulse" />
                   )}
                 </p>
-                <div className="w-full max-w-xl">
+                <div className="w-full max-w-2xl">
                   <ChatInput
                     onSubmit={handleSubmit}
                     value={input}

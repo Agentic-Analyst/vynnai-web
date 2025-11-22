@@ -597,14 +597,14 @@ const Reports: React.FC = () => {
     if (!hasBatchIds) {
       console.log('⚠️ No batch IDs available - will retry fetching reports periodically');
       let retryCount = 0;
-      const maxRetries = 20; // Poll for up to 1 minute (20 * 3 seconds)
+      const maxRetries = 10; // Poll for up to 2 minutes (10 * 12 seconds)
       
       const interval = setInterval(async () => {
         retryCount++;
         console.log(`🔄 Retry ${retryCount}/${maxRetries} - Checking if reports are ready...`);
         
         try {
-          // Try to fetch reports
+          // Try to fetch reports ONE AT A TIME to avoid exhausting connection pool
           await loadReportsForTickers(allWatchedSymbols, genDate, stockPrices);
           if (allSectors && allSectors.length > 0) {
             await loadReportsForSectors(allSectors, genDate, stockPrices);
@@ -655,7 +655,7 @@ const Reports: React.FC = () => {
           console.error('Error checking for reports:', error);
           // Continue polling
         }
-      }, 3000);
+      }, 12000); // 12 seconds - reduced polling frequency to avoid blocking other requests
       
       setPollInterval(interval);
       
@@ -667,11 +667,14 @@ const Reports: React.FC = () => {
     }
     
     // Normal polling with batch IDs
+    // CRITICAL FIX: Reduced polling frequency to avoid exhausting HTTP connection pool
+    // which blocks Chat SSE and News WebSocket. Sequential requests to minimize concurrent connections.
     const interval = setInterval(async () => {
       try {
         let companyBatchStatus;
         let sectorBatchStatus;
         
+        // Check statuses SEQUENTIALLY to reduce concurrent connections
         if (companyBatchId) {
           companyBatchStatus = await dailyReportsApi.getBatchStatus(companyBatchId);
         }
@@ -712,12 +715,15 @@ const Reports: React.FC = () => {
             });
             
             // SECOND ATTEMPT: Fetch ALL reports after generation (not just the newly generated ones)
+            // Fetch SEQUENTIALLY to avoid connection pool exhaustion
             try {
               // Re-fetch stock prices data to ensure we have latest sector info
               const latestStockPrices = stockPrices;
               
+              // Fetch company reports first
               await loadReportsForTickers(allWatchedSymbols, genDate, latestStockPrices);
               
+              // Then fetch sector reports (sequential, not parallel)
               if (allSectors && allSectors.length > 0) {
                 await loadReportsForSectors(allSectors, genDate, latestStockPrices);
               }
@@ -770,7 +776,7 @@ const Reports: React.FC = () => {
           error: error.message
         }));
       }
-    }, 3000); // Poll every 3 seconds
+    }, 12000); // Poll every 12 seconds - CRITICAL: Reduced from 3s to avoid blocking other API requests
     
     setPollInterval(interval);
     
@@ -913,11 +919,13 @@ const Reports: React.FC = () => {
       });
       
       // Start polling for batch status
+      // CRITICAL FIX: Reduced polling frequency to avoid exhausting HTTP connection pool
       const interval = setInterval(async () => {
         try {
           let companyBatchStatus;
           let sectorBatchStatus;
           
+          // Check statuses SEQUENTIALLY to reduce concurrent connections
           if (companyResult) {
             companyBatchStatus = await dailyReportsApi.getBatchStatus(companyResult.batch_id);
           }
@@ -967,7 +975,7 @@ const Reports: React.FC = () => {
             error: error.message
           }));
         }
-      }, 3000); // Poll every 3 seconds
+      }, 12000); // Poll every 12 seconds - CRITICAL: Reduced from 3s to avoid blocking other API requests
       
       setPollInterval(interval);
       

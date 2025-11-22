@@ -103,11 +103,11 @@ const ChatSidebar = ({
     <Collapsible
       open={isSidebarOpen}
       onOpenChange={onSidebarOpenChange}
-      className="bg-white border-r h-full relative"
+      className="bg-slate-950 border-r border-slate-800 h-full relative"
     >
       <CollapsibleContent className="w-64 p-4 h-full flex flex-col">
         {/* New Conversation Button */}
-        <Button onClick={onStartNewConversation} className="w-full mb-4">
+        <Button onClick={onStartNewConversation} className="w-full mb-4 bg-amber-600 hover:bg-amber-700 text-white border-none shadow-md shadow-amber-900/20">
           {/* Use parent's handler */}
           <PlusCircle className="mr-2 h-4 w-4" /> New Analysis
         </Button>
@@ -119,13 +119,13 @@ const ChatSidebar = ({
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-slate-900 border-slate-800 text-slate-200 placeholder:text-slate-500 focus-visible:ring-amber-500/50"
           />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         </div>
 
         {/* Conversation List */}
-        <div className="flex-1 overflow-auto space-y-1">
+        <div className="flex-1 overflow-auto space-y-1 pr-1 custom-scrollbar">
           {filteredConversations.map((c) => {
             const isActive = activeConversationId === c.id;
             const isEditing = renamingId === c.id;
@@ -146,9 +146,9 @@ const ChatSidebar = ({
                         onCommitRename(c.id, (renameValue || "").trim())
                       }
                       onKeyDown={(e) => handleRenameKeyDown(e, c.id)}
-                      className="h-9"
+                      className="h-9 bg-slate-800 border-slate-700 text-slate-200"
                     />
-                    <Button type="submit" size="sm">
+                    <Button type="submit" size="sm" variant="secondary">
                       Save
                     </Button>
                   </form>
@@ -157,8 +157,12 @@ const ChatSidebar = ({
                   <>
                     <Button
                       onClick={() => onSwitchConversation(c.id)}
-                      variant={isActive ? "secondary" : "ghost"}
-                      className="w-full justify-start pr-9 truncate"
+                      variant="ghost"
+                      className={`w-full justify-start pr-9 truncate transition-all duration-200 ${
+                        isActive 
+                          ? "bg-slate-800/80 text-amber-400 font-medium border-l-2 border-amber-500 pl-3" 
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+                      }`}
                     >
                       <span className="truncate">{c.title}</span>
                     </Button>
@@ -166,27 +170,27 @@ const ChatSidebar = ({
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-100"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-opacity"
                           aria-label="Chat actions"
                         >
-                          <MoreVertical className="h-4 w-4 text-slate-500" />
+                          <MoreVertical className="h-4 w-4" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="start"
                         side="right"
-                        className="w-44"
+                        className="w-44 bg-slate-900 border-slate-800 text-slate-300"
                       >
                         <DropdownMenuItem
                           onClick={() => onStartRename(c.id, c.title)}
-                          className="flex items-center gap-2"
+                          className="flex items-center gap-2 focus:bg-slate-800 focus:text-slate-100 cursor-pointer"
                         >
                           <Pencil className="h-4 w-4" /> Rename
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
+                        <DropdownMenuSeparator className="bg-slate-800" />
                         <DropdownMenuItem
                           onClick={() => onDeleteConversation(c.id)}
-                          className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                          className="flex items-center gap-2 text-red-400 focus:text-red-300 focus:bg-red-900/20 cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4" /> Delete
                         </DropdownMenuItem>
@@ -205,7 +209,7 @@ const ChatSidebar = ({
           size="icon"
           className={`absolute top-4 ${
             isSidebarOpen ? "left-64" : "left-0"
-          } transition-all duration-300`}
+          } transition-all duration-300 text-slate-500 hover:text-slate-300 hover:bg-slate-800/50`}
         >
           {isSidebarOpen ? <ChevronLeft /> : <ChevronRight />}
         </Button>

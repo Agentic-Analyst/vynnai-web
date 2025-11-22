@@ -9,8 +9,8 @@ type DownloadMessageProps = {
 const DownloadMessage = ({ message, onDownload }: DownloadMessageProps) => {
   return (
     <div className="m-0">
-      <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+      <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
         Available Downloads
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -19,12 +19,12 @@ const DownloadMessage = ({ message, onDownload }: DownloadMessageProps) => {
             <button
               key={entry.key}
               onClick={() => onDownload(entry)}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+              className="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2 text-sm hover:bg-slate-800 text-slate-300 transition-colors"
             >
               <span className="flex items-center gap-2">
                 <svg
                   viewBox="0 0 24 24"
-                  className="h-4 w-4"
+                  className="h-4 w-4 text-amber-500"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -33,7 +33,7 @@ const DownloadMessage = ({ message, onDownload }: DownloadMessageProps) => {
                 </svg>
                 {entry.label}
               </span>
-              <ChevronRight className="h-4 w-4 text-slate-400" />
+              <ChevronRight className="h-4 w-4 text-slate-500" />
             </button>
           ))}
       </div>

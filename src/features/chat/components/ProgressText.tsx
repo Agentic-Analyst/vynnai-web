@@ -17,21 +17,21 @@ const ProgressText = ({ text, className = "" }) => {
               .progress-text {
                 background: linear-gradient(
                   110deg,
-                  #9ca3af 0%,
-                  #6b7280 25%,
-                  #4b5563 35%,
-                  #374151 45%,
-                  #1f2937 55%,
-                  #374151 65%,
-                  #4b5563 75%,
-                  #6b7280 85%,
-                  #9ca3af 100%
+                  #fcd34d 0%,
+                  #fbbf24 25%,
+                  #f59e0b 35%,
+                  #d97706 45%,
+                  #b45309 55%,
+                  #d97706 65%,
+                  #f59e0b 75%,
+                  #fbbf24 85%,
+                  #fcd34d 100%
                 );
                 background-size: 300% 100%;
                 background-clip: text;
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
-                animation: gradient-flow 6s linear infinite;
+                animation: gradient-flow 4s linear infinite;
                 font-weight: 500;
                 letter-spacing: 0.01em;
               }
@@ -47,7 +47,7 @@ const ProgressText = ({ text, className = "" }) => {
                 width: 4px;
                 height: 4px;
                 border-radius: 50%;
-                background: #9ca3af;
+                background: #fcd34d;
                 animation: dot-pulse 1.5s ease-in-out infinite;
                 transform: translateY(-50%);
               }

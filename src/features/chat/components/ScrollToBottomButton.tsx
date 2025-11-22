@@ -23,11 +23,11 @@ const ScrollToBottomButton = ({
             onClick={scrollToBottom}
             variant="default"
             size="default"
-            className="h-12 w-12 rounded-full shadow-lg bg-blue-600 hover:bg-blue-700 text-white border-2 border-white transition-all duration-200 hover:scale-105 relative group"
+            className="h-12 w-12 rounded-full shadow-lg bg-amber-600 hover:bg-amber-700 text-white border-2 border-slate-800 transition-all duration-200 hover:scale-105 relative group shadow-amber-900/20"
           >
             <ArrowDown className="h-5 w-5 transition-transform group-hover:translate-y-0.5" />
             {unreadMessages > 0 && (
-              <span className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-2 -right-2 h-6 w-6 bg-red-600 text-white text-xs font-bold rounded-full flex items-center justify-center border border-slate-900">
                 {unreadMessages > 9 ? "9+" : unreadMessages}
               </span>
             )}

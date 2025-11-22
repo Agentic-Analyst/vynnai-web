@@ -61,7 +61,7 @@ const AnalysisLogMessage = memo(
     const { nlSummary, logLines = [] } = message;
 
     const StatusIcon = isStreaming ? Loader2 : CheckCircle;
-    const iconColor = isStreaming ? "text-primary" : "text-green-500";
+    const iconColor = isStreaming ? "text-amber-500" : "text-emerald-400";
     const hasLogs = logLines && logLines.length > 0;
 
     return (
@@ -73,7 +73,7 @@ const AnalysisLogMessage = memo(
       group relative flex flex-col items-left text-left
       rounded-2xl px-4 py-3
       backdrop-blur-sm transition-colors
-      bg-transparent
+      bg-transparent text-slate-200
     `}
           >
             <div className="text-left whitespace-pre-wrap leading-relaxed [&>*:not(:last-child)]:mb-3">
@@ -97,10 +97,10 @@ const AnalysisLogMessage = memo(
               <CollapsibleTrigger asChild>
                 <button
                   className={`
-                    flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 
-                    hover:text-slate-700 dark:hover:text-slate-200 transition-colors 
+                    flex items-center gap-2 text-xs text-slate-400 
+                    hover:text-slate-200 transition-colors 
                     px-2 py-1.5 rounded-lg 
-                    hover:bg-black/[0.05] dark:hover:bg-white/[0.05]
+                    hover:bg-white/[0.05]
                   `}
                 >
                   {isCollapsed ? (
@@ -127,7 +127,7 @@ const AnalysisLogMessage = memo(
                 <div className="relative mt-2 ml-3 pl-4">
                   <div
                     aria-hidden
-                    className="absolute top-0 bottom-0 left-0 w-px rounded-full bg-slate-200 dark:bg-slate-700/60"
+                    className="absolute top-0 bottom-0 left-0 w-px rounded-full bg-slate-700/60"
                   />
                   <div className="relative">
                     <div
@@ -135,13 +135,13 @@ const AnalysisLogMessage = memo(
                       onScroll={handleScroll}
                       className={`
           relative max-h-60 overflow-y-auto
-          bg-transparent
+          bg-slate-900/30 rounded-lg p-2 border border-slate-800/50
         `}
                     >
                       <pre
                         className={`
             text-xs font-mono whitespace-pre-wrap pr-3 
-            text-slate-600 dark:text-slate-400
+            text-slate-400
           `}
                       >
                         {logLines.join("\n")}
