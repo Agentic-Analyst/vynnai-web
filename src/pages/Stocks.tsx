@@ -431,14 +431,12 @@ const Stocks = () => {
           {/* Integrated Search Bar - More Compact */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search your stocks or add new ones..."
+            <Input 
+              placeholder="Search your stocks or add new ones..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm bg-muted/30"
-            />
-            
-            {/* Compact Search Results Info */}
+              className="pl-9 h-9 text-sm bg-white/60 dark:bg-slate-900/50 border-amber-200/50 dark:border-slate-800 focus-visible:ring-amber-500/50 backdrop-blur-sm"
+            />            {/* Compact Search Results Info */}
             {searchQuery && (
               <div className="absolute top-full mt-1 left-0 right-0 bg-background border rounded-md shadow-md z-10 p-2">
                 <div className="text-xs text-muted-foreground mb-1">

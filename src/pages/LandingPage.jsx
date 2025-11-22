@@ -86,8 +86,8 @@ const LandingPage = () => {
 
       draw() {
         ctx.save();
-        ctx.font = `${this.size}px Arial`;
-        ctx.fillStyle = `rgba(96, 165, 250, ${this.opacity})`;
+        ctx.font = `${this.size}px "Times New Roman", serif`; // Serif for luxury
+        ctx.fillStyle = `rgba(217, 119, 6, ${this.opacity})`; // Amber-600
         ctx.fillText(this.symbol, this.x, this.y);
         ctx.restore();
       }
@@ -108,7 +108,7 @@ const LandingPage = () => {
 
           if (distance < 150) {
             ctx.beginPath();
-            ctx.strokeStyle = `rgba(59, 130, 246, ${(1 - distance / 150) * 0.2})`;
+            ctx.strokeStyle = `rgba(245, 158, 11, ${(1 - distance / 150) * 0.2})`; // Amber-500
             ctx.lineWidth = 1;
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(otherParticle.x, otherParticle.y);
@@ -123,7 +123,7 @@ const LandingPage = () => {
 
         if (distance < 150) {
           ctx.beginPath();
-          ctx.strokeStyle = `rgba(96, 165, 250, ${(1 - distance / 150) * 0.4})`;
+          ctx.strokeStyle = `rgba(251, 191, 36, ${(1 - distance / 150) * 0.4})`; // Amber-400
           ctx.lineWidth = 2;
           ctx.moveTo(particle.x, particle.y);
           ctx.lineTo(mousePos.current.x, mousePos.current.y);
@@ -138,8 +138,8 @@ const LandingPage = () => {
         mousePos.current.x, mousePos.current.y, 0,
         mousePos.current.x, mousePos.current.y, 100
       );
-      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.15)');
-      gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+      gradient.addColorStop(0, 'rgba(245, 158, 11, 0.15)'); // Amber glow
+      gradient.addColorStop(1, 'rgba(245, 158, 11, 0)');
       
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -230,7 +230,7 @@ const LandingPage = () => {
   const startGitHub = () => authApi.startOAuth('github', '/chat');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-background p-6 relative overflow-hidden transition-colors duration-300">
       {/* Interactive Canvas Background */}
       <canvas
         ref={canvasRef}
@@ -240,36 +240,39 @@ const LandingPage = () => {
       
       {/* Animated gradient orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      <div className="w-full max-w-md rounded-2xl bg-white/5 backdrop-blur border border-white/10 p-6 sm:p-8 text-white shadow-2xl relative" style={{ zIndex: 1 }}>
+      <div className="w-full max-w-md rounded-2xl bg-card/50 backdrop-blur-md border border-amber-500/20 p-6 sm:p-8 text-foreground shadow-2xl relative" style={{ zIndex: 1 }}>
         <div className="mb-8 text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent mb-4">
-            Welcome to VYNN AI Agent
+          <h1 className="text-3xl sm:text-4xl font-serif font-bold bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 dark:from-amber-200 dark:via-amber-400 dark:to-amber-200 bg-clip-text text-transparent mb-4 tracking-tight">
+            VYNN AI
           </h1>
+          <p className="text-muted-foreground text-sm uppercase tracking-widest mb-6 font-medium">
+            Financial Intelligence
+          </p>
           
-          <div className="space-y-3 text-slate-300 leading-relaxed">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-200 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400"></span>
-              BETA ACCESS
+          <div className="space-y-4 text-muted-foreground leading-relaxed">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-200 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 animate-pulse"></span>
+              EXCLUSIVE ACCESS
             </div>
             
-            <p className="text-sm">
-              As we are still in development, VYNN AI agent is only publicly available for a limited number of users.
+            <p className="text-sm font-light">
+              Experience the future of financial analysis. Access is currently limited to invited members only.
             </p>
             
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 space-y-2">
-              <p className="text-sm font-medium text-slate-200">To request access:</p>
+            <div className="bg-secondary/50 rounded-lg p-4 border border-amber-500/10 space-y-2">
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-500/80 uppercase tracking-wider">Request Invitation</p>
               <p className="text-sm">
-                Send a request to 
-                <span className="mx-1 px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded text-blue-300 font-mono text-xs">
+                Contact our team at
+                <span className="block mt-1 px-3 py-1.5 bg-amber-500/5 border border-amber-500/20 rounded text-amber-600 dark:text-amber-300 font-mono text-xs">
                   zanwen.fu@duke.edu
                 </span>
               </p>
-              <p className="text-xs text-slate-400">
-                Then login using your email and the verification code I send you.
+              <p className="text-xs text-muted-foreground italic">
+                Please use your institutional email for verification.
               </p>
             </div>
           </div>
@@ -280,7 +283,7 @@ const LandingPage = () => {
           <Button
             type="button"
             onClick={startGoogle}
-            className="w-full justify-center gap-2 bg-white text-slate-900 hover:bg-slate-100"
+            className="w-full justify-center gap-2 bg-white text-slate-950 hover:bg-slate-100 font-medium transition-all duration-300"
             variant="secondary"
           >
             <GoogleIcon className="h-4 w-4" />
@@ -290,7 +293,7 @@ const LandingPage = () => {
           <Button
             type="button"
             onClick={startGitHub}
-            className="w-full justify-center gap-2 bg-slate-900 hover:bg-black"
+            className="w-full justify-center gap-2 bg-slate-950 text-slate-200 border border-slate-800 hover:bg-slate-900 hover:border-amber-500/50 hover:text-amber-400 transition-all duration-300"
           >
             <Github className="h-4 w-4" />
             Continue with GitHub

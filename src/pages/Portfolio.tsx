@@ -725,28 +725,28 @@ ${recommendation === 'Buy' ?
             ) : (
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                className="prose prose-sm max-w-none"
+                className="prose prose-sm max-w-none dark:prose-invert"
                 components={{
                   h1: ({ children }) => (
-                    <h1 className="text-2xl font-bold mb-4 pb-2 border-b">{children}</h1>
+                    <h1 className="text-2xl font-bold mb-4 pb-2 border-b border-border text-foreground">{children}</h1>
                   ),
                   h2: ({ children }) => (
-                    <h2 className="text-xl font-semibold mt-6 mb-3">{children}</h2>
+                    <h2 className="text-xl font-semibold mt-6 mb-3 text-foreground">{children}</h2>
                   ),
                   h3: ({ children }) => (
-                    <h3 className="text-lg font-medium mt-4 mb-2">{children}</h3>
+                    <h3 className="text-lg font-medium mt-4 mb-2 text-foreground">{children}</h3>
                   ),
                   ul: ({ children }) => (
-                    <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>
+                    <ul className="list-disc list-inside space-y-1 my-2 text-foreground">{children}</ul>
                   ),
                   ol: ({ children }) => (
-                    <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>
+                    <ol className="list-decimal list-inside space-y-1 my-2 text-foreground">{children}</ol>
                   ),
                   strong: ({ children }) => (
-                    <strong className="font-semibold text-gray-900">{children}</strong>
+                    <strong className="font-semibold text-foreground">{children}</strong>
                   ),
                   p: ({ children }) => (
-                    <p className="my-3 leading-relaxed text-gray-700">{children}</p>
+                    <p className="my-3 leading-relaxed text-muted-foreground dark:text-slate-300">{children}</p>
                   ),
                 }}
               >

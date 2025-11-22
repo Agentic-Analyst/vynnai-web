@@ -31,7 +31,7 @@ const ChatInput = ({
           onChange(e.target.value)
         }
         placeholder="Ask me to analyze any stock or company."
-        className="flex-grow rounded-xl h-14 text-base px-6 bg-slate-900/80 border-slate-700 text-slate-100 placeholder:text-slate-500 focus-visible:ring-amber-500/50 shadow-inner"
+        className="flex-grow rounded-xl h-14 text-base px-6 bg-white/90 dark:bg-slate-900/80 border-amber-100 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus-visible:ring-amber-500/50 shadow-xl shadow-amber-900/5 dark:shadow-none backdrop-blur-sm transition-all duration-300"
         disabled={isInputDisabled}
       />
       <Button

@@ -10,7 +10,7 @@ const StockDashboardLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-amber-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 transition-colors duration-300">
       <Sidebar isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
       
       <main className="flex-1 transition-all duration-300">

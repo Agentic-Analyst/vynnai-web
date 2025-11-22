@@ -34,6 +34,7 @@ import Reports from "./pages/Reports.tsx";
 import Navigation from "./components/Navigation.jsx";
 import { NewsWebSocketTest } from "./components/test/NewsWebSocketTest.tsx";
 import { API_BASE_URL } from "@/lib/apiBase";
+import { userStorage } from "@/lib/userStorage";
 
 const queryClient = new QueryClient();
 const AUTH_CHECK_URL = `${API_BASE_URL}/auth/session/me`; // 200 if cookie valid, 401 otherwise
@@ -107,6 +108,19 @@ const Shell = ({ children }) => {
 };
 
 const App = () => {
+  // Initialize theme
+  useEffect(() => {
+    const savedAccount = userStorage.getJSON('settings_account', null);
+    // Default to Dark Mode (Luxury) if no setting exists
+    const isDark = savedAccount ? savedAccount.darkMode : true;
+    
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
   return (
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>

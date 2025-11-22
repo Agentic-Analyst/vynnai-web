@@ -20,7 +20,7 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
   return (
     <Card 
       className={cn(
-        "overflow-hidden transition-all duration-300 hover:shadow-md bg-card/50 backdrop-blur-sm",
+        "overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/5 hover:border-amber-500/20 bg-white/60 dark:bg-slate-900/50 backdrop-blur-sm border-amber-500/10 dark:border-slate-800/60",
         onClick ? "cursor-pointer" : "",
         className
       )}
@@ -90,7 +90,7 @@ export function StockCard({ stock, priceHistory, className, onClick }: StockCard
         </div>
         
         {/* Analysis Section - more compact */}
-        <div className="space-y-1.5 pt-2 border-t border-border/50">
+        <div className="space-y-1.5 pt-2 border-t border-amber-500/10">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">Short-term:</span>
             <div>

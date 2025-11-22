@@ -126,12 +126,22 @@ const Settings = () => {
     if (savedAccount) {
       setAccountSettings(savedAccount);
       setOriginalAccountSettings(savedAccount);
+      
+      // Apply theme immediately on load
+      if (savedAccount.darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     } else {
-      // Set default email from auth
+      // Set default email from auth and DEFAULT TO DARK MODE (Luxury Theme)
       const authEmail = localStorage.getItem('auth_email') || '';
-      const defaultSettings = { ...accountSettings, email: authEmail };
+      const defaultSettings = { ...accountSettings, email: authEmail, darkMode: true };
       setAccountSettings(defaultSettings);
       setOriginalAccountSettings(defaultSettings);
+      
+      // Apply default dark mode
+      document.documentElement.classList.add('dark');
     }
 
     // Load notification settings
@@ -349,7 +359,24 @@ const Settings = () => {
           </div>
           <Switch
             checked={accountSettings.darkMode}
-            onCheckedChange={(checked) => setAccountSettings({ ...accountSettings, darkMode: checked })}
+            onCheckedChange={(checked) => {
+              // Apply theme immediately
+              if (checked) {
+                document.documentElement.classList.add('dark');
+              } else {
+                document.documentElement.classList.remove('dark');
+              }
+
+              // Update state
+              const newAccountSettings = { ...accountSettings, darkMode: checked };
+              setAccountSettings(newAccountSettings);
+
+              // Auto-save: Update original settings and storage
+              // We use originalAccountSettings as base to avoid saving other pending changes
+              const newOriginalSettings = { ...originalAccountSettings, darkMode: checked };
+              setOriginalAccountSettings(newOriginalSettings);
+              userStorage.setJSON('settings_account', newOriginalSettings);
+            }}
           />
         </div>
       </div>

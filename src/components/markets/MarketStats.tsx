@@ -82,14 +82,14 @@ export function MarketStats({ stocks, className }: MarketStatsProps) {
           value={totalMarketCap > 0 ? formatValue(totalMarketCap) : 'N/A'}
           trend={totalMarketCap > 0 ? marketCapTrend : undefined}
           icon={<Wallet2 />}
-          className="bg-primary/5"
+          className="bg-white/60 dark:bg-slate-900/50 border-amber-500/10 dark:border-slate-800/60 backdrop-blur-sm"
         />
         <StatsCard 
           title="Trading Volume" 
           value={totalVolume > 0 ? formatValue(totalVolume, 'volume') : 'N/A'}
           description={totalVolume > 0 ? "Today's volume" : "No data"}
           icon={<BarChart3 />}
-          className="bg-primary/5"
+          className="bg-white/60 dark:bg-slate-900/50 border-amber-500/10 dark:border-slate-800/60 backdrop-blur-sm"
         />
         <StatsCard 
           title="Top Gainer" 

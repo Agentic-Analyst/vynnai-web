@@ -36,63 +36,63 @@ export const ReportPreview: React.FC<ReportPreviewProps> = ({
   // If markdown content is provided, render it
   if (content) {
     return (
-      <div className="prose prose-sm max-w-none">
+      <div className="prose prose-sm max-w-none dark:prose-invert">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
             h1: ({ children }) => (
-              <h1 className="text-2xl font-bold text-gray-900 mb-4 pb-2 border-b">
+              <h1 className="text-2xl font-bold text-foreground mb-4 pb-2 border-b border-border">
                 {children}
               </h1>
             ),
             h2: ({ children }) => (
-              <h2 className="text-xl font-semibold text-gray-800 mt-6 mb-3">
+              <h2 className="text-xl font-semibold text-foreground mt-6 mb-3">
                 {children}
               </h2>
             ),
             h3: ({ children }) => (
-              <h3 className="text-lg font-medium text-gray-700 mt-4 mb-2">
+              <h3 className="text-lg font-medium text-foreground mt-4 mb-2">
                 {children}
               </h3>
             ),
             p: ({ children }) => (
-              <p className="text-gray-700 mb-3 leading-relaxed">
+              <p className="text-muted-foreground dark:text-slate-300 mb-3 leading-relaxed">
                 {children}
               </p>
             ),
             ul: ({ children }) => (
-              <ul className="list-disc list-inside mb-3 space-y-1">
+              <ul className="list-disc list-inside mb-3 space-y-1 text-foreground">
                 {children}
               </ul>
             ),
             ol: ({ children }) => (
-              <ol className="list-decimal list-inside mb-3 space-y-1">
+              <ol className="list-decimal list-inside mb-3 space-y-1 text-foreground">
                 {children}
               </ol>
             ),
             li: ({ children }) => (
-              <li className="text-gray-700">
+              <li className="text-muted-foreground dark:text-slate-300">
                 {children}
               </li>
             ),
             blockquote: ({ children }) => (
-              <blockquote className="border-l-4 border-primary pl-4 italic text-gray-600 my-4">
+              <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground my-4">
                 {children}
               </blockquote>
             ),
             code: ({ inline, children, ...props }: any) =>
               inline ? (
-                <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                <code className="bg-muted text-foreground px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
                   {children}
                 </code>
               ) : (
-                <code className="block bg-gray-100 text-gray-800 p-3 rounded-lg text-sm font-mono overflow-x-auto" {...props}>
+                <code className="block bg-muted text-foreground p-3 rounded-lg text-sm font-mono overflow-x-auto" {...props}>
                   {children}
                 </code>
               ),
             table: ({ children }) => (
               <div className="overflow-x-auto my-4">
-                <table className="min-w-full border-collapse border border-gray-300">
+                <table className="min-w-full border-collapse border border-border">
                   {children}
                 </table>
               </div>

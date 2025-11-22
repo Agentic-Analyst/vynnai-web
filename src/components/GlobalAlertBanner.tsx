@@ -81,11 +81,11 @@ export function GlobalAlertBanner() {
       iconBg: 'bg-orange-700',
     },
     info: {
-      bgColor: 'bg-gradient-to-r from-blue-500 to-blue-600',
-      borderColor: 'border-blue-600',
-      textColor: 'text-white',
+      bgColor: 'bg-gradient-to-r from-slate-800 to-slate-900',
+      borderColor: 'border-amber-500/30',
+      textColor: 'text-amber-100',
       icon: AlertTriangle,
-      iconBg: 'bg-blue-700',
+      iconBg: 'bg-slate-950',
     },
   };
 
