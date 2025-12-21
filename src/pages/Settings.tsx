@@ -755,6 +755,16 @@ const Settings = () => {
             </h2>
             {renderContent()}
           </div>
+
+          {/* Copyright Footer */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              © 2026 Zanwen Fu. All Rights Reserved.
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              Full intellectual property ownership
+            </p>
+          </div>
         </div>
       </div>
     </div>

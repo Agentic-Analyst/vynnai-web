@@ -10,10 +10,10 @@ const StockDashboardLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-amber-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 transition-colors duration-300">
+    <div className="h-screen flex bg-gradient-to-br from-slate-50 via-white to-amber-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 transition-colors duration-300 overflow-hidden">
       <Sidebar isCollapsed={isSidebarCollapsed} onToggle={toggleSidebar} />
       
-      <main className="flex-1 transition-all duration-300">
+      <main className="flex-1 transition-all duration-300 overflow-y-auto h-full">
         <div className="container max-w-full p-4 lg:p-6 animate-fade-in">
           <Outlet />
         </div>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   ChevronLeft,
   ChevronRight,
+  Mail,
   MoreVertical,
   Pencil,
   PlusCircle,
@@ -201,6 +202,29 @@ const ChatSidebar = ({
               </div>
             );
           })}
+        </div>
+
+        {/* Owner Info Footer */}
+        <div className="mt-auto pt-4 border-t border-slate-200/60 dark:border-slate-800">
+          <div className="text-xs text-slate-500 dark:text-slate-400 space-y-2">
+            <p className="font-medium text-slate-900 dark:text-slate-200">Contact Owner</p>
+            <a 
+              href="mailto:zanwen.fu@duke.edu" 
+              className="flex items-center gap-2 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            >
+              <Mail className="h-3 w-3" />
+              zanwen.fu@duke.edu
+            </a>
+            <a 
+              href="https://www.linkedin.com/in/zanwenfu/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="flex items-center gap-2 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            >
+              <span className="font-sans font-bold text-[9px] border border-current rounded-[2px] px-0.5 leading-none">in</span>
+              linkedin.com/in/zanwenfu
+            </a>
+          </div>
         </div>
       </CollapsibleContent>
       <CollapsibleTrigger asChild>

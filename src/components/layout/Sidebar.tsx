@@ -40,7 +40,7 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
 
   return (
     <aside className={cn(
-      "bg-white/80 dark:bg-background backdrop-blur-md text-foreground relative transition-all duration-300 ease-in-out flex flex-col border-r border-amber-500/10 shadow-xl shadow-amber-900/5 dark:shadow-none z-20",
+      "bg-white/80 dark:bg-background backdrop-blur-md text-foreground relative transition-all duration-300 ease-in-out flex flex-col border-r border-amber-500/10 shadow-xl shadow-amber-900/5 dark:shadow-none z-20 overflow-hidden",
       isCollapsed ? "w-16" : "w-64",
       className
     )}>
@@ -122,33 +122,46 @@ export function Sidebar({ isCollapsed, onToggle, className }: SidebarProps) {
         </nav>
       </ScrollArea>
       
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="border-t border-amber-500/10 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm mt-auto">
+        <div className="p-4">
+          <div className={cn(
+            "transition-all duration-200 rounded-lg p-3 text-xs",
+            isCollapsed ? "opacity-0 translate-y-4 pointer-events-none absolute bottom-0 left-0 w-full" : "opacity-100 translate-y-0 relative",
+            marketStatus.isOpen 
+              ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20" 
+              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+          )}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className={cn(
+                "w-2 h-2 rounded-full shadow-sm",
+                marketStatus.isOpen ? "bg-green-500 animate-pulse" : "bg-slate-400"
+              )} />
+              <p className="font-semibold tracking-wide uppercase text-[10px]">Market Status</p>
+            </div>
+            <p className="font-medium mb-1">{marketStatus.statusText}</p>
+            <button
+              onClick={() => setShowDetailedTime(!showDetailedTime)}
+              className="text-[10px] opacity-80 hover:opacity-100 transition-opacity cursor-pointer text-left w-full hover:underline"
+            >
+              {showDetailedTime ? marketStatus.timeUntilChangeDetailed : marketStatus.timeUntilChange}
+            </button>
+            <div className="mt-2 pt-2 border-t border-current/10 flex justify-between items-center">
+              <span className="text-[10px] opacity-70">Local Time</span>
+              <span className="text-[10px] font-mono font-medium">{localTime}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Copyright Footer */}
         <div className={cn(
-          "transition-opacity duration-200 rounded-md p-2 text-xs",
-          isCollapsed ? "opacity-0" : "opacity-100",
-          marketStatus.isOpen 
-            ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20" 
-            : "bg-sidebar-accent/50 text-sidebar-accent-foreground"
+          "px-4 pb-4 text-center transition-all duration-200",
+          isCollapsed ? "opacity-0 hidden" : "opacity-100"
         )}>
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-2 h-2 rounded-full",
-              marketStatus.isOpen ? "bg-green-500 animate-pulse" : "bg-gray-400"
-            )} />
-            <p className="font-medium">Market Status</p>
-          </div>
-          <p className="mt-1">{marketStatus.statusText}</p>
-          <button
-            onClick={() => setShowDetailedTime(!showDetailedTime)}
-            className="text-[10px] mt-0.5 opacity-80 hover:opacity-100 transition-opacity cursor-pointer text-left w-full underline decoration-dotted"
-            title="Click to toggle between detailed and estimated time"
-          >
-            {showDetailedTime ? marketStatus.timeUntilChangeDetailed : marketStatus.timeUntilChange}
-          </button>
-          <div className="mt-2 pt-2 border-t border-current/10">
-            <p className="text-[10px] opacity-60">Your local time</p>
-            <p className="text-[11px] font-mono mt-0.5">{localTime}</p>
-          </div>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+            © 2026 Zanwen Fu
+            <br />
+            All Rights Reserved
+          </p>
         </div>
       </div>
     </aside>

@@ -230,7 +230,7 @@ const LandingPage = () => {
   const startGitHub = () => authApi.startOAuth('github', '/chat');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-6 relative overflow-hidden transition-colors duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100 to-amber-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-6 relative overflow-hidden transition-colors duration-300">
       {/* Interactive Canvas Background */}
       <canvas
         ref={canvasRef}
@@ -240,11 +240,12 @@ const LandingPage = () => {
       
       {/* Animated gradient orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-yellow-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-amber-400/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute top-[20%] right-[10%] w-[40%] h-[40%] bg-orange-400/5 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute -bottom-[10%] left-[20%] w-[60%] h-[60%] bg-amber-300/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      <div className="w-full max-w-md rounded-2xl bg-card/50 backdrop-blur-md border border-amber-500/20 p-6 sm:p-8 text-foreground shadow-2xl relative" style={{ zIndex: 1 }}>
+      <div className="w-full max-w-md rounded-2xl bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border border-white/20 dark:border-slate-800 p-8 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] dark:shadow-none relative" style={{ zIndex: 1 }}>
         <div className="mb-8 text-center">
           <h1 className="text-3xl sm:text-4xl font-serif font-bold bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 dark:from-amber-200 dark:via-amber-400 dark:to-amber-200 bg-clip-text text-transparent mb-4 tracking-tight">
             VYNN AI
@@ -263,17 +264,29 @@ const LandingPage = () => {
               Experience the future of financial analysis. Access is currently limited to invited members only.
             </p>
             
-            <div className="bg-secondary/50 rounded-lg p-4 border border-amber-500/10 space-y-2">
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-500/80 uppercase tracking-wider">Request Invitation</p>
-              <p className="text-sm">
-                Contact our team at
-                <span className="block mt-1 px-3 py-1.5 bg-amber-500/5 border border-amber-500/20 rounded text-amber-600 dark:text-amber-300 font-mono text-xs">
-                  zanwen.fu@duke.edu
-                </span>
-              </p>
-              <p className="text-xs text-muted-foreground italic">
-                Please use your institutional email for verification.
-              </p>
+            <div className="bg-amber-50/80 dark:bg-amber-950/30 rounded-xl p-5 border border-amber-200/60 dark:border-amber-800/50 space-y-3 shadow-sm">
+              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Request Invitation</p>
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                Contact the owner at
+                <div className="mt-2 flex flex-col gap-2">
+                  <a 
+                    href="mailto:zanwen.fu@duke.edu" 
+                    className="flex items-center justify-center px-3 py-2 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-md text-amber-700 dark:text-amber-400 font-mono text-xs hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all shadow-sm hover:shadow"
+                  >
+                    <Mail className="w-3 h-3 mr-2" />
+                    zanwen.fu@duke.edu
+                  </a>
+                  <a 
+                    href="https://www.linkedin.com/in/zanwenfu/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center px-3 py-2 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-md text-amber-700 dark:text-amber-400 font-mono text-xs hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all shadow-sm hover:shadow"
+                  >
+                    <span className="mr-2 font-sans font-bold text-[10px] border border-current rounded px-0.5">in</span>
+                    linkedin.com/in/zanwenfu
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -283,93 +296,97 @@ const LandingPage = () => {
           <Button
             type="button"
             onClick={startGoogle}
-            className="w-full justify-center gap-2 bg-white text-slate-950 hover:bg-slate-100 font-medium transition-all duration-300"
-            variant="secondary"
+            className="w-full justify-center gap-2 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-all duration-300 shadow-sm h-11"
+            variant="ghost"
           >
-            <GoogleIcon className="h-4 w-4" />
+            <GoogleIcon className="h-5 w-5" />
             Continue with Google
           </Button>
 
           <Button
             type="button"
             onClick={startGitHub}
-            className="w-full justify-center gap-2 bg-slate-950 text-slate-200 border border-slate-800 hover:bg-slate-900 hover:border-amber-500/50 hover:text-amber-400 transition-all duration-300"
+            className="w-full justify-center gap-2 bg-[#24292F] text-white border border-transparent hover:bg-[#24292F]/90 transition-all duration-300 shadow-sm h-11"
           >
-            <Github className="h-4 w-4" />
+            <Github className="h-5 w-5" />
             Continue with GitHub
           </Button>
         </div>
 
-        <div className="relative my-6">
-          <div className="border-t border-white/10" />
-          <span className="absolute inset-x-0 -top-3 text-center">
-            <span className="bg-slate-900 px-3 text-xs uppercase tracking-wide text-white/60">or</span>
-          </span>
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-slate-200 dark:border-slate-800" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white dark:bg-slate-950 px-2 text-slate-500 dark:text-slate-400">
+              Or continue with email
+            </span>
+          </div>
         </div>
 
         {/* Email-code flow (optional) */}
         {step === 1 ? (
-          <form onSubmit={handleRequestCode} className="space-y-3">
-            <div className="flex items-center gap-2 text-white/80 text-sm">
-              <Mail className="h-4 w-4" />
-              <span>Login via one-time code</span>
+          <form onSubmit={handleRequestCode} className="space-y-4">
+            <div className="space-y-2">
+              <Input
+                type="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 h-11 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50"
+                disabled={sending}
+                required
+              />
             </div>
-            <Input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="text-black bg-white"
-              disabled={sending}
-              required
-            />
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+              className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-md shadow-amber-500/20 h-11 font-medium"
               disabled={sending}
             >
-              {sending ? 'Sending...' : 'Send verification code'}
+              {sending ? 'Sending code...' : 'Send verification code'}
             </Button>
-            {error && <div className="text-red-300 text-sm">{error}</div>}
+            {error && <div className="text-red-500 text-sm text-center bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-900/30">{error}</div>}
           </form>
         ) : (
-          <form onSubmit={handleVerify} className="space-y-3">
-            <div className="text-sm text-white/80">We sent a code to <strong>{email}</strong>.</div>
+          <form onSubmit={handleVerify} className="space-y-4">
+            <div className="text-sm text-slate-600 dark:text-slate-400 text-center">
+              We sent a code to <span className="font-medium text-slate-900 dark:text-slate-200">{email}</span>
+            </div>
             <Input
               type="text"
               inputMode="numeric"
-              placeholder="6-digit code"
+              placeholder="Enter 6-digit code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="text-black bg-white"
+              className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 h-11 text-center tracking-widest text-lg"
               disabled={sending}
               required
             />
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
+              className="w-full bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-md shadow-amber-500/20 h-11 font-medium"
               disabled={sending}
             >
-              {sending ? 'Verifying...' : <>Verify & Continue <ArrowRight className="ml-1 h-4 w-4" /></>}
+              {sending ? 'Verifying...' : <span className="flex items-center gap-2">Verify & Continue <ArrowRight className="h-4 w-4" /></span>}
             </Button>
 
-            <div className="flex justify-between items-center text-sm mt-1">
+            <div className="flex justify-between items-center text-xs mt-2 text-slate-500 dark:text-slate-400">
               <button
                 type="button"
-                className="underline disabled:opacity-50"
+                className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
                 disabled={cooldown > 0 || sending}
                 onClick={handleRequestCode}
               >
-                Resend code {cooldown > 0 ? `(${cooldown})` : ''}
+                Resend code {cooldown > 0 ? `(${cooldown}s)` : ''}
               </button>
-              <button type="button" className="underline" onClick={() => setStep(1)}>Use a different email</button>
+              <button type="button" className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors" onClick={() => setStep(1)}>Change email</button>
             </div>
-            {error && <div className="text-red-300 text-sm">{error}</div>}
+            {error && <div className="text-red-500 text-sm text-center bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-100 dark:border-red-900/30">{error}</div>}
           </form>
         )}
 
-        <p className="mt-6 text-center text-[11px] text-white/60">
-          By continuing you agree to our Terms and acknowledge our Privacy Policy.
+        <p className="mt-8 text-center text-[11px] text-slate-400 dark:text-slate-500">
+          By continuing you agree to our <a href="#" className="underline hover:text-slate-600 dark:hover:text-slate-300">Terms</a> and acknowledge our <a href="#" className="underline hover:text-slate-600 dark:hover:text-slate-300">Privacy Policy</a>.
         </p>
       </div>
     </div>

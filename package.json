@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "author": "Zanwen Fu",
+  "copyright": "Copyright © 2026 Zanwen Fu. All rights reserved.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

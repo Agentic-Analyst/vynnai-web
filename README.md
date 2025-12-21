@@ -99,3 +99,9 @@ src/
 - **Backend**: FastAPI, Server-Sent Events (SSE)
 - **APIs**: OpenAI GPT-4o-mini, Stock Analysis REST API
 - **Deployment**: Docker Compose
+
+## Copyright & Ownership
+
+**© 2026 Zanwen Fu. All Rights Reserved.**
+
+This application and all associated intellectual property rights are owned by Zanwen Fu. The source code, design, architecture, and implementations are proprietary and protected by copyright law.
