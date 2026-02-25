@@ -1,5 +1,5 @@
 // Build-time env from Vite:
-const envBase = import.meta?.env?.VITE_RUNNER_URL;
+const envBase = import.meta.env.VITE_RUNNER_URL;
 
 // Optional runtime override (usually unused; handy for emergency overrides)
 const runtimeBase =
