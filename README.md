@@ -17,6 +17,25 @@
 
 ---
 
+## Codebase Statistics
+
+| Category | Lines | Files |
+|----------|------:|------:|
+| TypeScript JSX (`.tsx`) | 14,308 | 56 |
+| TypeScript (`.ts`) | 4,241 | 22 |
+| JavaScript JSX (`.jsx`) | 3,551 | 52 |
+| JavaScript (`.js`) | 903 | 13 |
+| CSS (`.css`) | 150 | 1 |
+| HTML (`.html`) | 15 | 1 |
+| **Total (source code)** | **~23,168** | **145** |
+| Config / metadata (`.json`) | 9,865 | 6 |
+| Documentation (`.md`) | 699 | 3 |
+| **Grand Total** | **33,732** | **154** |
+
+> *Auto-generated files like `package-lock.json` (9,695 lines) are included in the JSON count. Hand-written source code totals ~23,168 lines.*
+
+---
+
 ## Overview
 
 VYNN AI is a full-stack financial intelligence SPA that unifies **AI-powered conversational analysis**, **real-time WebSocket market data**, **portfolio management**, **automated report generation**, and a **market news aggregation** system into a cohesive, premium interface.
