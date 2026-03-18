@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/vynnai-logo.jpg" alt="VYNN AI logo" width="200">
+
 # VYNN AI — Intelligent Financial Analysis Platform
 
 **A production-grade, real-time financial intelligence platform combining conversational AI with institutional-quality market analysis, live data streaming, and portfolio management.**
